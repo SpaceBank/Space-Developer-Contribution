@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Developer Contribution Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #fff;
+            font-size: 2.5rem;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            font-size: 0.875rem;
+        }
+
+        .step.active {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+
+        .step.completed {
+            background: rgba(34, 197, 94, 0.3);
+            border: 1px solid #22c55e;
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.75rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #a1a1aa;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        input[type="password"] {
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: none;
+        }
+
+        .repo-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .repo-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .repo-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .repo-item.selected {
+            background: rgba(99, 102, 241, 0.2);
+            border-left: 3px solid #6366f1;
+        }
+
+        .repo-item input[type="checkbox"] {
+            width: auto;
+            margin-right: 1rem;
+            cursor: pointer;
+        }
+
+        .repo-info {
+            flex: 1;
+        }
+
+        .repo-name {
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .repo-fullname {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-top: 0.25rem;
+        }
+
+        .repo-badge {
+            font-size: 0.625rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            margin-left: 0.5rem;
+        }
+
+        .repo-badge.private {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .search-box input {
+            padding-left: 2.5rem;
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .selection-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .summary-card h3 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #6366f1;
+        }
+
+        .summary-card p {
+            color: #a1a1aa;
+            font-size: 0.875rem;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        .chart-wrapper {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .chart-wrapper h2 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #fff;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 2rem;
+            color: #a1a1aa;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #fca5a5;
+            margin-top: 1rem;
+        }
+
+        .success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #86efac;
+            margin-top: 1rem;
+        }
+
+        .developer-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .developer-table th,
+        .developer-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .developer-table th {
+            color: #a1a1aa;
+            font-weight: 500;
+        }
+
+        .developer-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .repo-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #e4e4e7;
+        }
+
+        .repo-tag .repo-icon {
+            font-size: 0.75rem;
+        }
+
+        .dev-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            color: #e4e4e7;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .dev-chip:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .dev-chip.selected {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+            color: #86efac;
+        }
+
+        .dev-chip .dev-commits {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.375rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .token-hint {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-top: 0.5rem;
+        }
+
+        .token-hint a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+
+        .token-hint a:hover {
+            text-decoration: underline;
+        }
+
+        .provider-select {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .provider-option {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .provider-option:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .provider-option.selected {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .provider-option .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h1 style="margin: 0;">📊 Git Developer Contribution Dashboard</h1>
+            <div style="display: flex; gap: 0.5rem;">
+                <a href="/engagement.html" style="background: linear-gradient(90deg, #22c55e, #10b981); color: white; padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-size: 0.9rem;">👥 Developer Engagement →</a>
+                <a href="/metrics.html" style="background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-size: 0.9rem;">📈 Engineering Metrics →</a>
+            </div>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active" id="step1-indicator">
+                <span class="step-number">1</span>
+                <span>Authenticate</span>
+            </div>
+            <div class="step" id="step2-indicator">
+                <span class="step-number">2</span>
+                <span>Select Repos</span>
+            </div>
+            <div class="step" id="step3-indicator">
+                <span class="step-number">3</span>
+                <span>View Report</span>
+            </div>
+        </div>
+
+        <!-- Step 1: Authentication -->
+        <div class="panel" id="step1-panel">
+            <h2>🔐 Step 1: Connect to Git Provider</h2>
+
+            <div class="provider-select">
+                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
+                    <div class="icon">🐙</div>
+                    <div>GitHub</div>
+                </div>
+                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
+                    <div class="icon">🦊</div>
+                    <div>GitLab</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="token">Personal Access Token</label>
+                <input type="password" id="token" placeholder="Enter your token...">
+                <div class="token-hint" id="github-hint">
+                    💡 Need a token? <a href="https://github.com/settings/tokens/new" target="_blank">Create GitHub Token</a>
+                    (requires <code>repo</code> scope)
+                </div>
+                <div class="token-hint hidden" id="gitlab-hint">
+                    💡 Need a token? <a href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank">Create GitLab Token</a>
+                    (requires <code>read_repository</code> scope)
+                </div>
+            </div>
+
+            <div class="form-group" id="custom-url-group" style="display: none;">
+                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
+                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
+            </div>
+
+            <button onclick="fetchRepositories()">
+                <span>Connect & Fetch Repositories</span>
+                <span>→</span>
+            </button>
+
+            <div id="auth-error" class="error hidden"></div>
+            <div id="auth-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Fetching repositories...</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Repository Selection -->
+        <div class="panel hidden" id="step2-panel">
+            <h2>📁 Step 2: Select Repositories</h2>
+
+            <div class="search-box">
+                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
+            </div>
+
+            <div class="selection-info">
+                <span><strong id="selectedCount">0</strong> repositories selected</span>
+                <div>
+                    <button class="secondary" onclick="selectAll()">Select All</button>
+                    <button class="secondary" onclick="deselectAll()">Deselect All</button>
+                </div>
+            </div>
+
+            <div class="repo-list" id="repoList"></div>
+
+            <div class="form-row" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="form-group">
+                    <label for="period">Aggregation Period</label>
+                    <select id="period">
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY" selected>Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label for="branch">Branch</label>
+                    <select id="branch">
+                        <option value="">All Branches</option>
+                        <option value="master">master</option>
+                        <option value="main">main</option>
+                        <option value="develop">develop</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; padding-top: 1.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="excludeMerges" checked style="width: auto;">
+                        <span>Exclude merge commits</span>
+                    </label>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #a1a1aa;" title="Like GitHub's default behavior">ℹ️</span>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="secondary" onclick="goToStep(1)">← Back</button>
+                <button onclick="analyzeRepositories()" id="analyzeBtn" disabled>
+                    <span>Analyze Selected Repositories</span>
+                    <span>→</span>
+                </button>
+            </div>
+
+            <div id="analyze-error" class="error hidden"></div>
+            <div id="analyze-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Analyzing repositories... This may take a few minutes.</span>
+            </div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="panel hidden" id="step3-panel">
+            <h2>📊 Step 3: Contribution Report</h2>
+
+            <div class="button-group" style="margin-bottom: 1rem;">
+                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
+                <button class="secondary" onclick="goToStep(1)">🔄 Start Over</button>
+            </div>
+
+            <!-- Analyzed Repositories Section -->
+            <div class="analyzed-repos-section" id="analyzedReposSection" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.3);">
+                <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: #a1a1aa;">📁 Analyzed Repositories (<span id="analyzedRepoCount">0</span>)</h3>
+                <div id="analyzedReposList" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+                <div id="dateRangeInfo" style="margin-top: 0.75rem; font-size: 0.875rem; color: #a1a1aa;"></div>
+            </div>
+
+            <!-- Developer Filter Section -->
+            <div class="developer-filter-section" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h3 style="font-size: 1rem; color: #a1a1aa;">👥 Filter by Developers (<span id="selectedDevCount">0</span>/<span id="totalDevCount">0</span> selected)</h3>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="secondary" onclick="selectAllDevelopers()" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">Select All</button>
+                        <button class="secondary" onclick="deselectAllDevelopers()" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">Deselect All</button>
+                    </div>
+                </div>
+                <div id="developerFilterList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; max-height: 150px; overflow-y: auto;"></div>
+            </div>
+
+            <div class="summary-cards" id="summaryCards"></div>
+
+            <div class="charts-container">
+                <!-- Overall Activity Charts (not filtered by developer selection) -->
+                <div class="chart-wrapper">
+                    <h2>📈 Total Commits Over Time (All Developers)</h2>
+                    <div class="chart-container">
+                        <canvas id="totalCommitsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <h2>🏆 Top Committers</h2>
+                    <div class="chart-container">
+                        <canvas id="topCommittersChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <h2>🔀 PRs Merged Over Time</h2>
+                    <div class="chart-container">
+                        <canvas id="prsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Filtered by developer selection -->
+                <div class="chart-wrapper">
+                    <h2>📈 Commits Over Time (by Developer)</h2>
+                    <div class="chart-container">
+                        <canvas id="commitsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <h2>📊 Lines of Code Changed</h2>
+                    <div class="chart-container">
+                        <canvas id="linesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <h2>👥 Developer Contributions</h2>
+                    <div class="chart-container">
+                        <canvas id="developerPieChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <h2>📋 Developer Summary</h2>
+                    <table class="developer-table">
+                        <thead>
+                            <tr>
+                                <th>Developer</th>
+                                <th>Nickname</th>
+                                <th>Commits</th>
+                                <th>Lines Added</th>
+                                <th>Lines Deleted</th>
+                                <th>Repositories</th>
+                            </tr>
+                        </thead>
+                        <tbody id="developerTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentStep = 1;
+        let selectedProvider = 'GITHUB';
+        let repositories = [];
+        let selectedRepos = new Set();
+        let commitsChart = null;
+        let linesChart = null;
+        let pieChart = null;
+        let totalCommitsChart = null;
+        let topCommittersChart = null;
+        let prsChart = null;
+
+        // Developer filter state
+        let fullAnalysisData = null;  // Store the complete analysis data
+        let selectedDevelopers = new Set();  // Selected developer emails for filtering
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
+        });
+
+        // Provider selection
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            document.querySelectorAll('.provider-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.provider === provider);
+            });
+
+            document.getElementById('github-hint').classList.toggle('hidden', provider !== 'GITHUB');
+            document.getElementById('gitlab-hint').classList.toggle('hidden', provider !== 'GITLAB');
+            document.getElementById('custom-url-group').style.display = provider === 'GITLAB' ? 'block' : 'none';
+        }
+
+        // Step navigation
+        function goToStep(step) {
+            currentStep = step;
+
+            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
+            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
+            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
+
+            document.getElementById('step1-indicator').classList.toggle('active', step === 1);
+            document.getElementById('step1-indicator').classList.toggle('completed', step > 1);
+            document.getElementById('step2-indicator').classList.toggle('active', step === 2);
+            document.getElementById('step2-indicator').classList.toggle('completed', step > 2);
+            document.getElementById('step3-indicator').classList.toggle('active', step === 3);
+        }
+
+        // Fetch repositories
+        async function fetchRepositories() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('auth-error', 'Please enter your access token');
+                return;
+            }
+
+            hideError('auth-error');
+            showLoading('auth-loading');
+
+            try {
+                const response = await fetch('/api/git/repositories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch repositories. Check your token.');
+                }
+
+                const data = await response.json();
+                repositories = data.repositories;
+                selectedRepos.clear();
+
+                renderRepositoryList();
+                hideLoading('auth-loading');
+                goToStep(2);
+
+            } catch (error) {
+                hideLoading('auth-loading');
+                showError('auth-error', error.message);
+            }
+        }
+
+        // Render repository list
+        function renderRepositoryList(filter = '') {
+            const container = document.getElementById('repoList');
+            const filtered = repositories.filter(repo =>
+                repo.fullName.toLowerCase().includes(filter.toLowerCase()) ||
+                repo.name.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            container.innerHTML = filtered.map(repo => `
+                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
+                     onclick="toggleRepo('${repo.fullName}')">
+                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
+                    <div class="repo-info">
+                        <div class="repo-name">
+                            ${repo.name}
+                            ${repo.isPrivate ? '<span class="repo-badge private">Private</span>' : ''}
+                        </div>
+                        <div class="repo-fullname">${repo.fullName}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            updateSelectionCount();
+        }
+
+        function filterRepos() {
+            const filter = document.getElementById('repoSearch').value;
+            renderRepositoryList(filter);
+        }
+
+        function toggleRepo(fullName) {
+            if (selectedRepos.has(fullName)) {
+                selectedRepos.delete(fullName);
+            } else {
+                selectedRepos.add(fullName);
+            }
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function selectAll() {
+            const filter = document.getElementById('repoSearch').value.toLowerCase();
+            repositories.forEach(repo => {
+                if (repo.fullName.toLowerCase().includes(filter) || repo.name.toLowerCase().includes(filter)) {
+                    selectedRepos.add(repo.fullName);
+                }
+            });
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function deselectAll() {
+            selectedRepos.clear();
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function updateSelectionCount() {
+            document.getElementById('selectedCount').textContent = selectedRepos.size;
+            document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
+        }
+
+        // Analyze repositories
+        async function analyzeRepositories() {
+            if (selectedRepos.size === 0) {
+                showError('analyze-error', 'Please select at least one repository');
+                return;
+            }
+
+            hideError('analyze-error');
+            showLoading('analyze-loading');
+
+            const token = document.getElementById('token').value.trim();
+            const startDate = document.getElementById('startDate').value || null;
+            const endDate = document.getElementById('endDate').value || null;
+            const period = document.getElementById('period').value;
+            const branch = document.getElementById('branch').value || null;
+            const excludeMerges = document.getElementById('excludeMerges').checked;
+
+            try {
+                const response = await fetch('/api/git/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null,
+                        repositoryFullNames: Array.from(selectedRepos),
+                        startDate: startDate,
+                        endDate: endDate,
+                        period: period,
+                        branch: branch,
+                        excludeMerges: excludeMerges
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to analyze repositories');
+                }
+
+                const data = await response.json();
+                hideLoading('analyze-loading');
+                displayResults(data);
+                goToStep(3);
+
+            } catch (error) {
+                hideLoading('analyze-loading');
+                showError('analyze-error', error.message);
+            }
+        }
+
+        // Display results
+        function displayResults(data) {
+            // Store full data for filtering
+            fullAnalysisData = data;
+
+            // Initialize selected developers with all developers (use name as key since we group by name)
+            selectedDevelopers = new Set(data.developers.map(d => d.authorName));
+
+            // Show analyzed repositories
+            const reposList = document.getElementById('analyzedReposList');
+            const repoCount = document.getElementById('analyzedRepoCount');
+            const dateRangeInfo = document.getElementById('dateRangeInfo');
+
+            repoCount.textContent = data.analyzedRepositories.length;
+            reposList.innerHTML = data.analyzedRepositories.map(repo => `
+                <span class="repo-tag">
+                    <span class="repo-icon">📦</span>
+                    ${repo}
+                </span>
+            `).join('');
+
+            // Show date range and period
+            const periodLabels = { 'DAILY': 'Daily', 'WEEKLY': 'Weekly', 'MONTHLY': 'Monthly' };
+            dateRangeInfo.innerHTML = `
+                <span>📅 Date Range: <strong>${data.dateRange.startDate}</strong> to <strong>${data.dateRange.endDate}</strong></span>
+                <span style="margin-left: 1rem;">📊 Aggregation: <strong>${periodLabels[data.period] || data.period}</strong></span>
+            `;
+
+            // Render developer filter chips
+            renderDeveloperFilter(data.developers);
+
+            // Render overall charts (not affected by developer filter)
+            renderOverallCharts(data.developers);
+
+            // Render charts with all developers initially
+            renderChartsAndTable(data.developers);
+        }
+
+        // Render overall charts that show all data regardless of developer filter
+        function renderOverallCharts(allDevelopers) {
+            if (allDevelopers.length === 0) return;
+
+            const labels = allDevelopers[0]?.dataPoints.map(dp => dp.period) || [];
+            const colors = generateColors(allDevelopers.length);
+
+            // 1. Total Commits Over Time (aggregate all developers)
+            const totalCommitsByPeriod = labels.map((_, periodIndex) =>
+                allDevelopers.reduce((sum, dev) => sum + dev.dataPoints[periodIndex].commits, 0)
+            );
+
+            if (totalCommitsChart) totalCommitsChart.destroy();
+            totalCommitsChart = new Chart(document.getElementById('totalCommitsChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Commits',
+                        data: totalCommitsByPeriod,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    ...chartOptions(),
+                    plugins: {
+                        ...chartOptions().plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 2. Top Committers (horizontal bar chart)
+            const developerCommits = allDevelopers.map(dev => ({
+                name: dev.authorName,
+                commits: dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0)
+            })).sort((a, b) => b.commits - a.commits).slice(0, 10); // Top 10
+
+            if (topCommittersChart) topCommittersChart.destroy();
+            topCommittersChart = new Chart(document.getElementById('topCommittersChart'), {
+                type: 'bar',
+                data: {
+                    labels: developerCommits.map(d => d.name),
+                    datasets: [{
+                        label: 'Commits',
+                        data: developerCommits.map(d => d.commits),
+                        backgroundColor: colors.slice(0, developerCommits.length),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#e4e4e7',
+                            borderColor: '#6366f1',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                title: function(context) {
+                                    return developerCommits[context[0].dataIndex].name;
+                                },
+                                label: function(context) {
+                                    return `Commits: ${context.parsed.x}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#e4e4e7' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // 3. PRs Merged Over Time - use data from backend
+            const prData = fullAnalysisData.prCountByPeriod || labels.map(() => 0);
+            const hasPRData = prData.some(v => v > 0);
+            const totalPRs = prData.reduce((a, b) => a + b, 0);
+
+            if (prsChart) prsChart.destroy();
+            prsChart = new Chart(document.getElementById('prsChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Merged PRs',
+                        data: prData,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    ...chartOptions(),
+                    plugins: {
+                        ...chartOptions().plugins,
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: `Total Merged PRs: ${totalPRs}`,
+                            color: '#22c55e',
+                            font: { size: 14 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render developer filter chips
+        function renderDeveloperFilter(developers) {
+            const container = document.getElementById('developerFilterList');
+            document.getElementById('totalDevCount').textContent = developers.length;
+
+            container.innerHTML = developers.map(dev => {
+                const totalCommits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+                const isSelected = selectedDevelopers.has(dev.authorName);
+                const escapedName = dev.authorName.replace(/'/g, "\\'");
+                return `
+                    <div class="dev-chip ${isSelected ? 'selected' : ''}"
+                         onclick="toggleDeveloper('${escapedName}')"
+                         title="${dev.nickname || ''} - ${dev.authorName}">
+                        <span>👤 ${dev.authorName}</span>
+                        <span class="dev-commits">${totalCommits} commits</span>
+                    </div>
+                `;
+            }).join('');
+
+            updateSelectedDevCount();
+        }
+
+        // Toggle developer selection
+        function toggleDeveloper(name) {
+            if (selectedDevelopers.has(name)) {
+                selectedDevelopers.delete(name);
+            } else {
+                selectedDevelopers.add(name);
+            }
+
+            // Re-render filter chips
+            renderDeveloperFilter(fullAnalysisData.developers);
+
+            // Re-render charts with filtered developers
+            const filteredDevelopers = fullAnalysisData.developers.filter(d => selectedDevelopers.has(d.authorName));
+            renderChartsAndTable(filteredDevelopers);
+        }
+
+        // Select all developers
+        function selectAllDevelopers() {
+            selectedDevelopers = new Set(fullAnalysisData.developers.map(d => d.authorName));
+            renderDeveloperFilter(fullAnalysisData.developers);
+            renderChartsAndTable(fullAnalysisData.developers);
+        }
+
+        // Deselect all developers
+        function deselectAllDevelopers() {
+            selectedDevelopers.clear();
+            renderDeveloperFilter(fullAnalysisData.developers);
+            renderChartsAndTable([]);
+        }
+
+        // Update selected developer count
+        function updateSelectedDevCount() {
+            document.getElementById('selectedDevCount').textContent = selectedDevelopers.size;
+        }
+
+        // Render charts and table with given developers
+        function renderChartsAndTable(developers) {
+            // Summary cards - calculate from filtered developers
+            const totalCommits = developers.reduce((sum, dev) =>
+                sum + dev.dataPoints.reduce((s, dp) => s + dp.commits, 0), 0);
+            const totalLinesAdded = developers.reduce((sum, dev) =>
+                sum + dev.dataPoints.reduce((s, dp) => s + dp.linesAdded, 0), 0);
+            const totalLinesDeleted = developers.reduce((sum, dev) =>
+                sum + dev.dataPoints.reduce((s, dp) => s + dp.linesDeleted, 0), 0);
+
+            const summaryHtml = `
+                <div class="summary-card">
+                    <h3>${developers.length}</h3>
+                    <p>Developers</p>
+                </div>
+                <div class="summary-card">
+                    <h3>${totalCommits}</h3>
+                    <p>Total Commits</p>
+                </div>
+                <div class="summary-card">
+                    <h3>${totalLinesAdded.toLocaleString()}</h3>
+                    <p>Lines Added</p>
+                </div>
+                <div class="summary-card">
+                    <h3>${totalLinesDeleted.toLocaleString()}</h3>
+                    <p>Lines Deleted</p>
+                </div>
+            `;
+            document.getElementById('summaryCards').innerHTML = summaryHtml;
+
+            if (developers.length === 0) {
+                document.getElementById('developerTableBody').innerHTML = '<tr><td colspan="6">No developers selected</td></tr>';
+                // Clear charts
+                if (commitsChart) commitsChart.destroy();
+                if (linesChart) linesChart.destroy();
+                if (pieChart) pieChart.destroy();
+                return;
+            }
+
+            const labels = developers[0]?.dataPoints.map(dp => dp.period) || [];
+            const colors = generateColors(developers.length);
+
+            // Commits chart
+            if (commitsChart) commitsChart.destroy();
+            commitsChart = new Chart(document.getElementById('commitsChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: developers.map((dev, i) => ({
+                        label: dev.authorName,
+                        data: dev.dataPoints.map(dp => dp.commits),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        fill: false,
+                        tension: 0.3
+                    }))
+                },
+                options: chartOptions()
+            });
+
+            // Lines chart
+            if (linesChart) linesChart.destroy();
+            linesChart = new Chart(document.getElementById('linesChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: developers.map((dev, i) => ({
+                        label: dev.authorName,
+                        data: dev.dataPoints.map(dp => dp.linesAdded),
+                        backgroundColor: colors[i],
+                        stack: 'added'
+                    }))
+                },
+                options: { ...chartOptions(), scales: { x: { stacked: true, ...chartOptions().scales.x }, y: { stacked: true, ...chartOptions().scales.y } } }
+            });
+
+            // Pie chart
+            if (pieChart) pieChart.destroy();
+            const commitTotals = developers.map(dev => dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0));
+            pieChart = new Chart(document.getElementById('developerPieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: developers.map(dev => dev.authorName),
+                    datasets: [{ data: commitTotals, backgroundColor: colors }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { color: '#e4e4e7' } } }
+                }
+            });
+
+            // Developer table
+            document.getElementById('developerTableBody').innerHTML = developers.map(dev => {
+                const commits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+                const added = dev.dataPoints.reduce((sum, dp) => sum + dp.linesAdded, 0);
+                const deleted = dev.dataPoints.reduce((sum, dp) => sum + dp.linesDeleted, 0);
+                return `
+                    <tr>
+                        <td>${dev.authorName}</td>
+                        <td style="color: #6366f1;">${dev.nickname || ''}</td>
+                        <td>${commits}</td>
+                        <td style="color: #22c55e;">+${added.toLocaleString()}</td>
+                        <td style="color: #ef4444;">-${deleted.toLocaleString()}</td>
+                        <td>${Array.from(dev.repositories).join(', ')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Utilities
+        function generateColors(count) {
+            const colors = [
+                '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+                '#f43f5e', '#ef4444', '#f97316', '#f59e0b', '#eab308',
+                '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4',
+                '#0ea5e9', '#3b82f6'
+            ];
+            return colors.slice(0, count);
+        }
+
+        function chartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { labels: { color: '#e4e4e7' } },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#e4e4e7',
+                        borderColor: '#6366f1',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.y;
+                                return `${label}: ${value}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                    y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                }
+            };
+        }
+
+        function showError(id, message) {
+            const el = document.getElementById(id);
+            el.textContent = message;
+            el.classList.remove('hidden');
+        }
+
+        function hideError(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showLoading(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function hideLoading(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+

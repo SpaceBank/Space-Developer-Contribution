@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engineering Metrics Matrix</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            text-decoration: underline;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #e4e4e7;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: #a1a1aa;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            color: #a1a1aa;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Provider Selection */
+        .provider-select {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .provider-option {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .provider-option:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .provider-option.selected {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .provider-option .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Repository List */
+        .repo-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .repo-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .repo-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .repo-item.selected {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .repo-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #6366f1;
+        }
+
+        .repo-info {
+            flex: 1;
+        }
+
+        .repo-name {
+            font-weight: 500;
+        }
+
+        .repo-fullname {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+
+        .selection-info {
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        /* Metrics Matrix */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .metric-card.elite {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .metric-card.good {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .metric-card.fair {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .metric-card.needs-focus {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .metric-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #a1a1aa;
+        }
+
+        .metric-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .metric-badge.elite {
+            background: #22c55e;
+            color: #052e16;
+        }
+
+        .metric-badge.good {
+            background: #3b82f6;
+            color: #1e3a5f;
+        }
+
+        .metric-badge.fair {
+            background: #f59e0b;
+            color: #451a03;
+        }
+
+        .metric-badge.needs-focus {
+            background: #ef4444;
+            color: #450a0a;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-description {
+            font-size: 0.75rem;
+            color: #71717a;
+            line-height: 1.4;
+        }
+
+        /* Developer Matrix Table */
+        .matrix-table-container {
+            overflow-x: auto;
+            margin-top: 1.5rem;
+        }
+
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .matrix-table th,
+        .matrix-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .matrix-table th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            color: #a1a1aa;
+            position: sticky;
+            top: 0;
+        }
+
+        .matrix-table tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .matrix-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .matrix-cell .value {
+            font-weight: 500;
+        }
+
+        .matrix-cell .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .indicator.elite { background: #22c55e; }
+        .indicator.good { background: #3b82f6; }
+        .indicator.fair { background: #f59e0b; }
+        .indicator.needs-focus { background: #ef4444; }
+
+        /* Chart Container */
+        .chart-container {
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-color.elite { background: #22c55e; }
+        .legend-color.good { background: #3b82f6; }
+        .legend-color.fair { background: #f59e0b; }
+        .legend-color.needs-focus { background: #ef4444; }
+
+        /* Thresholds Table */
+        .thresholds-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .thresholds-table th,
+        .thresholds-table td {
+            padding: 0.75rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .thresholds-table th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .thresholds-table td:first-child {
+            text-align: left;
+            min-width: 220px;
+        }
+
+        .thresholds-table .metric-hint {
+            font-size: 0.7rem;
+            color: #71717a;
+            display: block;
+            margin-top: 0.25rem;
+        }
+
+        .thresholds-table .elite-col {
+            background: rgba(34, 197, 94, 0.15);
+            color: #86efac;
+        }
+
+        .thresholds-table .good-col {
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+        }
+
+        .thresholds-table .fair-col {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fcd34d;
+        }
+
+        .thresholds-table .focus-col {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+        }
+
+        /* Info icon tooltip styles */
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            font-size: 0.7rem;
+            cursor: help;
+            margin-left: 0.5rem;
+            position: relative;
+            vertical-align: middle;
+        }
+
+        .info-icon:hover {
+            background: rgba(99, 102, 241, 0.5);
+        }
+
+        .info-tooltip {
+            position: absolute;
+            left: calc(100% + 10px);
+            top: 50%;
+            transform: translateY(-50%);
+            width: 320px;
+            padding: 1rem;
+            background: #1e1e2e;
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            text-align: left;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        .info-icon:hover .info-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .info-tooltip .tooltip-title {
+            font-weight: 600;
+            color: #e4e4e7;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .info-tooltip .tooltip-desc {
+            color: #a1a1aa;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-tooltip .tooltip-formula {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #22c55e;
+            font-size: 0.75rem;
+        }
+
+        .info-tooltip .tooltip-why {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #71717a;
+            font-size: 0.75rem;
+        }
+
+        .thresholds-table th.elite-col { background: rgba(34, 197, 94, 0.3); color: #22c55e; }
+        .thresholds-table th.good-col { background: rgba(59, 130, 246, 0.3); color: #3b82f6; }
+        .thresholds-table th.fair-col { background: rgba(245, 158, 11, 0.3); color: #f59e0b; }
+        .thresholds-table th.focus-col { background: rgba(239, 68, 68, 0.3); color: #ef4444; }
+
+        .search-box {
+            margin-bottom: 1rem;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+            <a href="/" class="nav-link">← Contribution Dashboard</a>
+            <a href="/engagement.html" class="nav-link">👥 Developer Engagement</a>
+        </div>
+        <h1>📊 Engineering Metrics Matrix</h1>
+
+        <!-- Step 1: Authentication -->
+        <div class="panel" id="step1-panel">
+            <h2>🔐 Step 1: Connect to Git Provider</h2>
+
+            <div class="provider-select">
+                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
+                    <div class="icon">🐙</div>
+                    <div>GitHub</div>
+                </div>
+                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
+                    <div class="icon">🦊</div>
+                    <div>GitLab</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="token">Personal Access Token</label>
+                <input type="password" id="token" placeholder="Enter your token...">
+            </div>
+
+            <div class="form-group hidden" id="custom-url-group">
+                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
+                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
+            </div>
+
+            <button onclick="fetchRepositories()">
+                <span>Connect & Fetch Repositories</span>
+                <span>→</span>
+            </button>
+
+            <div id="auth-error" class="error hidden"></div>
+            <div id="auth-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Fetching repositories...</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Repository Selection -->
+        <div class="panel hidden" id="step2-panel">
+            <h2>📁 Step 2: Select Repositories</h2>
+
+            <div class="search-box">
+                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
+            </div>
+
+            <div class="selection-info">
+                <span id="selectionCount">0</span> repositories selected
+                <button class="secondary" style="float: right; padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="selectAllRepos()">Select All</button>
+            </div>
+
+            <div class="repo-list" id="repoList"></div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+
+            <div class="button-group" style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button class="secondary" onclick="goToStep(1)">← Back</button>
+                <button onclick="analyzeMetrics()" id="analyzeBtn" disabled>
+                    <span>Analyze Metrics</span>
+                    <span>→</span>
+                </button>
+            </div>
+
+            <div id="analyze-error" class="error hidden"></div>
+            <div id="analyze-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Analyzing metrics... This may take a few minutes.</span>
+            </div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="panel hidden" id="step3-panel">
+            <h2>📊 Step 3: Engineering Metrics Matrix</h2>
+
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
+                <button class="secondary" onclick="goToStep(1)">🔄 Start Over</button>
+            </div>
+
+            <!-- Analysis Info -->
+            <div id="analysisInfo" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;"></div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item"><span class="legend-color elite"></span> Elite</div>
+                <div class="legend-item"><span class="legend-color good"></span> Good</div>
+                <div class="legend-item"><span class="legend-color fair"></span> Fair</div>
+                <div class="legend-item"><span class="legend-color needs-focus"></span> Needs Focus</div>
+            </div>
+
+            <!-- Team Metrics Grid -->
+            <h3 style="margin: 1.5rem 0 1rem;">🏢 Team Metrics</h3>
+            <div class="metrics-grid" id="teamMetricsGrid"></div>
+
+            <!-- Trend Chart -->
+            <div class="panel">
+                <h3>📈 Weekly Trend</h3>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Developer Matrix -->
+            <div class="panel">
+                <h3>👥 Developer Metrics Matrix</h3>
+                <div class="matrix-table-container">
+                    <table class="matrix-table" id="developerMatrix">
+                        <thead>
+                            <tr>
+                                <th>Developer</th>
+                                <th>PRs</th>
+                                <th>Coding Time</th>
+                                <th>Pickup Time</th>
+                                <th>Review Time</th>
+                                <th>Cycle Time</th>
+                                <th>Merge Freq</th>
+                                <th>PR Size</th>
+                            </tr>
+                        </thead>
+                        <tbody id="developerMatrixBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Thresholds Reference - Redesigned -->
+            <div class="panel" style="margin-top: 1.5rem;">
+                <h3 style="margin-bottom: 1rem;">📋 Metric Thresholds Reference</h3>
+                <div style="overflow-x: auto;">
+                    <table class="thresholds-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th class="elite-col">🏆 Elite</th>
+                                <th class="good-col">✅ Good</th>
+                                <th class="fair-col">⚠️ Fair</th>
+                                <th class="focus-col">🔴 Needs Focus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <strong>⌨️ Coding Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">⌨️ Coding Time</div>
+                                            <div class="tooltip-desc">The time it takes from the first commit until a pull request is published. Short Coding Time correlates to low WIP, small PR Size, and clear requirements.</div>
+                                            <div class="tooltip-formula">Formula: PR Created At - First Commit Time</div>
+                                            <div class="tooltip-why">💡 Why it matters: Long coding time may indicate unclear requirements, scope creep, or too much work-in-progress.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">First commit → PR opened</span>
+                                </td>
+                                <td class="elite-col">&lt; 54 mins</td>
+                                <td class="good-col">54m - 4h</td>
+                                <td class="fair-col">5 - 23h</td>
+                                <td class="focus-col">&gt; 23h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>👀 Pickup Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">👀 Pickup Time</div>
+                                            <div class="tooltip-desc">The time a pull request waits for someone to start reviewing it. Low Pickup Time represents strong teamwork and a healthy review process.</div>
+                                            <div class="tooltip-formula">Formula: First Review Time - PR Created At</div>
+                                            <div class="tooltip-why">💡 Why it matters: Long pickup time creates bottlenecks and delays feedback, increasing context switching costs.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">PR opened → first review</span>
+                                </td>
+                                <td class="elite-col">&lt; 1h</td>
+                                <td class="good-col">1 - 4h</td>
+                                <td class="fair-col">5 - 16h</td>
+                                <td class="focus-col">&gt; 16h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>✅ Approve Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">✅ Approve Time</div>
+                                            <div class="tooltip-desc">The time from first comment/review to the first approval. This metric, along with Merge Time, is a more granular segment of Review Time.</div>
+                                            <div class="tooltip-formula">Formula: First Approval Time - First Review Time</div>
+                                            <div class="tooltip-why">💡 Why it matters: Long approve time may indicate complex PRs, unclear code, or slow review iterations.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">First comment → approval</span>
+                                </td>
+                                <td class="elite-col">&lt; 10h</td>
+                                <td class="good-col">10 - 22h</td>
+                                <td class="fair-col">23 - 42h</td>
+                                <td class="focus-col">&gt; 42h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>🔀 Merge Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">🔀 Merge Time</div>
+                                            <div class="tooltip-desc">The time from the first approval to merge. This metric, along with Approve Time, is a more granular segment of Review Time.</div>
+                                            <div class="tooltip-formula">Formula: Merged At - First Approval Time</div>
+                                            <div class="tooltip-why">💡 Why it matters: Long merge time after approval may indicate CI/CD issues, merge conflicts, or process bottlenecks.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">First approval → merge</span>
+                                </td>
+                                <td class="elite-col">&lt; 1h</td>
+                                <td class="good-col">1 - 3h</td>
+                                <td class="fair-col">4 - 16h</td>
+                                <td class="focus-col">&gt; 16h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>📝 Review Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">📝 Review Time</div>
+                                            <div class="tooltip-desc">The time it takes to complete a code review and get a pull request merged. Low Review Time represents strong teamwork and a healthy review process.</div>
+                                            <div class="tooltip-formula">Formula: Merged At - PR Created At</div>
+                                            <div class="tooltip-why">💡 Why it matters: Review Time = Pickup Time + Approve Time + Merge Time. It's the total time a PR is "in review".</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">PR opened → merge</span>
+                                </td>
+                                <td class="elite-col">&lt; 3h</td>
+                                <td class="good-col">3 - 14h</td>
+                                <td class="fair-col">15 - 24h</td>
+                                <td class="focus-col">&gt; 24h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>🔄 Cycle Time</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">🔄 Cycle Time</div>
+                                            <div class="tooltip-desc">The time it takes for a single engineering task to go through the different phases of the delivery process from 'code' to 'production'.</div>
+                                            <div class="tooltip-formula">Formula: Merged At - First Commit Time</div>
+                                            <div class="tooltip-why">💡 Why it matters: Cycle Time = Coding Time + Review Time. It's your end-to-end delivery speed for a single change.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">First commit → merge</span>
+                                </td>
+                                <td class="elite-col">&lt; 25h</td>
+                                <td class="good-col">25 - 72h</td>
+                                <td class="fair-col">73 - 161h</td>
+                                <td class="focus-col">&gt; 161h</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>📈 Merge Frequency</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">📈 Merge Frequency</div>
+                                            <div class="tooltip-desc">The total number of pull requests merged by a developer over a period of time (per week).</div>
+                                            <div class="tooltip-formula">Formula: Total PRs Merged / Weeks / Developers</div>
+                                            <div class="tooltip-why">💡 Why it matters: Higher merge frequency indicates consistent delivery and smaller batch sizes, reducing risk.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">PRs per developer per week</span>
+                                </td>
+                                <td class="elite-col">&gt; 2.0</td>
+                                <td class="good-col">1.2 - 2.0</td>
+                                <td class="fair-col">0.66 - 1.2</td>
+                                <td class="focus-col">&lt; 0.66</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>📏 PR Size</strong>
+                                    <span class="info-icon">ℹ
+                                        <div class="info-tooltip">
+                                            <div class="tooltip-title">📏 PR Size</div>
+                                            <div class="tooltip-desc">The number of code lines modified in a pull request. Smaller pull requests are easier to review, safer to merge and correlate to a lower Cycle Time.</div>
+                                            <div class="tooltip-formula">Formula: Lines Added + Lines Deleted</div>
+                                            <div class="tooltip-why">💡 Why it matters: Large PRs are harder to review thoroughly, leading to more bugs and longer review times.</div>
+                                        </div>
+                                    </span>
+                                    <br><span class="metric-hint">Lines of code changed</span>
+                                </td>
+                                <td class="elite-col">&lt; 100</td>
+                                <td class="good-col">100 - 155</td>
+                                <td class="fair-col">156 - 228</td>
+                                <td class="focus-col">&gt; 228</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentStep = 1;
+        let selectedProvider = 'GITHUB';
+        let repositories = [];
+        let selectedRepos = new Set();
+        let trendChart = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
+        });
+
+        // Provider selection
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            document.querySelectorAll('.provider-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.provider === provider);
+            });
+            document.getElementById('custom-url-group').classList.toggle('hidden', provider !== 'GITLAB');
+        }
+
+        // Step navigation
+        function goToStep(step) {
+            currentStep = step;
+            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
+            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
+            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
+        }
+
+        // Fetch repositories
+        async function fetchRepositories() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('auth-error', 'Please enter your access token');
+                return;
+            }
+
+            hideError('auth-error');
+            showLoading('auth-loading');
+
+            try {
+                const response = await fetch('/api/git/repositories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch repositories');
+
+                const data = await response.json();
+                repositories = data.repositories;
+                selectedRepos.clear();
+                renderRepositoryList();
+                hideLoading('auth-loading');
+                goToStep(2);
+            } catch (error) {
+                hideLoading('auth-loading');
+                showError('auth-error', error.message);
+            }
+        }
+
+        // Render repository list
+        function renderRepositoryList(filter = '') {
+            const container = document.getElementById('repoList');
+            const filtered = repositories.filter(repo =>
+                repo.fullName.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            container.innerHTML = filtered.map(repo => `
+                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
+                     onclick="toggleRepo('${repo.fullName}')">
+                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
+                    <div class="repo-info">
+                        <div class="repo-name">${repo.name}</div>
+                        <div class="repo-fullname">${repo.fullName}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            updateSelectionCount();
+        }
+
+        function filterRepos() {
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function toggleRepo(fullName) {
+            if (selectedRepos.has(fullName)) {
+                selectedRepos.delete(fullName);
+            } else {
+                selectedRepos.add(fullName);
+            }
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function selectAllRepos() {
+            repositories.forEach(repo => selectedRepos.add(repo.fullName));
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function updateSelectionCount() {
+            document.getElementById('selectionCount').textContent = selectedRepos.size;
+            document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
+        }
+
+        // Analyze metrics
+        async function analyzeMetrics() {
+            if (selectedRepos.size === 0) {
+                showError('analyze-error', 'Please select at least one repository');
+                return;
+            }
+
+            hideError('analyze-error');
+            showLoading('analyze-loading');
+
+            const token = document.getElementById('token').value.trim();
+            const startDate = document.getElementById('startDate').value || null;
+            const endDate = document.getElementById('endDate').value || null;
+
+            try {
+                const response = await fetch('/api/metrics/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null,
+                        repositoryFullNames: Array.from(selectedRepos),
+                        startDate: startDate,
+                        endDate: endDate
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to analyze metrics');
+
+                const data = await response.json();
+                hideLoading('analyze-loading');
+                displayResults(data);
+                goToStep(3);
+            } catch (error) {
+                hideLoading('analyze-loading');
+                showError('analyze-error', error.message);
+            }
+        }
+
+        // Display results
+        function displayResults(data) {
+            // Analysis Info
+            document.getElementById('analysisInfo').innerHTML = `
+                <strong>📁 Repositories:</strong> ${data.analyzedRepositories.join(', ')}<br>
+                <strong>📅 Date Range:</strong> ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
+                <strong>👥 Developers:</strong> ${data.teamMetrics.totalDevelopers} |
+                <strong>🔀 Total PRs:</strong> ${data.teamMetrics.totalPRs}
+            `;
+
+            // Team Metrics Grid
+            renderTeamMetrics(data.teamMetrics);
+
+            // Trend Chart
+            renderTrendChart(data.weeklyTrend);
+
+            // Developer Matrix
+            renderDeveloperMatrix(data.developerMetrics);
+        }
+
+        function renderTeamMetrics(metrics) {
+            const metricsConfig = [
+                { key: 'codingTime', name: 'Coding Time', icon: '⌨️', desc: 'First commit to PR opened' },
+                { key: 'pickupTime', name: 'Pickup Time', icon: '👀', desc: 'PR opened to first review' },
+                { key: 'approveTime', name: 'Approve Time', icon: '✅', desc: 'First comment to approval' },
+                { key: 'mergeTime', name: 'Merge Time', icon: '🔀', desc: 'First approval to merge' },
+                { key: 'reviewTime', name: 'Review Time', icon: '📝', desc: 'PR opened to merge' },
+                { key: 'cycleTime', name: 'Cycle Time', icon: '🔄', desc: 'First commit to merge' },
+                { key: 'mergeFrequency', name: 'Merge Frequency', icon: '📈', desc: 'PRs per developer per week' },
+                { key: 'prSize', name: 'PR Size', icon: '📏', desc: 'Average lines changed' }
+            ];
+
+            const grid = document.getElementById('teamMetricsGrid');
+            grid.innerHTML = metricsConfig.map(config => {
+                const metric = metrics[config.key];
+                const ratingClass = metric.rating.toLowerCase().replace('_', '-');
+                return `
+                    <div class="metric-card ${ratingClass}">
+                        <div class="metric-header">
+                            <span class="metric-name">${config.icon} ${config.name}</span>
+                            <span class="metric-badge ${ratingClass}">${metric.rating.replace('_', ' ')}</span>
+                        </div>
+                        <div class="metric-value">${metric.displayValue}</div>
+                        <div class="metric-description">${config.desc}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTrendChart(weeklyTrend) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+
+            if (trendChart) trendChart.destroy();
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weeklyTrend.map(w => w.week),
+                    datasets: [
+                        {
+                            label: 'Cycle Time (hours)',
+                            data: weeklyTrend.map(w => w.cycleTime),
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'PRs Merged',
+                            data: weeklyTrend.map(w => w.prCount),
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e4e4e7' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#a1a1aa' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Cycle Time (hrs)', color: '#a1a1aa' },
+                            ticks: { color: '#a1a1aa' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'PRs Merged', color: '#a1a1aa' },
+                            ticks: { color: '#a1a1aa' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderDeveloperMatrix(developers) {
+            const tbody = document.getElementById('developerMatrixBody');
+
+            tbody.innerHTML = developers.map(dev => `
+                <tr>
+                    <td>
+                        <strong>${dev.developerName}</strong><br>
+                        <span style="color: #6366f1; font-size: 0.8rem;">${dev.nickname}</span>
+                    </td>
+                    <td>${dev.totalPRs}</td>
+                    <td>${renderMatrixCell(dev.codingTime)}</td>
+                    <td>${renderMatrixCell(dev.pickupTime)}</td>
+                    <td>${renderMatrixCell(dev.reviewTime)}</td>
+                    <td>${renderMatrixCell(dev.cycleTime)}</td>
+                    <td>${renderMatrixCell(dev.mergeFrequency)}</td>
+                    <td>${renderMatrixCell(dev.prSize)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderMatrixCell(metric) {
+            const ratingClass = metric.rating.toLowerCase().replace('_', '-');
+            return `
+                <div class="matrix-cell">
+                    <span class="indicator ${ratingClass}"></span>
+                    <span class="value">${metric.displayValue}</span>
+                </div>
+            `;
+        }
+
+        // Utilities
+        function showError(id, message) {
+            const el = document.getElementById(id);
+            el.textContent = message;
+            el.classList.remove('hidden');
+        }
+
+        function hideError(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showLoading(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function hideLoading(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Engagement Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav-link {
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid #6366f1;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #e4e4e7;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: #a1a1aa;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            color: #a1a1aa;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Provider Selection */
+        .provider-select {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .provider-option {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .provider-option:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .provider-option.selected {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .provider-option .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Multi-select Contributors */
+        .contributors-container {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .contributor-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .contributor-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .contributor-item.selected {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .contributor-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #6366f1;
+        }
+
+        .contributor-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.3);
+        }
+
+        .contributor-info {
+            flex: 1;
+        }
+
+        .contributor-login {
+            font-weight: 500;
+        }
+
+        .contributor-contributions {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+
+        .selection-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .selection-controls button {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        /* Repository List */
+        .repo-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .repo-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .repo-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .repo-item.selected {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .summary-card h3 {
+            font-size: 2rem;
+            color: #6366f1;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card p {
+            color: #a1a1aa;
+            font-size: 0.875rem;
+        }
+
+        .summary-card .subtitle {
+            font-size: 0.75rem;
+            color: #71717a;
+            margin-top: 0.25rem;
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chart-panel h3 {
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            color: #e4e4e7;
+        }
+
+        .chart-container {
+            height: 300px;
+        }
+
+        /* Contributor Filter */
+        .contributor-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-chip:hover {
+            background: rgba(99, 102, 241, 0.3);
+        }
+
+        .filter-chip.selected {
+            background: #6366f1;
+            border-color: #6366f1;
+        }
+
+        .filter-chip img {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .data-table th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            color: #a1a1aa;
+        }
+
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .contributor-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .contributor-cell img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👥 Developer Engagement Dashboard</h1>
+
+        <div class="nav-links">
+            <a href="/" class="nav-link">📊 Contribution Dashboard</a>
+            <a href="/metrics.html" class="nav-link">📈 Engineering Metrics</a>
+        </div>
+
+        <!-- Step 1: Authentication & Fetch Contributors -->
+        <div class="panel" id="step1-panel">
+            <h2>🔐 Step 1: Connect & Fetch Contributors</h2>
+
+            <div class="provider-select">
+                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
+                    <div class="icon">🐙</div>
+                    <div>GitHub</div>
+                </div>
+                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
+                    <div class="icon">🦊</div>
+                    <div>GitLab</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="token">Personal Access Token (Organization Token)</label>
+                <input type="password" id="token" placeholder="Enter your organization token...">
+                <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.5rem;">
+                    This will fetch all members from organizations you have access to.
+                </p>
+            </div>
+
+            <div class="form-group hidden" id="custom-url-group">
+                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
+                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
+            </div>
+
+            <button onclick="fetchContributors()">
+                <span>Connect & Fetch Contributors</span>
+                <span>→</span>
+            </button>
+
+            <div id="auth-error" class="error hidden"></div>
+            <div id="auth-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Fetching organization members...</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Select Contributors & Configure -->
+        <div class="panel hidden" id="step2-panel">
+            <h2>👥 Step 2: Select Contributors & Configure Analysis</h2>
+
+            <button class="secondary" onclick="goToStep(1)" style="margin-bottom: 1rem;">← Back</button>
+
+            <!-- Organization Info -->
+            <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; font-size: 0.9rem;"></div>
+
+            <h3 style="margin-bottom: 0.5rem;">👤 Select Contributors</h3>
+            <div class="search-box">
+                <input type="text" id="contributorSearch" placeholder="Search contributors..." oninput="filterContributors()">
+            </div>
+
+            <div class="selection-controls">
+                <button class="secondary" onclick="selectAllContributors()">Select All</button>
+                <button class="secondary" onclick="deselectAllContributors()">Deselect All</button>
+                <span style="margin-left: auto; color: #a1a1aa;"><span id="contributorCount">0</span> selected</span>
+            </div>
+
+            <div class="contributors-container" id="contributorsList"></div>
+
+            <!-- Optional: Repository Filter -->
+            <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <input type="checkbox" id="filterByRepos" onchange="toggleRepoFilter()"
+                           style="width: 18px; height: 18px; accent-color: #6366f1;">
+                    <label for="filterByRepos" style="font-weight: 500; cursor: pointer;">
+                        📁 Filter by specific repositories
+                    </label>
+                </div>
+                <p id="repoFilterHint" style="font-size: 0.8rem; color: #71717a; margin-bottom: 0.5rem;">
+                    ✅ Will analyze activity across <strong>ALL accessible repositories</strong> by default.
+                    Check the box above to filter by specific repos.
+                </p>
+
+                <div id="repo-filter-section" class="hidden">
+                    <button class="secondary" onclick="fetchRepositories()" id="fetchReposBtn" style="margin-bottom: 0.5rem;">
+                        📂 Load Repositories
+                    </button>
+                    <div id="repo-selection" class="hidden">
+                        <div class="search-box">
+                            <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
+                        </div>
+                        <div class="selection-controls">
+                            <button class="secondary" onclick="selectAllRepos()">Select All</button>
+                            <button class="secondary" onclick="deselectAllRepos()">Deselect All</button>
+                            <span style="margin-left: auto; color: #a1a1aa;"><span id="repoCount">0</span> selected</span>
+                        </div>
+                        <div class="repo-list" id="repoList"></div>
+                    </div>
+                    <div id="repos-loading" class="loading hidden">
+                        <div class="spinner"></div>
+                        <span>Fetching repositories...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Range & Period -->
+            <div class="form-row" style="margin-top: 1.5rem;">
+                <div class="form-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="form-group">
+                    <label for="period">Aggregation Period</label>
+                    <select id="period">
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY" selected>Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="analyzeEngagement()" id="analyzeBtn" disabled style="margin-top: 1rem;">
+                <span>Analyze Engagement</span>
+                <span>→</span>
+            </button>
+
+            <div id="analyze-error" class="error hidden"></div>
+            <div id="analyze-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Analyzing engagement... This may take a few minutes.</span>
+            </div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="panel hidden" id="step3-panel">
+            <h2>📊 Step 3: Engagement Analysis Results</h2>
+
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
+                <button class="secondary" onclick="goToStep(1)">🔄 Start Over</button>
+            </div>
+
+            <!-- Analysis Info -->
+            <div id="analysisInfo" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;"></div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards" id="summaryCards"></div>
+
+            <!-- Contributor Filter for Charts -->
+            <div class="panel">
+                <h3 style="margin-bottom: 0.5rem;">🎯 Filter by Contributor</h3>
+                <div class="contributor-filter" id="contributorFilter"></div>
+            </div>
+
+            <!-- Charts Section -->
+            <h3 style="margin: 1.5rem 0 1rem;">📈 Commits</h3>
+            <div class="charts-grid">
+                <div class="chart-panel">
+                    <h3>📉 Commits Over Time</h3>
+                    <div class="chart-container">
+                        <canvas id="commitsLineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <h3>📊 Total Commits by Contributor</h3>
+                    <div class="chart-container">
+                        <canvas id="commitsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin: 1.5rem 0 1rem;">🔍 PR Reviews</h3>
+            <div class="charts-grid">
+                <div class="chart-panel">
+                    <h3>📉 PR Reviews Over Time</h3>
+                    <div class="chart-container">
+                        <canvas id="reviewsLineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <h3>📊 Total PR Reviews by Contributor</h3>
+                    <div class="chart-container">
+                        <canvas id="reviewsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin: 1.5rem 0 1rem;">💬 Comments</h3>
+            <div class="charts-grid">
+                <div class="chart-panel">
+                    <h3>📉 Comments Over Time</h3>
+                    <div class="chart-container">
+                        <canvas id="commentsLineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <h3>📊 Total Comments by Contributor</h3>
+                    <div class="chart-container">
+                        <canvas id="commentsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Table -->
+            <div class="panel" style="margin-top: 1.5rem;">
+                <h3>📋 Contributor Engagement Summary</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Contributor</th>
+                            <th>Commits</th>
+                            <th>PRs Reviewed</th>
+                            <th>Comments</th>
+                            <th>Total Activity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="engagementTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentStep = 1;
+        let selectedProvider = 'GITHUB';
+        let repositories = [];
+        let selectedRepos = new Set();
+        let contributors = [];
+        let selectedContributors = new Set();
+        let analysisData = null;
+        let selectedContributorsForChart = new Set();
+
+        // Charts
+        let commitsLineChart = null;
+        let commitsBarChart = null;
+        let reviewsLineChart = null;
+        let reviewsBarChart = null;
+        let commentsLineChart = null;
+        let commentsBarChart = null;
+
+        // Organizations found
+        let organizations = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
+        });
+
+        // Provider selection
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            document.querySelectorAll('.provider-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.provider === provider);
+            });
+            document.getElementById('custom-url-group').classList.toggle('hidden', provider !== 'GITLAB');
+        }
+
+        // Step navigation
+        function goToStep(step) {
+            currentStep = step;
+            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
+            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
+            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
+        }
+
+        // Fetch contributors directly from organization
+        async function fetchContributors() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('auth-error', 'Please enter your access token');
+                return;
+            }
+
+            hideError('auth-error');
+            showLoading('auth-loading');
+
+            try {
+                const response = await fetch('/api/engagement/members', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch contributors');
+
+                const data = await response.json();
+                contributors = data.contributors;
+                organizations = data.organizations || [];
+                selectedContributors.clear();
+                hideLoading('auth-loading');
+
+                // Show org info
+                if (organizations.length > 0) {
+                    document.getElementById('orgInfo').innerHTML = `
+                        <strong>🏢 Organizations:</strong> ${organizations.join(', ')}<br>
+                        <strong>👥 Total Contributors:</strong> ${data.totalCount}
+                    `;
+                } else {
+                    document.getElementById('orgInfo').innerHTML = `
+                        <strong>👥 Total Contributors:</strong> ${data.totalCount}
+                    `;
+                }
+
+                renderContributorsList();
+                goToStep(2);
+            } catch (error) {
+                hideLoading('auth-loading');
+                showError('auth-error', error.message);
+            }
+        }
+
+        // Fetch repositories (optional, for filtering)
+        async function fetchRepositories() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                return;
+            }
+
+            showLoading('repos-loading');
+
+            try {
+                const response = await fetch('/api/git/repositories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch repositories');
+
+                const data = await response.json();
+                repositories = data.repositories;
+                selectedRepos.clear();
+                renderRepositoryList();
+                hideLoading('repos-loading');
+                document.getElementById('repo-selection').classList.remove('hidden');
+            } catch (error) {
+                hideLoading('repos-loading');
+                showError('analyze-error', error.message);
+            }
+        }
+
+        // Render repository list
+        function renderRepositoryList(filter = '') {
+            const container = document.getElementById('repoList');
+            const filtered = repositories.filter(repo =>
+                repo.fullName.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            container.innerHTML = filtered.map(repo => `
+                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
+                     onclick="toggleRepo('${repo.fullName}')">
+                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
+                    <span>${repo.fullName}</span>
+                </div>
+            `).join('');
+
+            updateRepoCount();
+        }
+
+        function filterRepos() {
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function toggleRepo(fullName) {
+            if (selectedRepos.has(fullName)) {
+                selectedRepos.delete(fullName);
+            } else {
+                selectedRepos.add(fullName);
+            }
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function selectAllRepos() {
+            repositories.forEach(repo => selectedRepos.add(repo.fullName));
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function deselectAllRepos() {
+            selectedRepos.clear();
+            renderRepositoryList(document.getElementById('repoSearch').value);
+        }
+
+        function updateRepoCount() {
+            document.getElementById('repoCount').textContent = selectedRepos.size;
+        }
+
+        // Toggle repo filter section
+        function toggleRepoFilter() {
+            const checkbox = document.getElementById('filterByRepos');
+            const section = document.getElementById('repo-filter-section');
+            const hint = document.getElementById('repoFilterHint');
+
+            if (checkbox.checked) {
+                section.classList.remove('hidden');
+                hint.innerHTML = '⚠️ <strong>Filter mode:</strong> Select specific repositories below to analyze.';
+            } else {
+                section.classList.add('hidden');
+                hint.innerHTML = '✅ Will analyze activity across <strong>ALL accessible repositories</strong> by default. Check the box above to filter by specific repos.';
+                selectedRepos.clear();
+                updateRepoCount();
+            }
+        }
+
+        // Render contributors list
+        function renderContributorsList(filter = '') {
+            const container = document.getElementById('contributorsList');
+            const filtered = contributors.filter(c =>
+                c.login.toLowerCase().includes(filter.toLowerCase()) ||
+                (c.name && c.name.toLowerCase().includes(filter.toLowerCase()))
+            );
+
+            container.innerHTML = filtered.map(c => {
+                const reposInfo = c.publicRepos ? `📁 ${c.publicRepos} repos` : '';
+                const contributionsInfo = c.contributions ? `${c.contributions} contributions` : '';
+                const infoText = [contributionsInfo, reposInfo].filter(x => x).join(' • ');
+
+                return `
+                    <div class="contributor-item ${selectedContributors.has(c.login) ? 'selected' : ''}"
+                         onclick="toggleContributor('${c.login}')">
+                        <input type="checkbox" ${selectedContributors.has(c.login) ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleContributor('${c.login}')">
+                        <img class="contributor-avatar" src="${c.avatarUrl || ''}"
+                             onerror="this.style.display='none'" alt="">
+                        <div class="contributor-info">
+                            <div class="contributor-login">${c.name || c.login}</div>
+                            <div class="contributor-contributions">@${c.login}${infoText ? ' • ' + infoText : ''}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateContributorCount();
+        }
+
+        function filterContributors() {
+            renderContributorsList(document.getElementById('contributorSearch').value);
+        }
+
+        function toggleContributor(login) {
+            if (selectedContributors.has(login)) {
+                selectedContributors.delete(login);
+            } else {
+                selectedContributors.add(login);
+            }
+            renderContributorsList(document.getElementById('contributorSearch').value);
+        }
+
+        function selectAllContributors() {
+            contributors.forEach(c => selectedContributors.add(c.login));
+            renderContributorsList(document.getElementById('contributorSearch').value);
+        }
+
+        function deselectAllContributors() {
+            selectedContributors.clear();
+            renderContributorsList(document.getElementById('contributorSearch').value);
+        }
+
+        function updateContributorCount() {
+            document.getElementById('contributorCount').textContent = selectedContributors.size;
+            document.getElementById('analyzeBtn').disabled = selectedContributors.size === 0;
+        }
+
+
+        // Analyze engagement
+        async function analyzeEngagement() {
+            if (selectedContributors.size === 0) {
+                showError('analyze-error', 'Please select at least one contributor');
+                return;
+            }
+
+            const filterByRepos = document.getElementById('filterByRepos').checked;
+
+            // If filter is enabled but no repos selected, show error
+            if (filterByRepos && selectedRepos.size === 0) {
+                showError('analyze-error', 'Please select at least one repository, or uncheck "Filter by specific repositories" to analyze all repos.');
+                return;
+            }
+
+            hideError('analyze-error');
+            showLoading('analyze-loading');
+
+            const token = document.getElementById('token').value.trim();
+            const startDate = document.getElementById('startDate').value || null;
+            const endDate = document.getElementById('endDate').value || null;
+            const period = document.getElementById('period').value;
+
+            // Only send repos if filter is enabled, otherwise send empty array (backend will fetch all)
+            const reposToAnalyze = filterByRepos ? Array.from(selectedRepos) : [];
+
+            try {
+                const response = await fetch('/api/engagement/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: document.getElementById('baseUrl').value || null,
+                        repositoryFullNames: reposToAnalyze,
+                        contributorLogins: Array.from(selectedContributors),
+                        startDate: startDate,
+                        endDate: endDate,
+                        period: period
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to analyze engagement');
+
+                analysisData = await response.json();
+                hideLoading('analyze-loading');
+                displayResults(analysisData);
+                goToStep(3);
+            } catch (error) {
+                hideLoading('analyze-loading');
+                showError('analyze-error', error.message);
+            }
+        }
+
+        // Display results
+        function displayResults(data) {
+            // Initialize chart filters with all contributors
+            selectedContributorsForChart = new Set(data.contributors.map(c => c.login));
+
+            // Analysis Info
+            document.getElementById('analysisInfo').innerHTML = `
+                <strong>📁 Repositories:</strong> ${data.analyzedRepositories.join(', ')}<br>
+                <strong>📅 Date Range:</strong> ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
+                <strong>📊 Period:</strong> ${data.period}
+            `;
+
+            // Summary Cards
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="summary-card">
+                    <h3>${data.summary.totalContributors}</h3>
+                    <p>Contributors</p>
+                </div>
+                <div class="summary-card">
+                    <h3>${data.summary.totalCommits}</h3>
+                    <p>Total Commits</p>
+                    <div class="subtitle">Top: ${data.summary.mostActiveCommitter || 'N/A'}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>${data.summary.totalPRsReviewed}</h3>
+                    <p>PRs Reviewed</p>
+                    <div class="subtitle">Top: ${data.summary.mostActiveReviewer || 'N/A'}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>${data.summary.totalComments}</h3>
+                    <p>Comments</p>
+                    <div class="subtitle">Top: ${data.summary.mostActiveCommenter || 'N/A'}</div>
+                </div>
+            `;
+
+            // Contributor filter
+            renderContributorFilter(data.contributors);
+
+            // Render all charts
+            renderCharts(data);
+
+            // Render table
+            renderEngagementTable(data.contributors);
+        }
+
+        function renderContributorFilter(contributors) {
+            const container = document.getElementById('contributorFilter');
+            container.innerHTML = contributors.map(c => `
+                <div class="filter-chip ${selectedContributorsForChart.has(c.login) ? 'selected' : ''}"
+                     onclick="toggleChartContributor('${c.login}')">
+                    ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
+                    <span>${c.login}</span>
+                </div>
+            `).join('');
+        }
+
+        function toggleChartContributor(login) {
+            if (selectedContributorsForChart.has(login)) {
+                selectedContributorsForChart.delete(login);
+            } else {
+                selectedContributorsForChart.add(login);
+            }
+            renderContributorFilter(analysisData.contributors);
+            renderCharts(analysisData);
+        }
+
+        function renderCharts(data) {
+            const filteredContributors = data.contributors.filter(c =>
+                selectedContributorsForChart.has(c.login)
+            );
+            const colors = generateColors(filteredContributors.length);
+            const periods = data.periods;
+
+            // Commits Line Chart
+            if (commitsLineChart) commitsLineChart.destroy();
+            commitsLineChart = new Chart(document.getElementById('commitsLineChart'), {
+                type: 'line',
+                data: {
+                    labels: periods,
+                    datasets: filteredContributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.commitsOverTime.map(d => d.value),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        fill: false,
+                        tension: 0.3
+                    }))
+                },
+                options: chartOptions('Commits')
+            });
+
+            // Commits Bar Chart
+            if (commitsBarChart) commitsBarChart.destroy();
+            commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: filteredContributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Total Commits',
+                        data: filteredContributors.map(c => c.totalCommits),
+                        backgroundColor: colors
+                    }]
+                },
+                options: chartOptions('Commits')
+            });
+
+            // Reviews Line Chart
+            if (reviewsLineChart) reviewsLineChart.destroy();
+            reviewsLineChart = new Chart(document.getElementById('reviewsLineChart'), {
+                type: 'line',
+                data: {
+                    labels: periods,
+                    datasets: filteredContributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.reviewsOverTime.map(d => d.value),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        fill: false,
+                        tension: 0.3
+                    }))
+                },
+                options: chartOptions('PR Reviews')
+            });
+
+            // Reviews Bar Chart
+            if (reviewsBarChart) reviewsBarChart.destroy();
+            reviewsBarChart = new Chart(document.getElementById('reviewsBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: filteredContributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Total PR Reviews',
+                        data: filteredContributors.map(c => c.totalPRsReviewed),
+                        backgroundColor: colors
+                    }]
+                },
+                options: chartOptions('PR Reviews')
+            });
+
+            // Comments Line Chart
+            if (commentsLineChart) commentsLineChart.destroy();
+            commentsLineChart = new Chart(document.getElementById('commentsLineChart'), {
+                type: 'line',
+                data: {
+                    labels: periods,
+                    datasets: filteredContributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.commentsOverTime.map(d => d.value),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        fill: false,
+                        tension: 0.3
+                    }))
+                },
+                options: chartOptions('Comments')
+            });
+
+            // Comments Bar Chart
+            if (commentsBarChart) commentsBarChart.destroy();
+            commentsBarChart = new Chart(document.getElementById('commentsBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: filteredContributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Total Comments',
+                        data: filteredContributors.map(c => c.totalComments),
+                        backgroundColor: colors
+                    }]
+                },
+                options: chartOptions('Comments')
+            });
+        }
+
+        function renderEngagementTable(contributors) {
+            document.getElementById('engagementTableBody').innerHTML = contributors.map(c => `
+                <tr>
+                    <td>
+                        <div class="contributor-cell">
+                            ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
+                            <span>${c.login}</span>
+                        </div>
+                    </td>
+                    <td>${c.totalCommits}</td>
+                    <td>${c.totalPRsReviewed}</td>
+                    <td>${c.totalComments}</td>
+                    <td><strong>${c.totalCommits + c.totalPRsReviewed + c.totalComments}</strong></td>
+                </tr>
+            `).join('');
+        }
+
+        // Chart options
+        function chartOptions(label) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e4e4e7' }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#e4e4e7'
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#a1a1aa' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        ticks: { color: '#a1a1aa' },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        beginAtZero: true
+                    }
+                }
+            };
+        }
+
+        // Generate colors
+        function generateColors(count) {
+            const colors = [
+                '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+                '#f43f5e', '#ef4444', '#f97316', '#f59e0b', '#eab308',
+                '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4',
+                '#0ea5e9', '#3b82f6'
+            ];
+            return colors.slice(0, count);
+        }
+
+        // Utilities
+        function showError(id, message) {
+            const el = document.getElementById(id);
+            el.textContent = message;
+            el.classList.remove('hidden');
+        }
+
+        function hideError(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showLoading(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function hideLoading(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+
