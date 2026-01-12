@@ -57,7 +57,8 @@ data class EngagementAnalyzeRequest(
     val contributorLogins: List<String>,
     val startDate: String? = null,
     val endDate: String? = null,
-    val period: AggregationPeriod = AggregationPeriod.WEEKLY
+    val period: AggregationPeriod = AggregationPeriod.WEEKLY,
+    val excludeMergeCommits: Boolean = true  // Exclude merge commits by default
 )
 
 /**
@@ -75,11 +76,13 @@ data class ContributorEngagement(
     val login: String,
     val avatarUrl: String?,
     val totalCommits: Int,
-    val totalPRsReviewed: Int,
-    val totalComments: Int,
+    val totalPRsReviewed: Int = 0,  // Deprecated - kept for compatibility
+    val totalLinesAdded: Int,
+    val totalLinesDeleted: Int,
     val commitsOverTime: List<EngagementDataPoint>,
-    val reviewsOverTime: List<EngagementDataPoint>,
-    val commentsOverTime: List<EngagementDataPoint>
+    val reviewsOverTime: List<EngagementDataPoint> = emptyList(),  // Deprecated - kept for compatibility
+    val linesAddedOverTime: List<EngagementDataPoint>,
+    val linesDeletedOverTime: List<EngagementDataPoint>
 )
 
 /**
@@ -100,10 +103,11 @@ data class EngagementAnalysisResponse(
 data class EngagementSummary(
     val totalContributors: Int,
     val totalCommits: Int,
-    val totalPRsReviewed: Int,
-    val totalComments: Int,
+    val totalPRsReviewed: Int = 0,  // Deprecated - kept for compatibility
+    val totalLinesAdded: Int,
+    val totalLinesDeleted: Int,
     val mostActiveCommitter: String?,
-    val mostActiveReviewer: String?,
-    val mostActiveCommenter: String?
+    val mostActiveReviewer: String? = null,  // Deprecated - kept for compatibility
+    val mostLinesChangedBy: String?
 )
 

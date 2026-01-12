@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Developer Engagement Dashboard</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Developer Engagement - Space Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -20,6 +23,32 @@
             padding: 2rem;
         }
 
+        .back-button {
+            position: fixed;
+            top: 1.5rem;
+            left: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-button:hover {
+            background: rgba(139, 92, 246, 0.3);
+            border-color: rgba(139, 92, 246, 0.5);
+            transform: translateX(-3px);
+        }
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -27,25 +56,14 @@
 
         h1 {
             text-align: center;
-            margin-bottom: 0.5rem;
+            margin-bottom: 2rem;
             font-size: 2rem;
             background: linear-gradient(90deg, #6366f1, #a855f7);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .nav-links {
-            display: flex;
-            justify-content: center;
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .nav-link {
-            color: #6366f1;
-            text-decoration: none;
-            font-size: 0.9rem;
-            padding: 0.5rem 1rem;
+        .panel {
             border: 1px solid #6366f1;
             border-radius: 6px;
             transition: all 0.2s;
@@ -258,31 +276,46 @@
             font-size: 0.8rem;
         }
 
-        /* Repository List */
+        /* Repository List - Ultra Compact, 2 rows by default */
         .repo-list {
+            max-height: 60px; /* ~2 rows */
+            overflow-y: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1px;
+            padding: 2px;
+            background: rgba(255, 255, 255, 0.03);
+            transition: max-height 0.3s ease;
+        }
+
+        .repo-list.expanded {
             max-height: 200px;
             overflow-y: auto;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            margin-bottom: 1rem;
         }
 
         .repo-item {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 0.25rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
             cursor: pointer;
             transition: background 0.2s;
+            font-size: 0.65rem;
+            background: rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            height: 22px;
         }
 
         .repo-item:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .repo-item.selected {
-            background: rgba(99, 102, 241, 0.2);
+            background: rgba(99, 102, 241, 0.3);
         }
 
         /* Summary Cards */
@@ -430,13 +463,11 @@
     </style>
 </head>
 <body>
+    <a href="/" class="back-button">← Back to Home</a>
+
     <div class="container">
         <h1>👥 Developer Engagement Dashboard</h1>
 
-        <div class="nav-links">
-            <a href="/" class="nav-link">📊 Contribution Dashboard</a>
-            <a href="/metrics.html" class="nav-link">📈 Engineering Metrics</a>
-        </div>
 
         <!-- Step 1: Authentication & Fetch Contributors -->
         <div class="panel" id="step1-panel">
@@ -519,21 +550,39 @@
                         📂 Load Repositories
                     </button>
                     <div id="repo-selection" class="hidden">
-                        <div class="search-box">
-                            <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
+                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem;">
+                            <div class="search-box" style="flex:1; margin-bottom:0;">
+                                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()" style="margin-bottom:0;">
+                            </div>
+                            <span style="color:#71717a; font-size:0.8rem; white-space:nowrap;">
+                                📁 <span id="totalRepoCount">0</span> total repos
+                            </span>
                         </div>
                         <div class="selection-controls">
-                            <button class="secondary" onclick="selectAllRepos()">Select All</button>
+                            <button class="secondary" onclick="selectAllRepos()">Select Visible</button>
                             <button class="secondary" onclick="deselectAllRepos()">Deselect All</button>
                             <span style="margin-left: auto; color: #a1a1aa;"><span id="repoCount">0</span> selected</span>
                         </div>
                         <div class="repo-list" id="repoList"></div>
+                        <button id="expandReposBtn" class="secondary" onclick="toggleExpandRepos()"
+                                style="display:none; width:100%; font-size:0.7rem; padding:0.25rem; margin-top:0.25rem;">
+                            ▼ Show all repos
+                        </button>
                     </div>
                     <div id="repos-loading" class="loading hidden">
                         <div class="spinner"></div>
                         <span>Fetching repositories...</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Exclude Merge Commits Option -->
+            <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                <input type="checkbox" id="excludeMergeCommits" checked
+                       style="width: 18px; height: 18px; accent-color: #6366f1;">
+                <label for="excludeMergeCommits" style="cursor: pointer;">
+                    🔀 Exclude merge commits (recommended)
+                </label>
             </div>
 
             <!-- Date Range & Period -->
@@ -564,7 +613,7 @@
             <div id="analyze-error" class="error hidden"></div>
             <div id="analyze-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <span>Analyzing engagement... This may take a few minutes.</span>
+                <span id="loading-message">Initializing analysis...</span>
             </div>
         </div>
 
@@ -606,34 +655,33 @@
                 </div>
             </div>
 
-            <h3 style="margin: 1.5rem 0 1rem;">🔍 PR Reviews</h3>
+
+            <h3 style="margin: 1.5rem 0 1rem;">📝 Lines Changed</h3>
             <div class="charts-grid">
                 <div class="chart-panel">
-                    <h3>📉 PR Reviews Over Time</h3>
+                    <h3 style="color: #22c55e;">📈 Lines Added Over Time</h3>
                     <div class="chart-container">
-                        <canvas id="reviewsLineChart"></canvas>
+                        <canvas id="linesAddedLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
-                    <h3>📊 Total PR Reviews by Contributor</h3>
+                    <h3 style="color: #22c55e;">📊 Total Lines Added by Contributor</h3>
                     <div class="chart-container">
-                        <canvas id="reviewsBarChart"></canvas>
+                        <canvas id="linesAddedBarChart"></canvas>
                     </div>
                 </div>
             </div>
-
-            <h3 style="margin: 1.5rem 0 1rem;">💬 Comments</h3>
             <div class="charts-grid">
                 <div class="chart-panel">
-                    <h3>📉 Comments Over Time</h3>
+                    <h3 style="color: #ef4444;">📉 Lines Deleted Over Time</h3>
                     <div class="chart-container">
-                        <canvas id="commentsLineChart"></canvas>
+                        <canvas id="linesDeletedLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
-                    <h3>📊 Total Comments by Contributor</h3>
+                    <h3 style="color: #ef4444;">📊 Total Lines Deleted by Contributor</h3>
                     <div class="chart-container">
-                        <canvas id="commentsBarChart"></canvas>
+                        <canvas id="linesDeletedBarChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -646,9 +694,9 @@
                         <tr>
                             <th>Contributor</th>
                             <th>Commits</th>
-                            <th>PRs Reviewed</th>
-                            <th>Comments</th>
-                            <th>Total Activity</th>
+                            <th>Lines Added</th>
+                            <th>Lines Deleted</th>
+                            <th>Total Lines</th>
                         </tr>
                     </thead>
                     <tbody id="engagementTableBody"></tbody>
@@ -671,10 +719,10 @@
         // Charts
         let commitsLineChart = null;
         let commitsBarChart = null;
-        let reviewsLineChart = null;
-        let reviewsBarChart = null;
-        let commentsLineChart = null;
-        let commentsBarChart = null;
+        let linesAddedLineChart = null;
+        let linesAddedBarChart = null;
+        let linesDeletedLineChart = null;
+        let linesDeletedBarChart = null;
 
         // Organizations found
         let organizations = [];
@@ -784,29 +832,60 @@
                 renderRepositoryList();
                 hideLoading('repos-loading');
                 document.getElementById('repo-selection').classList.remove('hidden');
+                document.getElementById('totalRepoCount').textContent = repositories.length;
             } catch (error) {
                 hideLoading('repos-loading');
                 showError('analyze-error', error.message);
             }
         }
 
-        // Render repository list
+        // Render repository list - compact 2 rows by default
+        let repoListExpanded = false;
+
         function renderRepositoryList(filter = '') {
             const container = document.getElementById('repoList');
             const filtered = repositories.filter(repo =>
                 repo.fullName.toLowerCase().includes(filter.toLowerCase())
             );
 
-            container.innerHTML = filtered.map(repo => `
-                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
-                     onclick="toggleRepo('${repo.fullName}')">
-                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
-                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
-                    <span>${repo.fullName}</span>
-                </div>
-            `).join('');
+            // Show all filtered repos (CSS will hide overflow)
+            container.innerHTML = filtered.map(repo => {
+                const shortName = repo.fullName.split('/').pop() || repo.fullName;
+                return `
+                    <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
+                         onclick="toggleRepo('${repo.fullName}')" title="${repo.fullName}">
+                        <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')"
+                               style="width:10px;height:10px;min-width:10px;">
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</span>
+                    </div>
+                `;
+            }).join('');
 
             updateRepoCount();
+            updateExpandButton(filtered.length);
+        }
+
+        function updateExpandButton(totalCount) {
+            const btn = document.getElementById('expandReposBtn');
+            const container = document.getElementById('repoList');
+            if (totalCount > 10) {
+                btn.style.display = 'inline-block';
+                btn.textContent = repoListExpanded ? `▲ Collapse (${totalCount} repos)` : `▼ Show all ${totalCount} repos`;
+                container.classList.toggle('expanded', repoListExpanded);
+            } else {
+                btn.style.display = 'none';
+                container.classList.remove('expanded');
+            }
+        }
+
+        function toggleExpandRepos() {
+            repoListExpanded = !repoListExpanded;
+            const container = document.getElementById('repoList');
+            container.classList.toggle('expanded', repoListExpanded);
+            updateExpandButton(repositories.filter(repo =>
+                repo.fullName.toLowerCase().includes(document.getElementById('repoSearch').value.toLowerCase())
+            ).length);
         }
 
         function filterRepos() {
@@ -823,8 +902,12 @@
         }
 
         function selectAllRepos() {
-            repositories.forEach(repo => selectedRepos.add(repo.fullName));
-            renderRepositoryList(document.getElementById('repoSearch').value);
+            // Only select filtered/visible repos
+            const filter = document.getElementById('repoSearch').value.toLowerCase();
+            repositories
+                .filter(repo => repo.fullName.toLowerCase().includes(filter))
+                .forEach(repo => selectedRepos.add(repo.fullName));
+            renderRepositoryList(filter);
         }
 
         function deselectAllRepos() {
@@ -931,6 +1014,29 @@
             hideError('analyze-error');
             showLoading('analyze-loading');
 
+            // Dynamic loading messages based on selection
+            const numContributors = selectedContributors.size;
+            const numRepos = filterByRepos ? selectedRepos.size : 'all';
+            const contributorNames = Array.from(selectedContributors).slice(0, 3).join(', ') + (numContributors > 3 ? '...' : '');
+
+            const loadingMessages = [
+                `🔗 Connecting to GitHub API...`,
+                `📋 Analyzing ${numContributors} contributor(s): ${contributorNames}`,
+                `📦 Fetching commits from ${numRepos} repository(ies)...`,
+                `⚡ Processing commit data in parallel...`,
+                `📊 Calculating line changes...`,
+                `📈 Aggregating results...`,
+                `✨ Almost done...`
+            ];
+            let msgIndex = 0;
+            const loadingMsgEl = document.getElementById('loading-message');
+            loadingMsgEl.textContent = loadingMessages[0];
+
+            const msgInterval = setInterval(() => {
+                msgIndex = (msgIndex + 1) % loadingMessages.length;
+                loadingMsgEl.textContent = loadingMessages[msgIndex];
+            }, 3000);
+
             const token = document.getElementById('token').value.trim();
             const startDate = document.getElementById('startDate').value || null;
             const endDate = document.getElementById('endDate').value || null;
@@ -951,9 +1057,12 @@
                         contributorLogins: Array.from(selectedContributors),
                         startDate: startDate,
                         endDate: endDate,
-                        period: period
+                        period: period,
+                        excludeMergeCommits: document.getElementById('excludeMergeCommits').checked
                     })
                 });
+
+                clearInterval(msgInterval);
 
                 if (!response.ok) throw new Error('Failed to analyze engagement');
 
@@ -962,8 +1071,33 @@
                 displayResults(analysisData);
                 goToStep(3);
             } catch (error) {
+                clearInterval(msgInterval);
                 hideLoading('analyze-loading');
                 showError('analyze-error', error.message);
+            }
+        }
+
+        // Toggle repo list view in results
+        function toggleRepoDetails() {
+            const box = document.getElementById('repoDetailsBox');
+            const btn = document.getElementById('repoToggleBtn');
+
+            if (box.style.display === 'none') {
+                // Render repos only when expanding
+                const repos = window.analysisRepos || [];
+                box.innerHTML = `
+                    <div style="margin-bottom:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:6px; max-height:100px; overflow-y:auto;">
+                        <div style="font-size:0.65rem; color:#a1a1aa; display:flex; flex-wrap:wrap; gap:0.2rem;">
+                            ${repos.map(r => `<span style="background:rgba(255,255,255,0.08); padding:0.1rem 0.25rem; border-radius:2px;">${r.split('/').pop()}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+                box.style.display = 'block';
+                btn.textContent = 'Hide ▲';
+            } else {
+                box.style.display = 'none';
+                box.innerHTML = ''; // Clear content when hidden
+                btn.textContent = 'Show ▼';
             }
         }
 
@@ -972,11 +1106,25 @@
             // Initialize chart filters with all contributors
             selectedContributorsForChart = new Set(data.contributors.map(c => c.login));
 
-            // Analysis Info
+            // Analysis Info - with collapsible repo list
+            const repos = data.analyzedRepositories || [];
+            const repoCount = repos.length;
+
+            // Store repos for later use when expanding
+            window.analysisRepos = repos;
+
             document.getElementById('analysisInfo').innerHTML = `
-                <strong>📁 Repositories:</strong> ${data.analyzedRepositories.join(', ')}<br>
-                <strong>📅 Date Range:</strong> ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
-                <strong>📊 Period:</strong> ${data.period}
+                <div style="margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                    <strong>📁 Repositories:</strong>
+                    <span style="background:rgba(99,102,241,0.2); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.8rem;">${repoCount}</span>
+                    <button class="secondary" onclick="toggleRepoDetails()" id="repoToggleBtn"
+                        style="font-size:0.65rem; padding:0.15rem 0.4rem;">Show ▼</button>
+                </div>
+                <div id="repoDetailsBox" style="display:none;"></div>
+                <div>
+                    <strong>📅</strong> ${data.dateRange.startDate} to ${data.dateRange.endDate} &nbsp;
+                    <strong>📊</strong> ${data.period}
+                </div>
             `;
 
             // Summary Cards
@@ -990,15 +1138,14 @@
                     <p>Total Commits</p>
                     <div class="subtitle">Top: ${data.summary.mostActiveCommitter || 'N/A'}</div>
                 </div>
-                <div class="summary-card">
-                    <h3>${data.summary.totalPRsReviewed}</h3>
-                    <p>PRs Reviewed</p>
-                    <div class="subtitle">Top: ${data.summary.mostActiveReviewer || 'N/A'}</div>
+                <div class="summary-card" style="background: rgba(34, 197, 94, 0.1);">
+                    <h3 style="color: #22c55e;">+${data.summary.totalLinesAdded.toLocaleString()}</h3>
+                    <p>Lines Added</p>
                 </div>
-                <div class="summary-card">
-                    <h3>${data.summary.totalComments}</h3>
-                    <p>Comments</p>
-                    <div class="subtitle">Top: ${data.summary.mostActiveCommenter || 'N/A'}</div>
+                <div class="summary-card" style="background: rgba(239, 68, 68, 0.1);">
+                    <h3 style="color: #ef4444;">-${data.summary.totalLinesDeleted.toLocaleString()}</h3>
+                    <p>Lines Deleted</p>
+                    <div class="subtitle">Top: ${data.summary.mostLinesChangedBy || 'N/A'}</div>
                 </div>
             `;
 
@@ -1073,70 +1220,70 @@
                 options: chartOptions('Commits')
             });
 
-            // Reviews Line Chart
-            if (reviewsLineChart) reviewsLineChart.destroy();
-            reviewsLineChart = new Chart(document.getElementById('reviewsLineChart'), {
+            // Lines Added Line Chart
+            if (linesAddedLineChart) linesAddedLineChart.destroy();
+            linesAddedLineChart = new Chart(document.getElementById('linesAddedLineChart'), {
                 type: 'line',
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
                         label: c.login,
-                        data: c.reviewsOverTime.map(d => d.value),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
+                        data: c.linesAddedOverTime.map(d => d.value),
+                        borderColor: '#22c55e',
+                        backgroundColor: '#22c55e20',
                         fill: false,
                         tension: 0.3
                     }))
                 },
-                options: chartOptions('PR Reviews')
+                options: chartOptions('Lines Added')
             });
 
-            // Reviews Bar Chart
-            if (reviewsBarChart) reviewsBarChart.destroy();
-            reviewsBarChart = new Chart(document.getElementById('reviewsBarChart'), {
+            // Lines Added Bar Chart
+            if (linesAddedBarChart) linesAddedBarChart.destroy();
+            linesAddedBarChart = new Chart(document.getElementById('linesAddedBarChart'), {
                 type: 'bar',
                 data: {
                     labels: filteredContributors.map(c => c.login),
                     datasets: [{
-                        label: 'Total PR Reviews',
-                        data: filteredContributors.map(c => c.totalPRsReviewed),
-                        backgroundColor: colors
+                        label: 'Total Lines Added',
+                        data: filteredContributors.map(c => c.totalLinesAdded),
+                        backgroundColor: '#22c55e'
                     }]
                 },
-                options: chartOptions('PR Reviews')
+                options: chartOptions('Lines Added')
             });
 
-            // Comments Line Chart
-            if (commentsLineChart) commentsLineChart.destroy();
-            commentsLineChart = new Chart(document.getElementById('commentsLineChart'), {
+            // Lines Deleted Line Chart
+            if (linesDeletedLineChart) linesDeletedLineChart.destroy();
+            linesDeletedLineChart = new Chart(document.getElementById('linesDeletedLineChart'), {
                 type: 'line',
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
                         label: c.login,
-                        data: c.commentsOverTime.map(d => d.value),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
+                        data: c.linesDeletedOverTime.map(d => d.value),
+                        borderColor: '#ef4444',
+                        backgroundColor: '#ef444420',
                         fill: false,
                         tension: 0.3
                     }))
                 },
-                options: chartOptions('Comments')
+                options: chartOptions('Lines Deleted')
             });
 
-            // Comments Bar Chart
-            if (commentsBarChart) commentsBarChart.destroy();
-            commentsBarChart = new Chart(document.getElementById('commentsBarChart'), {
+            // Lines Deleted Bar Chart
+            if (linesDeletedBarChart) linesDeletedBarChart.destroy();
+            linesDeletedBarChart = new Chart(document.getElementById('linesDeletedBarChart'), {
                 type: 'bar',
                 data: {
                     labels: filteredContributors.map(c => c.login),
                     datasets: [{
-                        label: 'Total Comments',
-                        data: filteredContributors.map(c => c.totalComments),
-                        backgroundColor: colors
+                        label: 'Total Lines Deleted',
+                        data: filteredContributors.map(c => c.totalLinesDeleted),
+                        backgroundColor: '#ef4444'
                     }]
                 },
-                options: chartOptions('Comments')
+                options: chartOptions('Lines Deleted')
             });
         }
 
@@ -1150,9 +1297,9 @@
                         </div>
                     </td>
                     <td>${c.totalCommits}</td>
-                    <td>${c.totalPRsReviewed}</td>
-                    <td>${c.totalComments}</td>
-                    <td><strong>${c.totalCommits + c.totalPRsReviewed + c.totalComments}</strong></td>
+                    <td style="color: #22c55e;">+${c.totalLinesAdded.toLocaleString()}</td>
+                    <td style="color: #ef4444;">-${c.totalLinesDeleted.toLocaleString()}</td>
+                    <td><strong>${(c.totalLinesAdded + c.totalLinesDeleted).toLocaleString()}</strong></td>
                 </tr>
             `).join('');
         }

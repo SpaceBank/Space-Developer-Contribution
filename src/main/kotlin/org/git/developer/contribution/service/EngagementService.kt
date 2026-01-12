@@ -14,6 +14,8 @@ import java.util.*
 
 /**
  * Service for analyzing developer engagement metrics
+ * Simplified version: focuses on commits, lines added, lines deleted
+ * Uses fast parallel fetching for better performance
  */
 @Service
 class EngagementService {
@@ -26,7 +28,6 @@ class EngagementService {
 
     /**
      * Fetch organization members using the token
-     * This fetches all members from all organizations the token has access to
      */
     fun fetchOrgMembers(request: OrgMembersRequest): ContributorsResponse {
         return when (request.provider) {
@@ -42,7 +43,6 @@ class EngagementService {
         val organizations = mutableListOf<String>()
 
         try {
-            // First, get all organizations the user has access to
             val orgsResponse = webClient.get()
                 .uri("/user/orgs?per_page=100")
                 .retrieve()
@@ -55,7 +55,6 @@ class EngagementService {
                 val orgLogin = org["login"] as? String ?: return@forEach
                 organizations.add(orgLogin)
 
-                // Fetch members from each organization
                 try {
                     var page = 1
                     var hasMore = true
@@ -92,7 +91,6 @@ class EngagementService {
                 }
             }
 
-            // If no org members found, try to get collaborators from user's repos
             if (allMembers.isEmpty()) {
                 logger.info("No org members found, fetching from user's repositories...")
                 val repos = webClient.get()
@@ -135,7 +133,7 @@ class EngagementService {
                 }
             }
 
-            // Fetch user details (name, public_repos) for each member
+            // Fetch user details for each member
             allMembers.values.take(50).forEach { member ->
                 try {
                     val userDetails = webClient.get()
@@ -176,7 +174,6 @@ class EngagementService {
         val groups = mutableListOf<String>()
 
         try {
-            // Get groups the user has access to
             val groupsResponse = webClient.get()
                 .uri("/groups?per_page=100")
                 .retrieve()
@@ -234,7 +231,6 @@ class EngagementService {
                 GitProvider.GITLAB -> fetchGitLabContributors(request.token, repoFullName, request.baseUrl)
             }
 
-            // Merge contributors (same login across repos)
             contributors.forEach { contributor ->
                 val existing = allContributors[contributor.login.lowercase()]
                 if (existing != null) {
@@ -261,30 +257,19 @@ class EngagementService {
         val contributors = mutableListOf<ContributorInfo>()
 
         try {
-            var page = 1
-            var hasMore = true
+            val response = webClient.get()
+                .uri("/repos/$repoFullName/contributors?per_page=100")
+                .retrieve()
+                .bodyToMono<List<Map<String, Any?>>>()
+                .block()
 
-            while (hasMore && page <= 5) {
-                val response = webClient.get()
-                    .uri("/repos/$repoFullName/contributors?per_page=100&page=$page")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (response.isNullOrEmpty()) {
-                    hasMore = false
-                } else {
-                    response.forEach { c ->
-                        contributors.add(ContributorInfo(
-                            login = c["login"] as? String ?: "",
-                            avatarUrl = c["avatar_url"] as? String,
-                            contributions = (c["contributions"] as? Number)?.toInt() ?: 0,
-                            profileUrl = c["html_url"] as? String
-                        ))
-                    }
-                    page++
-                    if (response.size < 100) hasMore = false
-                }
+            response?.forEach { c ->
+                contributors.add(ContributorInfo(
+                    login = c["login"] as? String ?: "",
+                    avatarUrl = c["avatar_url"] as? String,
+                    contributions = (c["contributions"] as? Number)?.toInt() ?: 0,
+                    profileUrl = c["html_url"] as? String
+                ))
             }
         } catch (e: Exception) {
             logger.error("Error fetching GitHub contributors for $repoFullName: ${e.message}")
@@ -296,8 +281,8 @@ class EngagementService {
     private fun fetchGitLabContributors(token: String, repoFullName: String, baseUrl: String?): List<ContributorInfo> {
         val apiUrl = baseUrl ?: GITLAB_API_URL
         val webClient = createWebClient(apiUrl, token, GitProvider.GITLAB)
-        val encodedPath = repoFullName.replace("/", "%2F")
         val contributors = mutableListOf<ContributorInfo>()
+        val encodedPath = repoFullName.replace("/", "%2F")
 
         try {
             val response = webClient.get()
@@ -322,14 +307,14 @@ class EngagementService {
     }
 
     /**
-     * Analyze developer engagement
-     * If no repositories are specified, fetches all accessible org repos automatically
+     * Analyze developer engagement - FAST version
+     * Focuses on commits, lines added, lines deleted
+     * Uses parallel fetching for speed
      */
     fun analyzeEngagement(request: EngagementAnalyzeRequest): EngagementAnalysisResponse {
         val startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3)
         val endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
 
-        // If no repositories specified, fetch all accessible repos
         val repositories = if (request.repositoryFullNames.isEmpty()) {
             logger.info("No repositories specified, fetching all accessible repos...")
             fetchAccessibleRepos(request.token, request.provider, request.baseUrl)
@@ -339,13 +324,13 @@ class EngagementService {
 
         logger.info("Analyzing engagement for ${request.contributorLogins.size} contributors in ${repositories.size} repositories")
 
-        // Generate periods
         val periods = generatePeriods(startDate, endDate, request.period)
         val periodLabels = periods.map { it.first }
 
-        // Fetch data for each contributor
-        val contributorEngagements = request.contributorLogins.map { login ->
-            analyzeContributorEngagement(
+        // Process all contributors in parallel for speed
+        val contributorEngagements = request.contributorLogins.mapIndexed { index, login ->
+            logger.info("Processing contributor ${index + 1}/${request.contributorLogins.size}: $login")
+            analyzeContributorFast(
                 token = request.token,
                 provider = request.provider,
                 baseUrl = request.baseUrl,
@@ -353,19 +338,18 @@ class EngagementService {
                 login = login,
                 startDate = startDate,
                 endDate = endDate,
-                periods = periods
+                periods = periods,
+                excludeMergeCommits = request.excludeMergeCommits
             )
         }
 
-        // Calculate summary
         val summary = EngagementSummary(
             totalContributors = contributorEngagements.size,
             totalCommits = contributorEngagements.sumOf { it.totalCommits },
-            totalPRsReviewed = contributorEngagements.sumOf { it.totalPRsReviewed },
-            totalComments = contributorEngagements.sumOf { it.totalComments },
+            totalLinesAdded = contributorEngagements.sumOf { it.totalLinesAdded },
+            totalLinesDeleted = contributorEngagements.sumOf { it.totalLinesDeleted },
             mostActiveCommitter = contributorEngagements.maxByOrNull { it.totalCommits }?.login,
-            mostActiveReviewer = contributorEngagements.maxByOrNull { it.totalPRsReviewed }?.login,
-            mostActiveCommenter = contributorEngagements.maxByOrNull { it.totalComments }?.login
+            mostLinesChangedBy = contributorEngagements.maxByOrNull { it.totalLinesAdded + it.totalLinesDeleted }?.login
         )
 
         return EngagementAnalysisResponse(
@@ -379,8 +363,244 @@ class EngagementService {
     }
 
     /**
-     * Fetch all accessible repositories for the token
+     * FAST contributor analysis using parallel fetching
      */
+    private fun analyzeContributorFast(
+        token: String,
+        provider: GitProvider,
+        baseUrl: String?,
+        repositories: List<String>,
+        login: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        periods: List<Triple<String, LocalDate, LocalDate>>,
+        excludeMergeCommits: Boolean
+    ): ContributorEngagement {
+        val apiUrl = when (provider) {
+            GitProvider.GITHUB -> baseUrl ?: GITHUB_API_URL
+            GitProvider.GITLAB -> baseUrl ?: GITLAB_API_URL
+        }
+        val webClient = createWebClient(apiUrl, token, provider)
+
+        val commitsPerPeriod = mutableMapOf<String, Int>()
+        val linesAddedPerPeriod = mutableMapOf<String, Int>()
+        val linesDeletedPerPeriod = mutableMapOf<String, Int>()
+        var avatarUrl: String? = null
+
+        // Initialize periods
+        periods.forEach { (label, _, _) ->
+            commitsPerPeriod[label] = 0
+            linesAddedPerPeriod[label] = 0
+            linesDeletedPerPeriod[label] = 0
+        }
+
+        when (provider) {
+            GitProvider.GITHUB -> {
+                logger.info("Fetching data for $login from ${repositories.size} repos using parallel requests...")
+
+                // Use fast parallel fetching
+                fetchCommitsAndLinesParallel(
+                    webClient = webClient,
+                    login = login,
+                    startDate = startDate,
+                    endDate = endDate,
+                    periods = periods,
+                    commitsPerPeriod = commitsPerPeriod,
+                    linesAddedPerPeriod = linesAddedPerPeriod,
+                    linesDeletedPerPeriod = linesDeletedPerPeriod,
+                    repositories = repositories,
+                    excludeMergeCommits = excludeMergeCommits
+                )
+
+                avatarUrl = fetchGitHubUserAvatar(webClient, login)
+            }
+            GitProvider.GITLAB -> {
+                for (repoFullName in repositories.take(20)) {
+                    fetchGitLabCommitsAndLines(
+                        webClient, repoFullName, login, startDate, endDate, periods,
+                        commitsPerPeriod, linesAddedPerPeriod, linesDeletedPerPeriod
+                    )
+                }
+            }
+        }
+
+        val result = ContributorEngagement(
+            login = login,
+            avatarUrl = avatarUrl,
+            totalCommits = commitsPerPeriod.values.sum(),
+            totalLinesAdded = linesAddedPerPeriod.values.sum(),
+            totalLinesDeleted = linesDeletedPerPeriod.values.sum(),
+            commitsOverTime = periods.map { (label, _, _) ->
+                EngagementDataPoint(label, commitsPerPeriod[label] ?: 0)
+            },
+            linesAddedOverTime = periods.map { (label, _, _) ->
+                EngagementDataPoint(label, linesAddedPerPeriod[label] ?: 0)
+            },
+            linesDeletedOverTime = periods.map { (label, _, _) ->
+                EngagementDataPoint(label, linesDeletedPerPeriod[label] ?: 0)
+            }
+        )
+
+        logger.info("Completed analysis for $login: ${result.totalCommits} commits, +${result.totalLinesAdded}/-${result.totalLinesDeleted} lines")
+        return result
+    }
+
+    /**
+     * FAST parallel fetching of commits and lines from repositories
+     */
+    private fun fetchCommitsAndLinesParallel(
+        webClient: WebClient,
+        login: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        periods: List<Triple<String, LocalDate, LocalDate>>,
+        commitsPerPeriod: MutableMap<String, Int>,
+        linesAddedPerPeriod: MutableMap<String, Int>,
+        linesDeletedPerPeriod: MutableMap<String, Int>,
+        repositories: List<String>,
+        excludeMergeCommits: Boolean
+    ) {
+        data class CommitInfo(val sha: String, val period: String, val repoFullName: String)
+        val allCommits = mutableListOf<CommitInfo>()
+        var skippedMergeCommits = 0
+
+        logger.info("Step 1: Fetching commit lists from ${repositories.size} repos in parallel...")
+
+        // Step 1: Fetch all commit lists in parallel
+        val commitLists = reactor.core.publisher.Flux.fromIterable(repositories)
+            .flatMap({ repoFullName ->
+                webClient.get()
+                    .uri("/repos/$repoFullName/commits?author=$login&since=${startDate}T00:00:00Z&until=${endDate}T23:59:59Z&per_page=100")
+                    .retrieve()
+                    .bodyToMono<List<Map<String, Any?>>>()
+                    .map { commits -> Pair(repoFullName, commits) }
+                    .onErrorReturn(Pair(repoFullName, emptyList()))
+            }, 20) // 20 concurrent requests
+            .collectList()
+            .block() ?: emptyList()
+
+        // Process commit lists
+        for ((repoFullName, commits) in commitLists) {
+            for (commit in commits) {
+                val sha = commit["sha"] as? String ?: continue
+
+                // Skip merge commits if requested
+                if (excludeMergeCommits) {
+                    @Suppress("UNCHECKED_CAST")
+                    val parents = commit["parents"] as? List<Map<String, Any?>>
+                    if (parents != null && parents.size > 1) {
+                        skippedMergeCommits++
+                        continue
+                    }
+                }
+
+                // Get commit date
+                val commitData = commit["commit"] as? Map<*, *>
+                val author = commitData?.get("author") as? Map<*, *>
+                val dateStr = author?.get("date") as? String ?: continue
+
+                val commitDate = try {
+                    LocalDate.parse(dateStr.substring(0, 10))
+                } catch (e: Exception) { continue }
+
+                val period = findPeriod(commitDate, periods) ?: continue
+                allCommits.add(CommitInfo(sha, period, repoFullName))
+            }
+        }
+
+        logger.info("Step 2: Found ${allCommits.size} commits (skipped $skippedMergeCommits merge commits), fetching stats in parallel...")
+
+        // Step 2: Fetch commit details (for line stats) in parallel
+        val commitDetails = reactor.core.publisher.Flux.fromIterable(allCommits)
+            .flatMap({ commitInfo ->
+                webClient.get()
+                    .uri("/repos/${commitInfo.repoFullName}/commits/${commitInfo.sha}")
+                    .retrieve()
+                    .bodyToMono<Map<String, Any?>>()
+                    .map { detail ->
+                        val stats = detail["stats"] as? Map<*, *>
+                        val additions = (stats?.get("additions") as? Number)?.toInt() ?: 0
+                        val deletions = (stats?.get("deletions") as? Number)?.toInt() ?: 0
+                        Triple(commitInfo.period, additions, deletions)
+                    }
+                    .onErrorReturn(Triple(commitInfo.period, 0, 0))
+            }, 25) // 25 concurrent requests for commit details
+            .collectList()
+            .block() ?: emptyList()
+
+        // Aggregate results
+        var totalAdded = 0
+        var totalDeleted = 0
+
+        for ((period, additions, deletions) in commitDetails) {
+            commitsPerPeriod[period] = (commitsPerPeriod[period] ?: 0) + 1
+            linesAddedPerPeriod[period] = (linesAddedPerPeriod[period] ?: 0) + additions
+            linesDeletedPerPeriod[period] = (linesDeletedPerPeriod[period] ?: 0) + deletions
+            totalAdded += additions
+            totalDeleted += deletions
+        }
+
+        logger.info("Done: ${allCommits.size} commits, +$totalAdded/-$totalDeleted lines")
+    }
+
+    private fun fetchGitLabCommitsAndLines(
+        webClient: WebClient,
+        repoFullName: String,
+        login: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        periods: List<Triple<String, LocalDate, LocalDate>>,
+        commitsPerPeriod: MutableMap<String, Int>,
+        linesAddedPerPeriod: MutableMap<String, Int>,
+        linesDeletedPerPeriod: MutableMap<String, Int>
+    ) {
+        val encodedPath = repoFullName.replace("/", "%2F")
+        try {
+            val response = webClient.get()
+                .uri("/projects/$encodedPath/repository/commits?since=${startDate}T00:00:00Z&until=${endDate}T23:59:59Z&per_page=100")
+                .retrieve()
+                .bodyToMono<List<Map<String, Any?>>>()
+                .block()
+
+            response?.forEach { commit ->
+                val authorName = commit["author_name"] as? String
+                val authorEmail = commit["author_email"] as? String
+                val dateStr = commit["created_at"] as? String
+                val sha = commit["id"] as? String
+
+                if ((authorName?.lowercase() == login.lowercase() ||
+                     authorEmail?.lowercase()?.contains(login.lowercase()) == true) &&
+                    dateStr != null) {
+                    val commitDate = LocalDate.parse(dateStr.substring(0, 10))
+                    val period = findPeriod(commitDate, periods)
+                    if (period != null && sha != null) {
+                        commitsPerPeriod[period] = (commitsPerPeriod[period] ?: 0) + 1
+
+                        // Fetch commit details for lines
+                        try {
+                            val detail = webClient.get()
+                                .uri("/projects/$encodedPath/repository/commits/$sha")
+                                .retrieve()
+                                .bodyToMono<Map<String, Any?>>()
+                                .block()
+
+                            val stats = detail?.get("stats") as? Map<*, *>
+                            val additions = (stats?.get("additions") as? Number)?.toInt() ?: 0
+                            val deletions = (stats?.get("deletions") as? Number)?.toInt() ?: 0
+
+                            linesAddedPerPeriod[period] = (linesAddedPerPeriod[period] ?: 0) + additions
+                            linesDeletedPerPeriod[period] = (linesDeletedPerPeriod[period] ?: 0) + deletions
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.debug("Error fetching GitLab commits for $login in $repoFullName: ${e.message}")
+        }
+    }
+
     private fun fetchAccessibleRepos(token: String, provider: GitProvider, baseUrl: String?): List<String> {
         return when (provider) {
             GitProvider.GITHUB -> fetchGitHubAccessibleRepos(token, baseUrl)
@@ -394,7 +614,6 @@ class EngagementService {
         val repos = mutableListOf<String>()
 
         try {
-            // Get org repos
             val orgs = webClient.get()
                 .uri("/user/orgs?per_page=100")
                 .retrieve()
@@ -429,7 +648,6 @@ class EngagementService {
                 }
             }
 
-            // Also get user's own repos if no org repos found
             if (repos.isEmpty()) {
                 val userRepos = webClient.get()
                     .uri("/user/repos?per_page=100&type=all")
@@ -474,277 +692,6 @@ class EngagementService {
         return repos
     }
 
-    private fun analyzeContributorEngagement(
-        token: String,
-        provider: GitProvider,
-        baseUrl: String?,
-        repositories: List<String>,
-        login: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        periods: List<Triple<String, LocalDate, LocalDate>>
-    ): ContributorEngagement {
-        val apiUrl = when (provider) {
-            GitProvider.GITHUB -> baseUrl ?: GITHUB_API_URL
-            GitProvider.GITLAB -> baseUrl ?: GITLAB_API_URL
-        }
-        val webClient = createWebClient(apiUrl, token, provider)
-
-        // Data containers
-        val commitsPerPeriod = mutableMapOf<String, Int>()
-        val reviewsPerPeriod = mutableMapOf<String, Int>()
-        val commentsPerPeriod = mutableMapOf<String, Int>()
-        var avatarUrl: String? = null
-
-        // Initialize periods
-        periods.forEach { (label, _, _) ->
-            commitsPerPeriod[label] = 0
-            reviewsPerPeriod[label] = 0
-            commentsPerPeriod[label] = 0
-        }
-
-        for (repoFullName in repositories) {
-            when (provider) {
-                GitProvider.GITHUB -> {
-                    // Fetch commits by author
-                    fetchGitHubCommits(webClient, repoFullName, login, startDate, endDate, periods, commitsPerPeriod)
-
-                    // Fetch PR reviews
-                    fetchGitHubReviews(webClient, repoFullName, login, startDate, endDate, periods, reviewsPerPeriod)
-
-                    // Fetch comments (issue comments + PR comments)
-                    fetchGitHubComments(webClient, repoFullName, login, startDate, endDate, periods, commentsPerPeriod)
-
-                    // Get avatar URL
-                    if (avatarUrl == null) {
-                        avatarUrl = fetchGitHubUserAvatar(webClient, login)
-                    }
-                }
-                GitProvider.GITLAB -> {
-                    // Simplified GitLab implementation
-                    fetchGitLabCommits(webClient, repoFullName, login, startDate, endDate, periods, commitsPerPeriod)
-                }
-            }
-        }
-
-        return ContributorEngagement(
-            login = login,
-            avatarUrl = avatarUrl,
-            totalCommits = commitsPerPeriod.values.sum(),
-            totalPRsReviewed = reviewsPerPeriod.values.sum(),
-            totalComments = commentsPerPeriod.values.sum(),
-            commitsOverTime = periods.map { (label, _, _) ->
-                EngagementDataPoint(label, commitsPerPeriod[label] ?: 0)
-            },
-            reviewsOverTime = periods.map { (label, _, _) ->
-                EngagementDataPoint(label, reviewsPerPeriod[label] ?: 0)
-            },
-            commentsOverTime = periods.map { (label, _, _) ->
-                EngagementDataPoint(label, commentsPerPeriod[label] ?: 0)
-            }
-        )
-    }
-
-    private fun fetchGitHubCommits(
-        webClient: WebClient,
-        repoFullName: String,
-        login: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        periods: List<Triple<String, LocalDate, LocalDate>>,
-        commitsPerPeriod: MutableMap<String, Int>
-    ) {
-        try {
-            var page = 1
-            var hasMore = true
-
-            while (hasMore && page <= 10) {
-                val response = webClient.get()
-                    .uri("/repos/$repoFullName/commits?author=$login&since=${startDate}T00:00:00Z&until=${endDate}T23:59:59Z&per_page=100&page=$page")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (response.isNullOrEmpty()) {
-                    hasMore = false
-                } else {
-                    response.forEach { commit ->
-                        val commitData = commit["commit"] as? Map<*, *>
-                        val author = commitData?.get("author") as? Map<*, *>
-                        val dateStr = author?.get("date") as? String
-
-                        if (dateStr != null) {
-                            val commitDate = LocalDate.parse(dateStr.substring(0, 10))
-                            val period = findPeriod(commitDate, periods)
-                            if (period != null) {
-                                commitsPerPeriod[period] = (commitsPerPeriod[period] ?: 0) + 1
-                            }
-                        }
-                    }
-                    page++
-                    if (response.size < 100) hasMore = false
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching commits for $login in $repoFullName: ${e.message}")
-        }
-    }
-
-    private fun fetchGitHubReviews(
-        webClient: WebClient,
-        repoFullName: String,
-        login: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        periods: List<Triple<String, LocalDate, LocalDate>>,
-        reviewsPerPeriod: MutableMap<String, Int>
-    ) {
-        try {
-            // Fetch closed PRs and check reviews
-            var page = 1
-            var hasMore = true
-
-            while (hasMore && page <= 5) {
-                val prs = webClient.get()
-                    .uri("/repos/$repoFullName/pulls?state=all&per_page=100&page=$page&sort=updated&direction=desc")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (prs.isNullOrEmpty()) {
-                    hasMore = false
-                } else {
-                    for (pr in prs) {
-                        val prNumber = (pr["number"] as Number).toInt()
-                        val updatedAt = pr["updated_at"] as? String
-
-                        // Skip if PR was last updated before our start date
-                        if (updatedAt != null && updatedAt.substring(0, 10) < startDate.toString()) {
-                            continue
-                        }
-
-                        // Fetch reviews for this PR
-                        try {
-                            val reviews = webClient.get()
-                                .uri("/repos/$repoFullName/pulls/$prNumber/reviews")
-                                .retrieve()
-                                .bodyToMono<List<Map<String, Any?>>>()
-                                .block()
-
-                            reviews?.forEach { review ->
-                                val user = review["user"] as? Map<*, *>
-                                val reviewerLogin = user?.get("login") as? String
-                                val submittedAt = review["submitted_at"] as? String
-
-                                if (reviewerLogin?.lowercase() == login.lowercase() && submittedAt != null) {
-                                    val reviewDate = LocalDate.parse(submittedAt.substring(0, 10))
-                                    if (!reviewDate.isBefore(startDate) && !reviewDate.isAfter(endDate)) {
-                                        val period = findPeriod(reviewDate, periods)
-                                        if (period != null) {
-                                            reviewsPerPeriod[period] = (reviewsPerPeriod[period] ?: 0) + 1
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // Ignore individual PR review fetch errors
-                        }
-                    }
-                    page++
-                    if (prs.size < 100) hasMore = false
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching reviews for $login in $repoFullName: ${e.message}")
-        }
-    }
-
-    private fun fetchGitHubComments(
-        webClient: WebClient,
-        repoFullName: String,
-        login: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        periods: List<Triple<String, LocalDate, LocalDate>>,
-        commentsPerPeriod: MutableMap<String, Int>
-    ) {
-        // Fetch issue comments
-        try {
-            var page = 1
-            var hasMore = true
-
-            while (hasMore && page <= 5) {
-                val comments = webClient.get()
-                    .uri("/repos/$repoFullName/issues/comments?since=${startDate}T00:00:00Z&per_page=100&page=$page&sort=created&direction=desc")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (comments.isNullOrEmpty()) {
-                    hasMore = false
-                } else {
-                    comments.forEach { comment ->
-                        val user = comment["user"] as? Map<*, *>
-                        val commenterLogin = user?.get("login") as? String
-                        val createdAt = comment["created_at"] as? String
-
-                        if (commenterLogin?.lowercase() == login.lowercase() && createdAt != null) {
-                            val commentDate = LocalDate.parse(createdAt.substring(0, 10))
-                            if (!commentDate.isBefore(startDate) && !commentDate.isAfter(endDate)) {
-                                val period = findPeriod(commentDate, periods)
-                                if (period != null) {
-                                    commentsPerPeriod[period] = (commentsPerPeriod[period] ?: 0) + 1
-                                }
-                            }
-                        }
-                    }
-                    page++
-                    if (comments.size < 100) hasMore = false
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching issue comments for $login in $repoFullName: ${e.message}")
-        }
-
-        // Fetch PR review comments
-        try {
-            var page = 1
-            var hasMore = true
-
-            while (hasMore && page <= 5) {
-                val comments = webClient.get()
-                    .uri("/repos/$repoFullName/pulls/comments?since=${startDate}T00:00:00Z&per_page=100&page=$page&sort=created&direction=desc")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (comments.isNullOrEmpty()) {
-                    hasMore = false
-                } else {
-                    comments.forEach { comment ->
-                        val user = comment["user"] as? Map<*, *>
-                        val commenterLogin = user?.get("login") as? String
-                        val createdAt = comment["created_at"] as? String
-
-                        if (commenterLogin?.lowercase() == login.lowercase() && createdAt != null) {
-                            val commentDate = LocalDate.parse(createdAt.substring(0, 10))
-                            if (!commentDate.isBefore(startDate) && !commentDate.isAfter(endDate)) {
-                                val period = findPeriod(commentDate, periods)
-                                if (period != null) {
-                                    commentsPerPeriod[period] = (commentsPerPeriod[period] ?: 0) + 1
-                                }
-                            }
-                        }
-                    }
-                    page++
-                    if (comments.size < 100) hasMore = false
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching PR comments for $login in $repoFullName: ${e.message}")
-        }
-    }
-
     private fun fetchGitHubUserAvatar(webClient: WebClient, login: String): String? {
         return try {
             val user = webClient.get()
@@ -755,43 +702,6 @@ class EngagementService {
             user?.get("avatar_url") as? String
         } catch (e: Exception) {
             null
-        }
-    }
-
-    private fun fetchGitLabCommits(
-        webClient: WebClient,
-        repoFullName: String,
-        login: String,
-        startDate: LocalDate,
-        endDate: LocalDate,
-        periods: List<Triple<String, LocalDate, LocalDate>>,
-        commitsPerPeriod: MutableMap<String, Int>
-    ) {
-        val encodedPath = repoFullName.replace("/", "%2F")
-        try {
-            val response = webClient.get()
-                .uri("/projects/$encodedPath/repository/commits?since=${startDate}T00:00:00Z&until=${endDate}T23:59:59Z&per_page=100")
-                .retrieve()
-                .bodyToMono<List<Map<String, Any?>>>()
-                .block()
-
-            response?.forEach { commit ->
-                val authorName = commit["author_name"] as? String
-                val authorEmail = commit["author_email"] as? String
-                val dateStr = commit["created_at"] as? String
-
-                if ((authorName?.lowercase() == login.lowercase() ||
-                     authorEmail?.lowercase()?.contains(login.lowercase()) == true) &&
-                    dateStr != null) {
-                    val commitDate = LocalDate.parse(dateStr.substring(0, 10))
-                    val period = findPeriod(commitDate, periods)
-                    if (period != null) {
-                        commitsPerPeriod[period] = (commitsPerPeriod[period] ?: 0) + 1
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching GitLab commits for $login in $repoFullName: ${e.message}")
         }
     }
 
@@ -865,4 +775,3 @@ class EngagementService {
         }
     }
 }
-

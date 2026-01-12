@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Engineering Metrics Matrix</title>
+    <title>Engineering Matrix - Space Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -20,6 +20,32 @@
             padding: 2rem;
         }
 
+        .back-button {
+            position: fixed;
+            top: 1.5rem;
+            left: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-button:hover {
+            background: rgba(251, 146, 60, 0.3);
+            border-color: rgba(251, 146, 60, 0.5);
+            transform: translateX(-3px);
+        }
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -34,17 +60,6 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .nav-link {
-            display: inline-block;
-            margin-bottom: 1rem;
-            color: #6366f1;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .nav-link:hover {
-            text-decoration: underline;
-        }
 
         .panel {
             background: rgba(255, 255, 255, 0.05);
@@ -565,12 +580,10 @@
     </style>
 </head>
 <body>
+    <a href="/" class="back-button">← Back to Home</a>
+
     <div class="container">
-        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-            <a href="/" class="nav-link">← Contribution Dashboard</a>
-            <a href="/engagement.html" class="nav-link">👥 Developer Engagement</a>
-        </div>
-        <h1>📊 Engineering Metrics Matrix</h1>
+        <h1>⚡ Engineering Matrix</h1>
 
         <!-- Step 1: Authentication -->
         <div class="panel" id="step1-panel">
@@ -587,17 +600,17 @@
                 </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="margin-top: 1rem;">
                 <label for="token">Personal Access Token</label>
                 <input type="password" id="token" placeholder="Enter your token...">
             </div>
 
-            <div class="form-group hidden" id="custom-url-group">
+            <div class="form-group hidden" id="custom-url-group" style="margin-top: 1rem;">
                 <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
                 <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
             </div>
 
-            <button onclick="fetchRepositories()">
+            <button onclick="fetchRepositories()" style="margin-top: 1rem;">
                 <span>Connect & Fetch Repositories</span>
                 <span>→</span>
             </button>
