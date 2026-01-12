@@ -225,6 +225,316 @@ GitDeveloperContribution/
 2. **Rate limiting** - GitHub API has rate limits; use GraphQL where possible
 3. **Merge commits** - Enable "Exclude merge commits" for accurate stats
 
+---
+
+## ☁️ AWS Deployment Guide
+
+### Option 1: EC2 Instance (Recommended for Beginners)
+
+#### What You Need from AWS:
+- AWS Account
+- EC2 Instance (t2.micro for free tier, t2.small/medium for production)
+- Security Group with ports 22 (SSH), 80 (HTTP), 443 (HTTPS), 8081 (App)
+- Elastic IP (optional, for static public IP)
+
+#### Step-by-Step Deployment:
+
+**1. Launch EC2 Instance**
+```bash
+# AWS Console → EC2 → Launch Instance
+# - Choose: Amazon Linux 2023 or Ubuntu 22.04
+# - Instance type: t2.small (2GB RAM recommended)
+# - Create/select key pair for SSH
+# - Configure Security Group (see below)
+```
+
+**2. Configure Security Group**
+```
+Inbound Rules:
+- SSH (22) → Your IP or 0.0.0.0/0
+- HTTP (80) → 0.0.0.0/0
+- HTTPS (443) → 0.0.0.0/0
+- Custom TCP (8081) → 0.0.0.0/0
+```
+
+**3. Connect to EC2**
+```bash
+# Download your .pem key file and connect
+chmod 400 your-key.pem
+ssh -i your-key.pem ec2-user@<your-ec2-public-ip>
+# For Ubuntu: ssh -i your-key.pem ubuntu@<your-ec2-public-ip>
+```
+
+**4. Install Java 17**
+```bash
+# Amazon Linux 2023
+sudo yum install java-17-amazon-corretto -y
+
+# Ubuntu
+sudo apt update
+sudo apt install openjdk-17-jdk -y
+
+# Verify installation
+java -version
+```
+
+**5. Install Git and Clone Project**
+```bash
+sudo yum install git -y  # Amazon Linux
+# OR
+sudo apt install git -y  # Ubuntu
+
+git clone https://github.com/SpaceBank/Space-Developer-Contribution.git
+cd Space-Developer-Contribution
+```
+
+**6. Build and Run**
+```bash
+# Make gradlew executable
+chmod +x gradlew
+
+# Build the JAR
+./gradlew build -x test
+
+# Run on port 80 (requires sudo) or 8081
+sudo ./gradlew bootRun --args='--server.port=80'
+# OR
+./gradlew bootRun --args='--server.port=8081'
+```
+
+**7. Run as Background Service**
+```bash
+# Create a systemd service file
+sudo nano /etc/systemd/system/gitcontribution.service
+```
+
+Add this content:
+```ini
+[Unit]
+Description=Git Developer Contribution Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/Space-Developer-Contribution
+ExecStart=/home/ec2-user/Space-Developer-Contribution/gradlew bootRun --args='--server.port=8081'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable gitcontribution
+sudo systemctl start gitcontribution
+sudo systemctl status gitcontribution
+```
+
+**8. Access Your App**
+```
+http://<your-ec2-public-ip>:8081
+```
+
+---
+
+### Option 2: Run as JAR with Nginx Reverse Proxy
+
+**1. Build JAR file**
+```bash
+./gradlew build -x test
+# JAR will be in: build/libs/GitDeveloperContribution-0.0.1-SNAPSHOT.jar
+```
+
+**2. Run JAR directly**
+```bash
+# Run in background
+nohup java -jar build/libs/GitDeveloperContribution-0.0.1-SNAPSHOT.jar --server.port=8081 > app.log 2>&1 &
+
+# Check if running
+ps aux | grep java
+```
+
+**3. Install and Configure Nginx**
+```bash
+# Amazon Linux
+sudo yum install nginx -y
+
+# Ubuntu
+sudo apt install nginx -y
+
+# Start Nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+**4. Configure Nginx as Reverse Proxy**
+```bash
+sudo nano /etc/nginx/conf.d/gitcontribution.conf
+```
+
+Add:
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # or use _ for any
+
+    location / {
+        proxy_pass http://localhost:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+}
+```
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Now access via: `http://<your-ec2-public-ip>` (port 80)
+
+---
+
+### Option 3: AWS Elastic Beanstalk (Easy Auto-scaling)
+
+**1. Install EB CLI**
+```bash
+pip install awsebcli
+```
+
+**2. Build JAR**
+```bash
+./gradlew build -x test
+```
+
+**3. Initialize and Deploy**
+```bash
+eb init -p java-17 git-contribution-app
+eb create git-contribution-env
+eb deploy
+```
+
+**4. Open App**
+```bash
+eb open
+```
+
+---
+
+### Option 4: Docker + ECS/ECR
+
+**1. Create Dockerfile**
+```dockerfile
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar", "--server.port=8081"]
+```
+
+**2. Build and Push to ECR**
+```bash
+# Build JAR first
+./gradlew build -x test
+
+# Build Docker image
+docker build -t git-contribution .
+
+# Create ECR repository (AWS Console or CLI)
+aws ecr create-repository --repository-name git-contribution
+
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+
+# Tag and push
+docker tag git-contribution:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/git-contribution:latest
+docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/git-contribution:latest
+```
+
+**3. Deploy to ECS**
+- Create ECS Cluster
+- Create Task Definition with your ECR image
+- Create Service with desired count
+
+---
+
+### 🔐 SSL/HTTPS Setup (Recommended for Production)
+
+**Option A: AWS Certificate Manager + Load Balancer**
+1. Request free SSL certificate in ACM
+2. Create Application Load Balancer
+3. Add HTTPS listener with ACM certificate
+4. Point to your EC2 instance
+
+**Option B: Let's Encrypt with Certbot**
+```bash
+# Install Certbot
+sudo yum install certbot python3-certbot-nginx -y  # Amazon Linux
+# OR
+sudo apt install certbot python3-certbot-nginx -y  # Ubuntu
+
+# Get certificate (requires domain pointing to your server)
+sudo certbot --nginx -d your-domain.com
+```
+
+---
+
+### 💰 AWS Cost Estimation
+
+| Service | Free Tier | Production |
+|---------|-----------|------------|
+| EC2 t2.micro | 750 hrs/month free (1 year) | ~$8/month |
+| EC2 t2.small | - | ~$17/month |
+| Elastic IP | Free if attached | $3.6/month if unused |
+| Data Transfer | 100GB free | $0.09/GB after |
+| Route 53 (DNS) | - | $0.50/zone/month |
+
+---
+
+### 🚀 Quick Deploy Script
+
+Create `deploy.sh` on your EC2:
+```bash
+#!/bin/bash
+cd /home/ec2-user/Space-Developer-Contribution
+git pull origin main
+./gradlew build -x test
+sudo systemctl restart gitcontribution
+echo "Deployment complete!"
+```
+
+Make executable and run:
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+---
+
+### 📋 AWS Checklist
+
+- [ ] AWS Account created
+- [ ] EC2 instance launched
+- [ ] Security Group configured (ports 22, 80, 443, 8081)
+- [ ] Java 17 installed
+- [ ] Git installed and repo cloned
+- [ ] Application built and running
+- [ ] Systemd service configured (for auto-restart)
+- [ ] Nginx configured (optional, for port 80)
+- [ ] Domain configured (optional)
+- [ ] SSL certificate installed (optional)
+
 ## 📄 License
 
 MIT License
