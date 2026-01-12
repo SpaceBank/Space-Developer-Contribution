@@ -132,6 +132,181 @@ class MetricsService(
         since: String?,
         baseUrl: String?
     ): List<PRDetailedInfo> {
+        // Use GraphQL API for faster data fetching - single request for all PR data
+        return try {
+            fetchGitHubPRDetailsViaGraphQL(token, repositoryFullName, since, baseUrl)
+        } catch (e: Exception) {
+            logger.warn("GraphQL fetch failed for $repositoryFullName, falling back to REST: ${e.message}")
+            fetchGitHubPRDetailsViaREST(token, repositoryFullName, since, baseUrl)
+        }
+    }
+
+    /**
+     * Fast GraphQL-based PR fetching - gets all data in one request per batch
+     */
+    private fun fetchGitHubPRDetailsViaGraphQL(
+        token: String,
+        repositoryFullName: String,
+        since: String?,
+        baseUrl: String?
+    ): List<PRDetailedInfo> {
+        val exchangeStrategies = ExchangeStrategies.builder()
+            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
+            .build()
+
+        val webClient = WebClient.builder()
+            .baseUrl("https://api.github.com")
+            .exchangeStrategies(exchangeStrategies)
+            .defaultHeader("Authorization", "Bearer $token")
+            .defaultHeader("Content-Type", "application/json")
+            .build()
+
+        val parts = repositoryFullName.split("/")
+        if (parts.size != 2) return emptyList()
+        val owner = parts[0]
+        val repo = parts[1]
+
+        val prList = mutableListOf<PRDetailedInfo>()
+        var hasNextPage = true
+        var cursor: String? = null
+
+        while (hasNextPage) {
+            val afterClause = if (cursor != null) ", after: \"$cursor\"" else ""
+            val query = """
+                query {
+                  repository(owner: "$owner", name: "$repo") {
+                    pullRequests(states: [MERGED], first: 50, orderBy: {field: UPDATED_AT, direction: DESC}$afterClause) {
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                      nodes {
+                        number
+                        title
+                        author { login }
+                        createdAt
+                        mergedAt
+                        additions
+                        deletions
+                        commits(first: 1) {
+                          nodes {
+                            commit {
+                              committedDate
+                            }
+                          }
+                        }
+                        reviews(first: 10) {
+                          nodes {
+                            submittedAt
+                            state
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            try {
+                val response = webClient.post()
+                    .uri("/graphql")
+                    .bodyValue(mapOf("query" to query))
+                    .retrieve()
+                    .bodyToMono<Map<String, Any?>>()
+                    .block()
+
+                val data = response?.get("data") as? Map<*, *>
+                val repository = data?.get("repository") as? Map<*, *>
+                val pullRequests = repository?.get("pullRequests") as? Map<*, *>
+                val pageInfo = pullRequests?.get("pageInfo") as? Map<*, *>
+                val nodes = pullRequests?.get("nodes") as? List<*>
+
+                hasNextPage = pageInfo?.get("hasNextPage") as? Boolean ?: false
+                cursor = pageInfo?.get("endCursor") as? String
+
+                if (nodes != null) {
+                    for (node in nodes) {
+                        val pr = node as? Map<*, *> ?: continue
+                        val mergedAt = pr["mergedAt"] as? String ?: continue
+
+                        // Filter by since date
+                        if (since != null && mergedAt < since) {
+                            hasNextPage = false
+                            break
+                        }
+
+                        val author = pr["author"] as? Map<*, *>
+                        val authorLogin = author?.get("login") as? String ?: "unknown"
+                        val commits = pr["commits"] as? Map<*, *>
+                        val commitNodes = commits?.get("nodes") as? List<*>
+                        val firstCommit = commitNodes?.firstOrNull() as? Map<*, *>
+                        val commit = firstCommit?.get("commit") as? Map<*, *>
+                        val firstCommitTime = commit?.get("committedDate") as? String
+
+                        val reviews = pr["reviews"] as? Map<*, *>
+                        val reviewNodes = reviews?.get("nodes") as? List<*>
+                        var firstReviewTime: String? = null
+                        var firstApprovalTime: String? = null
+
+                        if (reviewNodes != null && reviewNodes.isNotEmpty()) {
+                            val sortedReviews = reviewNodes
+                                .mapNotNull { it as? Map<*, *> }
+                                .filter { it["submittedAt"] != null }
+                                .sortedBy { it["submittedAt"] as String }
+
+                            if (sortedReviews.isNotEmpty()) {
+                                firstReviewTime = sortedReviews.first()["submittedAt"] as? String
+                            }
+
+                            val approvals = sortedReviews.filter { it["state"] == "APPROVED" }
+                            if (approvals.isNotEmpty()) {
+                                firstApprovalTime = approvals.first()["submittedAt"] as? String
+                            }
+                        }
+
+                        val additions = (pr["additions"] as? Number)?.toInt() ?: 0
+                        val deletions = (pr["deletions"] as? Number)?.toInt() ?: 0
+
+                        prList.add(PRDetailedInfo(
+                            prNumber = (pr["number"] as Number).toInt(),
+                            title = pr["title"] as? String ?: "",
+                            authorLogin = authorLogin,
+                            repositoryFullName = repositoryFullName,
+                            createdAt = pr["createdAt"] as? String ?: "",
+                            mergedAt = mergedAt,
+                            firstCommitTime = firstCommitTime,
+                            firstReviewTime = firstReviewTime,
+                            firstApprovalTime = firstApprovalTime,
+                            additions = additions,
+                            deletions = deletions,
+                            prSize = additions + deletions
+                        ))
+                    }
+                }
+
+                // Limit to avoid too many requests
+                if (prList.size >= 200) {
+                    hasNextPage = false
+                }
+            } catch (e: Exception) {
+                logger.error("GraphQL error for $repositoryFullName: ${e.message}")
+                throw e
+            }
+        }
+
+        logger.info("Fetched ${prList.size} PRs via GraphQL for $repositoryFullName")
+        return prList
+    }
+
+    /**
+     * Fallback REST-based PR fetching (slower, but works if GraphQL fails)
+     */
+    private fun fetchGitHubPRDetailsViaREST(
+        token: String,
+        repositoryFullName: String,
+        since: String?,
+        baseUrl: String?
+    ): List<PRDetailedInfo> {
         val apiUrl = baseUrl ?: "https://api.github.com"
 
         val exchangeStrategies = ExchangeStrategies.builder()
@@ -149,10 +324,11 @@ class MetricsService(
         var page = 1
         var hasMore = true
 
-        while (hasMore && page <= 10) {
+        // Limit to 3 pages for performance
+        while (hasMore && page <= 3) {
             try {
                 val response = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls?state=closed&per_page=100&page=$page&sort=updated&direction=desc")
+                    .uri("/repos/$repositoryFullName/pulls?state=closed&per_page=50&page=$page&sort=updated&direction=desc")
                     .retrieve()
                     .bodyToMono<List<Map<String, Any?>>>()
                     .block()
@@ -169,18 +345,26 @@ class MetricsService(
                         val prNumber = (pr["number"] as Number).toInt()
                         val user = pr["user"] as? Map<*, *>
                         val authorLogin = user?.get("login") as? String ?: "unknown"
+                        val createdAt = pr["created_at"] as? String ?: continue
 
-                        // Fetch additional PR details
-                        val prDetails = fetchGitHubPRAdditionalDetails(
-                            webClient, repositoryFullName, prNumber, pr, authorLogin, mergedAt
-                        )
-
-                        if (prDetails != null) {
-                            prList.add(prDetails)
-                        }
+                        // Basic info without additional API calls for speed
+                        prList.add(PRDetailedInfo(
+                            prNumber = prNumber,
+                            title = pr["title"] as? String ?: "",
+                            authorLogin = authorLogin,
+                            repositoryFullName = repositoryFullName,
+                            createdAt = createdAt,
+                            mergedAt = mergedAt,
+                            firstCommitTime = createdAt, // Use created as approximation
+                            firstReviewTime = null,
+                            firstApprovalTime = null,
+                            additions = 0,
+                            deletions = 0,
+                            prSize = 0
+                        ))
                     }
                     page++
-                    if (response.size < 100) hasMore = false
+                    if (response.size < 50) hasMore = false
                 }
             } catch (e: Exception) {
                 logger.error("Error fetching GitHub PRs for $repositoryFullName: ${e.message}")
@@ -189,131 +373,6 @@ class MetricsService(
         }
 
         return prList
-    }
-
-    private fun fetchGitHubPRAdditionalDetails(
-        webClient: WebClient,
-        repositoryFullName: String,
-        prNumber: Int,
-        pr: Map<String, Any?>,
-        authorLogin: String,
-        mergedAt: String
-    ): PRDetailedInfo? {
-        return try {
-            val createdAt = pr["created_at"] as? String ?: return null
-
-            // Fetch individual PR to get additions/deletions (not available in list response)
-            var additions = 0
-            var deletions = 0
-            try {
-                val prDetail = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls/$prNumber")
-                    .retrieve()
-                    .bodyToMono<Map<String, Any?>>()
-                    .block()
-
-                if (prDetail != null) {
-                    additions = (prDetail["additions"] as? Number)?.toInt() ?: 0
-                    deletions = (prDetail["deletions"] as? Number)?.toInt() ?: 0
-                }
-            } catch (e: Exception) {
-                logger.debug("Could not fetch PR details for #$prNumber: ${e.message}")
-            }
-            val prSize = additions + deletions
-
-            // Fetch commits to get first commit time
-            var firstCommitTime: String? = null
-            try {
-                val commits = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls/$prNumber/commits?per_page=100")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (!commits.isNullOrEmpty()) {
-                    val firstCommit = commits.first()
-                    val commitData = firstCommit["commit"] as? Map<*, *>
-                    val author = commitData?.get("author") as? Map<*, *>
-                    firstCommitTime = author?.get("date") as? String
-                }
-            } catch (e: Exception) {
-                logger.debug("Could not fetch commits for PR #$prNumber: ${e.message}")
-            }
-
-            // Fetch reviews to get review times
-            var firstReviewTime: String? = null
-            var firstApprovalTime: String? = null
-            var firstCommentTime: String? = null
-
-            try {
-                val reviews = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls/$prNumber/reviews")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (!reviews.isNullOrEmpty()) {
-                    // First review (any type) - this is when someone started reviewing
-                    val firstReview = reviews.minByOrNull { it["submitted_at"] as? String ?: "z" }
-                    firstReviewTime = firstReview?.get("submitted_at") as? String
-                    firstCommentTime = firstReviewTime
-
-                    // First approval
-                    val approvals = reviews.filter { it["state"] == "APPROVED" }
-                    if (approvals.isNotEmpty()) {
-                        val firstApproval = approvals.minByOrNull { it["submitted_at"] as? String ?: "z" }
-                        firstApprovalTime = firstApproval?.get("submitted_at") as? String
-                        logger.debug("PR #$prNumber: found ${approvals.size} approvals, first at $firstApprovalTime")
-                    }
-                }
-            } catch (e: Exception) {
-                logger.debug("Could not fetch reviews for PR #$prNumber: ${e.message}")
-            }
-
-            // Also try to get comments (review comments may come before formal reviews)
-            try {
-                val comments = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls/$prNumber/comments?per_page=1")
-                    .retrieve()
-                    .bodyToMono<List<Map<String, Any?>>>()
-                    .block()
-
-                if (!comments.isNullOrEmpty()) {
-                    val firstComment = comments.first()
-                    val commentTime = firstComment["created_at"] as? String
-                    if (commentTime != null && (firstCommentTime == null || commentTime < firstCommentTime)) {
-                        firstCommentTime = commentTime
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore
-            }
-
-            // Use firstCommentTime if we have it and it's earlier than firstReviewTime
-            if (firstCommentTime != null && (firstReviewTime == null || firstCommentTime < firstReviewTime)) {
-                firstReviewTime = firstCommentTime
-            }
-
-            logger.debug("PR #$prNumber: size=$prSize, firstCommit=$firstCommitTime, firstReview=$firstReviewTime, firstApproval=$firstApprovalTime")
-
-            PRDetailedInfo(
-                prNumber = prNumber,
-                title = pr["title"] as? String ?: "",
-                authorLogin = authorLogin,
-                repositoryFullName = repositoryFullName,
-                createdAt = createdAt,
-                mergedAt = mergedAt,
-                firstCommitTime = firstCommitTime,
-                firstReviewTime = firstReviewTime,
-                firstApprovalTime = firstApprovalTime,
-                additions = additions,
-                deletions = deletions,
-                prSize = prSize
-            )
-        } catch (e: Exception) {
-            logger.error("Error fetching PR details for #$prNumber: ${e.message}")
-            null
-        }
     }
 
     private fun fetchGitLabMRDetails(
