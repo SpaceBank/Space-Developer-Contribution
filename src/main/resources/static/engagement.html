@@ -689,18 +689,23 @@
             <!-- Detailed Table -->
             <div class="panel" style="margin-top: 1.5rem;">
                 <h3>📋 Contributor Engagement Summary</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Contributor</th>
-                            <th>Commits</th>
-                            <th>Lines Added</th>
-                            <th>Lines Deleted</th>
-                            <th>Total Lines</th>
-                        </tr>
-                    </thead>
-                    <tbody id="engagementTableBody"></tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Contributor</th>
+                                <th>Commits</th>
+                                <th>PRs Merged</th>
+                                <th>PRs Reviewed</th>
+                                <th>Issues</th>
+                                <th>Active Days</th>
+                                <th>Lines Added</th>
+                                <th>Lines Deleted</th>
+                            </tr>
+                        </thead>
+                        <tbody id="engagementTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -1127,7 +1132,7 @@
                 </div>
             `;
 
-            // Summary Cards
+            // Summary Cards - with new GraphQL metrics
             document.getElementById('summaryCards').innerHTML = `
                 <div class="summary-card">
                     <h3>${data.summary.totalContributors}</h3>
@@ -1138,14 +1143,33 @@
                     <p>Total Commits</p>
                     <div class="subtitle">Top: ${data.summary.mostActiveCommitter || 'N/A'}</div>
                 </div>
+                <div class="summary-card" style="background: rgba(139, 92, 246, 0.1);">
+                    <h3 style="color: #8b5cf6;">${data.summary.totalPRsMerged || 0}</h3>
+                    <p>PRs Merged</p>
+                    <div class="subtitle">Impact metric</div>
+                </div>
+                <div class="summary-card" style="background: rgba(59, 130, 246, 0.1);">
+                    <h3 style="color: #3b82f6;">${data.summary.totalPRsReviewed || 0}</h3>
+                    <p>PRs Reviewed</p>
+                    <div class="subtitle">Team player</div>
+                </div>
+                <div class="summary-card" style="background: rgba(245, 158, 11, 0.1);">
+                    <h3 style="color: #f59e0b;">${data.summary.totalIssuesClosed || 0}</h3>
+                    <p>Issues Closed</p>
+                    <div class="subtitle">Problem solving</div>
+                </div>
+                <div class="summary-card" style="background: rgba(16, 185, 129, 0.1);">
+                    <h3 style="color: #10b981;">${data.summary.totalActiveDays || 0}</h3>
+                    <p>Active Days</p>
+                    <div class="subtitle">Total across team</div>
+                </div>
                 <div class="summary-card" style="background: rgba(34, 197, 94, 0.1);">
-                    <h3 style="color: #22c55e;">+${data.summary.totalLinesAdded.toLocaleString()}</h3>
+                    <h3 style="color: #22c55e;">+${(data.summary.totalLinesAdded || 0).toLocaleString()}</h3>
                     <p>Lines Added</p>
                 </div>
                 <div class="summary-card" style="background: rgba(239, 68, 68, 0.1);">
-                    <h3 style="color: #ef4444;">-${data.summary.totalLinesDeleted.toLocaleString()}</h3>
+                    <h3 style="color: #ef4444;">-${(data.summary.totalLinesDeleted || 0).toLocaleString()}</h3>
                     <p>Lines Deleted</p>
-                    <div class="subtitle">Top: ${data.summary.mostLinesChangedBy || 'N/A'}</div>
                 </div>
             `;
 
@@ -1296,10 +1320,13 @@
                             <span>${c.login}</span>
                         </div>
                     </td>
-                    <td>${c.totalCommits}</td>
-                    <td style="color: #22c55e;">+${c.totalLinesAdded.toLocaleString()}</td>
-                    <td style="color: #ef4444;">-${c.totalLinesDeleted.toLocaleString()}</td>
-                    <td><strong>${(c.totalLinesAdded + c.totalLinesDeleted).toLocaleString()}</strong></td>
+                    <td><strong>${c.totalCommits}</strong></td>
+                    <td style="color: #8b5cf6;">${c.prsMerged || 0}</td>
+                    <td style="color: #3b82f6;">${c.prsReviewed || 0}</td>
+                    <td style="color: #f59e0b;">${c.issuesClosed || 0}</td>
+                    <td style="color: #10b981;">${c.activeDays || 0}</td>
+                    <td style="color: #22c55e;">+${(c.totalLinesAdded || 0).toLocaleString()}</td>
+                    <td style="color: #ef4444;">-${(c.totalLinesDeleted || 0).toLocaleString()}</td>
                 </tr>
             `).join('');
         }

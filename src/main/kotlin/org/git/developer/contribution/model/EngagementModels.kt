@@ -76,13 +76,19 @@ data class ContributorEngagement(
     val login: String,
     val avatarUrl: String?,
     val totalCommits: Int,
-    val totalPRsReviewed: Int = 0,  // Deprecated - kept for compatibility
     val totalLinesAdded: Int,
     val totalLinesDeleted: Int,
+    // New GraphQL-based metrics
+    val prsMerged: Int = 0,           // PR Merge Velocity - shows how many ideas were finished
+    val prsReviewed: Int = 0,         // Review Responsiveness - team player metric
+    val issuesClosed: Int = 0,        // Issue Resolution - problem solving metric
+    val activeDays: Int = 0,          // Commit Consistency - active days in period
     val commitsOverTime: List<EngagementDataPoint>,
-    val reviewsOverTime: List<EngagementDataPoint> = emptyList(),  // Deprecated - kept for compatibility
     val linesAddedOverTime: List<EngagementDataPoint>,
-    val linesDeletedOverTime: List<EngagementDataPoint>
+    val linesDeletedOverTime: List<EngagementDataPoint>,
+    // Legacy fields for backward compatibility
+    val totalPRsReviewed: Int = 0,
+    val reviewsOverTime: List<EngagementDataPoint> = emptyList()
 )
 
 /**
@@ -103,11 +109,16 @@ data class EngagementAnalysisResponse(
 data class EngagementSummary(
     val totalContributors: Int,
     val totalCommits: Int,
-    val totalPRsReviewed: Int = 0,  // Deprecated - kept for compatibility
     val totalLinesAdded: Int,
     val totalLinesDeleted: Int,
     val mostActiveCommitter: String?,
-    val mostActiveReviewer: String? = null,  // Deprecated - kept for compatibility
-    val mostLinesChangedBy: String?
+    val mostLinesChangedBy: String?,
+    // New GraphQL-based metrics
+    val totalPRsMerged: Int = 0,      // Total PRs merged by all contributors
+    val totalPRsReviewed: Int = 0,    // Total PR reviews by all contributors
+    val totalIssuesClosed: Int = 0,   // Total issues closed by all contributors
+    val totalActiveDays: Int = 0,     // Sum of active days across contributors
+    // Legacy fields
+    val mostActiveReviewer: String? = null
 )
 
