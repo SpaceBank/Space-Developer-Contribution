@@ -276,46 +276,58 @@
             font-size: 0.8rem;
         }
 
-        /* Repository List - Ultra Compact, 2 rows by default */
+        /* Repository List */
         .repo-list {
-            max-height: 60px; /* ~2 rows */
-            overflow-y: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1px;
-            padding: 2px;
-            background: rgba(255, 255, 255, 0.03);
-            transition: max-height 0.3s ease;
-        }
-
-        .repo-list.expanded {
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
         }
 
         .repo-item {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
-            padding: 0.15rem 0.35rem;
-            border-radius: 3px;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             cursor: pointer;
             transition: background 0.2s;
-            font-size: 0.65rem;
-            background: rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-            height: 22px;
         }
 
         .repo-item:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .repo-item.selected {
-            background: rgba(99, 102, 241, 0.3);
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .repo-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #6366f1;
+        }
+
+        .repo-info {
+            flex: 1;
+        }
+
+        .repo-name {
+            font-weight: 500;
+        }
+
+        .repo-fullname {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+
+        .selection-info {
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
         }
 
         /* Summary Cards */
@@ -635,24 +647,16 @@
 
                 <div id="repo-filter-section" class="hidden">
                     <div id="repo-selection">
-                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem;">
-                            <div class="search-box" style="flex:1; margin-bottom:0;">
-                                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()" style="margin-bottom:0;">
-                            </div>
-                            <span style="color:#71717a; font-size:0.8rem; white-space:nowrap;">
-                                📁 <span id="totalRepoCount">0</span> total repos
-                            </span>
+                        <div class="search-box">
+                            <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
                         </div>
-                        <div class="selection-controls">
-                            <button class="secondary" onclick="selectAllRepos()">Select Visible</button>
-                            <button class="secondary" onclick="deselectAllRepos()">Deselect All</button>
-                            <span style="margin-left: auto; color: #a1a1aa;"><span id="repoCount">0</span> selected</span>
+
+                        <div class="selection-info">
+                            <span id="repoCount">0</span> repositories selected
+                            <button class="secondary" style="float: right; padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="selectAllRepos()">Select All</button>
                         </div>
+
                         <div class="repo-list" id="repoList"></div>
-                        <button id="expandReposBtn" class="secondary" onclick="toggleExpandRepos()"
-                                style="display:none; width:100%; font-size:0.7rem; padding:0.25rem; margin-top:0.25rem;">
-                            ▼ Show all repos
-                        </button>
                     </div>
                 </div>
             </div>
@@ -982,39 +986,22 @@
                 r.toLowerCase().includes(filter.toLowerCase())
             );
 
-            document.getElementById('totalRepoCount').textContent = repositories.length;
-
-            // Show max 50 repos initially, with expand button
-            const showCount = window.reposExpanded ? filtered.length : Math.min(50, filtered.length);
-            const visibleRepos = filtered.slice(0, showCount);
-
-            container.innerHTML = visibleRepos.map(repo => {
+            container.innerHTML = filtered.map(repo => {
                 const repoName = repo.split('/').pop();
                 return `
                     <div class="repo-item ${selectedRepos.has(repo) ? 'selected' : ''}"
                          onclick="toggleRepo('${repo}')">
                         <input type="checkbox" ${selectedRepos.has(repo) ? 'checked' : ''}
                                onclick="event.stopPropagation(); toggleRepo('${repo}')">
-                        <span title="${repo}">${repoName}</span>
+                        <div class="repo-info">
+                            <div class="repo-name">${repoName}</div>
+                            <div class="repo-fullname">${repo}</div>
+                        </div>
                     </div>
                 `;
             }).join('');
 
-            // Show expand button if there are more repos
-            const expandBtn = document.getElementById('expandReposBtn');
-            if (filtered.length > 50 && !window.reposExpanded) {
-                expandBtn.style.display = 'block';
-                expandBtn.textContent = `▼ Show all ${filtered.length} repos`;
-            } else {
-                expandBtn.style.display = 'none';
-            }
-
             updateRepoCount();
-        }
-
-        function toggleExpandRepos() {
-            window.reposExpanded = !window.reposExpanded;
-            renderRepoList(document.getElementById('repoSearch').value);
         }
 
         function filterRepos() {
@@ -1034,7 +1021,7 @@
             const filter = document.getElementById('repoSearch').value.toLowerCase();
             repositories.filter(r => r.toLowerCase().includes(filter))
                 .forEach(r => selectedRepos.add(r));
-            renderRepoList(filter);
+            renderRepoList(document.getElementById('repoSearch').value);
         }
 
         function deselectAllRepos() {
@@ -1043,7 +1030,10 @@
         }
 
         function updateRepoCount() {
-            document.getElementById('repoCount').textContent = selectedRepos.size;
+            const repoCountEl = document.getElementById('repoCount');
+            if (repoCountEl) {
+                repoCountEl.textContent = selectedRepos.size;
+            }
         }
 
 
@@ -1183,7 +1173,14 @@
 
             // Handle PRs when ready (usually slower)
             prsPromise.then(prData => {
-                updateLoadingStatus('prs', 'complete');
+                // Calculate totals for status display
+                if (prData && prData.contributors && Array.isArray(prData.contributors)) {
+                    const totalPRs = prData.contributors.reduce((sum, c) => sum + (c.prsMerged || 0), 0);
+                    const totalReviews = prData.contributors.reduce((sum, c) => sum + (c.prsReviewed || 0), 0);
+                    updateLoadingStatus('prs', 'complete', `${totalPRs} PRs, ${totalReviews} Reviews`);
+                } else {
+                    updateLoadingStatus('prs', 'complete');
+                }
                 mergePRDataIntoResults(prData);
                 displayPRResults();
             }).catch(err => {
@@ -1251,7 +1248,7 @@
         }
 
         // Update loading status indicator
-        function updateLoadingStatus(section, status) {
+        function updateLoadingStatus(section, status, customText = null) {
             const el = document.getElementById(`status-${section}`);
             if (!el) return;
 
@@ -1260,7 +1257,8 @@
             } else if (status === 'loading') {
                 el.innerHTML = `<span class="status-indicator status-loading"><span class="mini-spinner"></span> Loading...</span>`;
             } else if (status === 'complete') {
-                el.innerHTML = `<span class="status-indicator status-complete">✓ Complete</span>`;
+                const text = customText || '✓ Complete';
+                el.innerHTML = `<span class="status-indicator status-complete">✓ ${text}</span>`;
             } else if (status === 'error') {
                 el.innerHTML = `<span class="status-indicator" style="background: rgba(239,68,68,0.2); color: #ef4444;">✗ Failed</span>`;
             }
@@ -1370,6 +1368,9 @@
 
         // Display PR results after they load
         function displayPRResults() {
+            // Restore PR chart sections (they were replaced by shimmer)
+            restorePRChartSections();
+            
             // Update summary cards
             const s = analysisData.summary;
             document.getElementById('prsMergedCard').querySelector('.card-value').textContent = s.totalPRsMerged.toLocaleString();
@@ -1379,6 +1380,76 @@
             // Render PR charts
             renderPRCharts(analysisData);
             renderEngagementTable(analysisData.contributors, false); // full data now
+        }
+
+        // Restore PR chart sections that were replaced by shimmer
+        function restorePRChartSections() {
+            const prSection = document.getElementById('prChartsSection');
+            const reviewSection = document.getElementById('reviewChartsSection');
+            const activeDaysSection = document.getElementById('activeDaysChartsSection');
+
+            if (prSection) {
+                prSection.innerHTML = `
+                    <div class="chart-panel">
+                        <h3 style="color: #8b5cf6;">📈 PRs Merged Over Time</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation/merge activity over the selected period</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="prsMergedLineChartShimmer"></div>
+                            <canvas id="prsMergedLineChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-panel">
+                        <h3 style="color: #8b5cf6;">📊 Total PRs Merged by Contributor</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total PRs created between contributors</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="prsMergedBarChartShimmer"></div>
+                            <canvas id="prsMergedBarChart"></canvas>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (reviewSection) {
+                reviewSection.innerHTML = `
+                    <div class="chart-panel">
+                        <h3 style="color: #3b82f6;">📈 PRs Reviewed Over Time</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows code review activity over the selected period</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="prsReviewedLineChartShimmer"></div>
+                            <canvas id="prsReviewedLineChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-panel">
+                        <h3 style="color: #3b82f6;">📊 Total PRs Reviewed by Contributor</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total reviews performed between contributors</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="prsReviewedBarChartShimmer"></div>
+                            <canvas id="prsReviewedBarChart"></canvas>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (activeDaysSection) {
+                activeDaysSection.innerHTML = `
+                    <div class="chart-panel">
+                        <h3 style="color: #10b981;">📈 Active Days Over Time</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows how many days had activity in each period</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="activeDaysLineChartShimmer"></div>
+                            <canvas id="activeDaysLineChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-panel">
+                        <h3 style="color: #10b981;">📊 Total Active Days by Contributor</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total active days between contributors</p>
+                        <div class="chart-container">
+                            <div class="chart-shimmer shimmer hidden" id="activeDaysBarChartShimmer"></div>
+                            <canvas id="activeDaysBarChart"></canvas>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         // Render only commits charts
