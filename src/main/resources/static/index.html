@@ -14,7 +14,7 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
             background: #0a0a1a;
         }
 
@@ -75,28 +75,14 @@
         .particle:nth-child(8) { left: 80%; animation-delay: 4s; animation-duration: 21s; }
         .particle:nth-child(9) { left: 90%; animation-delay: 1s; animation-duration: 23s; }
         .particle:nth-child(10) { left: 15%; animation-delay: 3s; animation-duration: 26s; }
-        .particle:nth-child(11) { left: 25%; animation-delay: 0s; animation-duration: 16s; }
-        .particle:nth-child(12) { left: 35%; animation-delay: 2s; animation-duration: 20s; }
-        .particle:nth-child(13) { left: 45%; animation-delay: 4s; animation-duration: 18s; }
-        .particle:nth-child(14) { left: 55%; animation-delay: 1s; animation-duration: 22s; }
-        .particle:nth-child(15) { left: 65%; animation-delay: 3s; animation-duration: 19s; }
-        .particle:nth-child(16) { left: 75%; animation-delay: 5s; animation-duration: 24s; }
-        .particle:nth-child(17) { left: 85%; animation-delay: 2s; animation-duration: 17s; }
-        .particle:nth-child(18) { left: 95%; animation-delay: 4s; animation-duration: 21s; }
-        .particle:nth-child(19) { left: 5%; animation-delay: 1s; animation-duration: 23s; }
-        .particle:nth-child(20) { left: 55%; animation-delay: 3s; animation-duration: 26s; }
 
         @keyframes float {
             0% {
                 transform: translateY(100vh) rotate(0deg);
                 opacity: 0;
             }
-            10% {
-                opacity: 1;
-            }
-            90% {
-                opacity: 1;
-            }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
             100% {
                 transform: translateY(-100vh) rotate(720deg);
                 opacity: 0;
@@ -159,12 +145,172 @@
             font-size: 1.25rem;
             color: #9ca3af;
             text-align: center;
-            margin-bottom: 4rem;
+            margin-bottom: 3rem;
             max-width: 600px;
         }
 
+        /* Login Panel */
+        .login-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2.5rem;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+            width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        .login-panel h2 {
+            color: #fff;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #9ca3af;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        .connect-btn {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-msg {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+            text-align: center;
+            display: none;
+        }
+
+        .loading-indicator {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        /* User Info Panel (shown after login) */
+        .user-info {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #22c55e;
+        }
+
+        .user-details {
+            flex: 1;
+        }
+
+        .user-name {
+            color: #fff;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .user-stats {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* Cards Container */
         .cards-container {
-            display: grid;
+            display: none;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 2rem;
             max-width: 1200px;
@@ -251,41 +397,25 @@
         /* Card specific colors */
         .card.contribution:hover {
             border-color: rgba(34, 197, 94, 0.5);
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.3),
-                0 0 60px rgba(34, 197, 94, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(34, 197, 94, 0.2);
         }
-
-        .card.contribution:hover .card-arrow {
-            background: #22c55e;
-        }
+        .card.contribution:hover .card-arrow { background: #22c55e; }
 
         .card.matrix:hover {
             border-color: rgba(251, 146, 60, 0.5);
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.3),
-                0 0 60px rgba(251, 146, 60, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(251, 146, 60, 0.2);
         }
-
-        .card.matrix:hover .card-arrow {
-            background: #fb923c;
-        }
+        .card.matrix:hover .card-arrow { background: #fb923c; }
 
         .card.engagement:hover {
             border-color: rgba(139, 92, 246, 0.5);
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.3),
-                0 0 60px rgba(139, 92, 246, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(139, 92, 246, 0.2);
         }
-
-        .card.engagement:hover .card-arrow {
-            background: #8b5cf6;
-        }
+        .card.engagement:hover .card-arrow { background: #8b5cf6; }
 
         /* Footer */
         .footer {
-            position: absolute;
-            bottom: 2rem;
+            margin-top: 3rem;
             text-align: center;
             color: #4b5563;
             font-size: 0.875rem;
@@ -296,27 +426,16 @@
             text-decoration: none;
         }
 
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
         /* Responsive */
         @media (max-width: 768px) {
-            h1 {
-                font-size: 2rem;
-            }
+            h1 { font-size: 2rem; }
+            .subtitle { font-size: 1rem; }
+            .cards-container { grid-template-columns: 1fr; }
+            .logo { font-size: 3rem; }
+        }
 
-            .subtitle {
-                font-size: 1rem;
-            }
-
-            .cards-container {
-                grid-template-columns: 1fr;
-            }
-
-            .logo {
-                font-size: 3rem;
-            }
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
@@ -325,16 +444,6 @@
     <div class="bg-animation">
         <div class="grid-lines"></div>
         <div class="particles">
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
-            <div class="particle"></div>
             <div class="particle"></div>
             <div class="particle"></div>
             <div class="particle"></div>
@@ -354,25 +463,71 @@
         <h1>Space Developer Analytics</h1>
         <p class="subtitle">Powerful insights into your team's Git activity, engineering metrics, and developer engagement across all your repositories.</p>
 
-        <div class="cards-container">
-            <!-- Developer Contribution -->
-            <div class="card contribution" onclick="window.location.href='contribution.html'">
+        <!-- Login Panel -->
+        <div class="login-panel" id="loginPanel">
+            <h2>🔐 Connect to Git Provider</h2>
+
+            <!-- Provider Selection -->
+            <div class="provider-select" style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')"
+                     style="flex: 1; padding: 1rem; border: 2px solid rgba(99, 102, 241, 0.5); border-radius: 12px; cursor: pointer; text-align: center; background: rgba(99, 102, 241, 0.1); transition: all 0.3s;">
+                    <div style="font-size: 2rem;">🐙</div>
+                    <div style="color: #fff; font-weight: 600;">GitHub</div>
+                </div>
+                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')"
+                     style="flex: 1; padding: 1rem; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s;">
+                    <div style="font-size: 2rem;">🦊</div>
+                    <div style="color: #9ca3af; font-weight: 600;">GitLab</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="token">Personal Access Token (Organization)</label>
+                <input type="password" id="token" placeholder="Enter your token...">
+            </div>
+
+            <div class="form-group hidden" id="gitlabUrlGroup">
+                <label for="baseUrl">GitLab API URL (for self-hosted)</label>
+                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
+            </div>
+
+            <button class="connect-btn" onclick="connectWithToken()" id="connectBtn">
+                Connect & Load Data
+            </button>
+            <div class="error-msg" id="errorMsg"></div>
+            <div class="loading-indicator" id="loadingIndicator">
+                <div class="spinner"></div>
+                <div class="loading-text" id="loadingText">Connecting...</div>
+            </div>
+        </div>
+
+        <!-- User Info (shown after login) -->
+        <div class="user-info" id="userInfo">
+            <img class="user-avatar" id="userAvatar" src="" alt="Avatar">
+            <div class="user-details">
+                <div class="user-name" id="userName">Connected</div>
+                <div class="user-stats" id="userStats">Loading stats...</div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <!-- Cards (shown after login) -->
+        <div class="cards-container" id="cardsContainer">
+            <div class="card contribution" onclick="navigateTo('contribution.html')">
                 <span class="card-icon">📊</span>
                 <h2>Developer Contribution</h2>
                 <p>Analyze commit history, lines of code changes, and contribution patterns across repositories. Visualize developer activity with interactive charts.</p>
                 <div class="card-arrow">→</div>
             </div>
 
-            <!-- Engineering Matrix -->
-            <div class="card matrix" onclick="window.location.href='matrix.html'">
+            <div class="card matrix" onclick="navigateTo('matrix.html')">
                 <span class="card-icon">⚡</span>
                 <h2>Engineering Matrix</h2>
                 <p>Track key engineering metrics: Cycle Time, PR Size, Review Time, Merge Frequency, and more. Benchmark against industry standards.</p>
                 <div class="card-arrow">→</div>
             </div>
 
-            <!-- Developer Engagement -->
-            <div class="card engagement" onclick="window.location.href='engagement.html'">
+            <div class="card engagement" onclick="navigateTo('engagement.html')">
                 <span class="card-icon">👥</span>
                 <h2>Developer Engagement</h2>
                 <p>Monitor developer activity including commits, PR reviews, and code changes. Track engagement trends over time with detailed analytics.</p>
@@ -386,13 +541,228 @@
     </div>
 
     <script>
-        // Add some interactivity - cards glow effect on mouse move
+        // State
+        let selectedProvider = 'GITHUB';
+
+        // Check if already logged in on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const sessionData = getSessionData();
+            if (sessionData && sessionData.token) {
+                showLoggedInState(sessionData);
+            }
+        });
+
+        // Provider selection
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            document.querySelectorAll('.provider-option').forEach(el => {
+                const isSelected = el.dataset.provider === provider;
+                el.style.borderColor = isSelected ? 'rgba(99, 102, 241, 0.5)' : 'rgba(255, 255, 255, 0.1)';
+                el.style.background = isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent';
+                el.querySelector('div:last-child').style.color = isSelected ? '#fff' : '#9ca3af';
+            });
+            document.getElementById('gitlabUrlGroup').classList.toggle('hidden', provider !== 'GITLAB');
+        }
+
+        // Get session data from sessionStorage
+        function getSessionData() {
+            const data = sessionStorage.getItem('spaceAnalyticsSession');
+            return data ? JSON.parse(data) : null;
+        }
+
+        // Save session data to sessionStorage
+        function saveSessionData(data) {
+            sessionStorage.setItem('spaceAnalyticsSession', JSON.stringify(data));
+        }
+
+        // Clear session data
+        function clearSessionData() {
+            sessionStorage.removeItem('spaceAnalyticsSession');
+        }
+
+        // Connect with token
+        async function connectWithToken() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('Please enter a valid token');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            try {
+                // Step 1: Fetch user info
+                updateLoadingText('Authenticating...');
+                const userResponse = await fetch('https://api.github.com/user', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!userResponse.ok) {
+                    throw new Error('Invalid token. Please check and try again.');
+                }
+
+                const user = await userResponse.json();
+
+                // Step 2: Fetch organizations
+                updateLoadingText('Loading organizations...');
+                const orgsResponse = await fetch('https://api.github.com/user/orgs?per_page=100', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const orgs = await orgsResponse.json();
+
+                // Step 3: Fetch ALL repositories (with full pagination)
+                updateLoadingText('Loading repositories (0)...');
+                let allRepos = [];
+                let page = 1;
+                let hasMore = true;
+
+                while (hasMore) {
+                    const reposResponse = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&type=all`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const repos = await reposResponse.json();
+
+                    if (!Array.isArray(repos) || repos.length === 0) {
+                        hasMore = false;
+                    } else {
+                        allRepos = allRepos.concat(repos.map(r => ({
+                            fullName: r.full_name,
+                            name: r.name,
+                            owner: r.owner.login,
+                            private: r.private
+                        })));
+                        updateLoadingText(`Loading repositories (${allRepos.length})...`);
+                        page++;
+                        if (repos.length < 100) hasMore = false;
+                    }
+                }
+
+                // Step 4: Fetch ALL contributors (org members) with pagination
+                updateLoadingText(`Loading contributors (0)...`);
+                let allContributors = [];
+
+                for (const org of orgs) {
+                    let memberPage = 1;
+                    let hasMoreMembers = true;
+
+                    while (hasMoreMembers) {
+                        try {
+                            const membersResponse = await fetch(`https://api.github.com/orgs/${org.login}/members?per_page=100&page=${memberPage}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (membersResponse.ok) {
+                                const members = await membersResponse.json();
+                                if (!Array.isArray(members) || members.length === 0) {
+                                    hasMoreMembers = false;
+                                } else {
+                                    members.forEach(m => {
+                                        if (!allContributors.find(c => c.login === m.login)) {
+                                            allContributors.push({
+                                                login: m.login,
+                                                avatarUrl: m.avatar_url,
+                                                profileUrl: m.html_url
+                                            });
+                                        }
+                                    });
+                                    updateLoadingText(`Loading contributors (${allContributors.length})...`);
+                                    memberPage++;
+                                    if (members.length < 100) hasMoreMembers = false;
+                                }
+                            } else {
+                                hasMoreMembers = false;
+                            }
+                        } catch (e) {
+                            console.warn(`Could not fetch members from ${org.login} page ${memberPage}`);
+                            hasMoreMembers = false;
+                        }
+                    }
+                }
+
+                // Save session data
+                const sessionData = {
+                    token: token,
+                    provider: selectedProvider,
+                    baseUrl: document.getElementById('baseUrl').value || null,
+                    user: {
+                        login: user.login,
+                        name: user.name || user.login,
+                        avatarUrl: user.avatar_url
+                    },
+                    organizations: orgs.map(o => o.login),
+                    repositories: allRepos,
+                    contributors: allContributors,
+                    loadedAt: new Date().toISOString()
+                };
+
+                saveSessionData(sessionData);
+                showLoading(false);
+                showLoggedInState(sessionData);
+
+            } catch (error) {
+                showLoading(false);
+                showError(error.message);
+            }
+        }
+
+        // Show logged in state
+        function showLoggedInState(sessionData) {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('cardsContainer').style.display = 'grid';
+
+            document.getElementById('userAvatar').src = sessionData.user.avatarUrl || '';
+            document.getElementById('userName').textContent = `👋 Welcome, ${sessionData.user.name}`;
+            const providerIcon = sessionData.provider === 'GITLAB' ? '🦊' : '🐙';
+            document.getElementById('userStats').textContent =
+                `${providerIcon} ${sessionData.provider} • 📦 ${sessionData.repositories.length} repos • 👥 ${sessionData.contributors.length} contributors`;
+        }
+
+        // Logout
+        function logout() {
+            clearSessionData();
+            document.getElementById('loginPanel').style.display = 'block';
+            document.getElementById('userInfo').style.display = 'none';
+            document.getElementById('cardsContainer').style.display = 'none';
+            document.getElementById('token').value = '';
+        }
+
+        // Navigate to page
+        function navigateTo(page) {
+            const sessionData = getSessionData();
+            if (!sessionData) {
+                showError('Session expired. Please login again.');
+                return;
+            }
+            window.location.href = page;
+        }
+
+        // UI Helpers
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'flex' : 'none';
+            document.getElementById('connectBtn').disabled = show;
+        }
+
+        function updateLoadingText(text) {
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+
+        // Card hover effects
         document.querySelectorAll('.card').forEach(card => {
             card.addEventListener('mousemove', (e) => {
                 const rect = card.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-
                 card.style.setProperty('--mouse-x', `${x}px`);
                 card.style.setProperty('--mouse-y', `${y}px`);
             });
@@ -400,4 +770,3 @@
     </script>
 </body>
 </html>
-

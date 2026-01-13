@@ -21,16 +21,21 @@ repositories {
 
 extra["springModulithVersion"] = "2.0.1"
 
+val osArch = System.getProperty("os.arch")
+val macOsClassifier = if (osArch == "aarch64") "osx-aarch_64" else "osx-x86_64"
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-webclient")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.118.Final:$macOsClassifier")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
-    implementation("tools.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
     testImplementation("org.springframework.boot:spring-boot-starter-restclient-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webclient-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webflux-test")

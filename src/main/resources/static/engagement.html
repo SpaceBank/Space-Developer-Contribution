@@ -460,6 +460,135 @@
             color: #e4e4e7;
             margin-bottom: 0.5rem;
         }
+
+        /* Shimmer Loading Animation */
+        .shimmer {
+            background: linear-gradient(90deg,
+                rgba(255,255,255,0.05) 25%,
+                rgba(255,255,255,0.15) 50%,
+                rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .shimmer-card {
+            height: 80px;
+            margin-bottom: 1rem;
+        }
+
+        .shimmer-chart {
+            height: 300px;
+            margin-bottom: 1rem;
+        }
+
+        .shimmer-text {
+            height: 20px;
+            width: 60%;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-loading {
+            position: relative;
+            min-height: 100px;
+        }
+
+        .section-loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+
+        .section-loaded {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-loading {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .status-complete {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .mini-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Chart shimmer overlay */
+        .chart-shimmer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-shimmer::after {
+            content: '⏳ Loading...';
+            color: #a1a1aa;
+            font-size: 0.875rem;
+        }
+
+        .chart-container {
+            position: relative;
+        }
+
+        .chart-shimmer.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -468,52 +597,11 @@
     <div class="container">
         <h1>👥 Developer Engagement Dashboard</h1>
 
-
-        <!-- Step 1: Authentication & Fetch Contributors -->
-        <div class="panel" id="step1-panel">
-            <h2>🔐 Step 1: Connect & Fetch Contributors</h2>
-
-            <div class="provider-select">
-                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
-                    <div class="icon">🐙</div>
-                    <div>GitHub</div>
-                </div>
-                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
-                    <div class="icon">🦊</div>
-                    <div>GitLab</div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="token">Personal Access Token (Organization Token)</label>
-                <input type="password" id="token" placeholder="Enter your organization token...">
-                <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.5rem;">
-                    This will fetch all members from organizations you have access to.
-                </p>
-            </div>
-
-            <div class="form-group hidden" id="custom-url-group">
-                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
-                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
-            </div>
-
-            <button onclick="fetchContributors()">
-                <span>Connect & Fetch Contributors</span>
-                <span>→</span>
-            </button>
-
-            <div id="auth-error" class="error hidden"></div>
-            <div id="auth-loading" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Fetching organization members...</span>
-            </div>
-        </div>
-
         <!-- Step 2: Select Contributors & Configure -->
-        <div class="panel hidden" id="step2-panel">
-            <h2>👥 Step 2: Select Contributors & Configure Analysis</h2>
+        <div class="panel" id="step2-panel">
+            <h2>👥 Select Contributors & Configure Analysis</h2>
 
-            <button class="secondary" onclick="goToStep(1)" style="margin-bottom: 1rem;">← Back</button>
+            <a href="/" class="secondary" style="display: inline-block; margin-bottom: 1rem; text-decoration: none;">← Back to Home</a>
 
             <!-- Organization Info -->
             <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; font-size: 0.9rem;"></div>
@@ -546,10 +634,7 @@
                 </p>
 
                 <div id="repo-filter-section" class="hidden">
-                    <button class="secondary" onclick="fetchRepositories()" id="fetchReposBtn" style="margin-bottom: 0.5rem;">
-                        📂 Load Repositories
-                    </button>
-                    <div id="repo-selection" class="hidden">
+                    <div id="repo-selection">
                         <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem;">
                             <div class="search-box" style="flex:1; margin-bottom:0;">
                                 <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()" style="margin-bottom:0;">
@@ -568,10 +653,6 @@
                                 style="display:none; width:100%; font-size:0.7rem; padding:0.25rem; margin-top:0.25rem;">
                             ▼ Show all repos
                         </button>
-                    </div>
-                    <div id="repos-loading" class="loading hidden">
-                        <div class="spinner"></div>
-                        <span>Fetching repositories...</span>
                     </div>
                 </div>
             </div>
@@ -626,6 +707,15 @@
                 <button class="secondary" onclick="goToStep(1)">🔄 Start Over</button>
             </div>
 
+            <!-- Loading Status Panel -->
+            <div id="loadingStatusPanel" class="hidden" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px; display: flex; gap: 1.5rem; align-items: center;">
+                <span style="font-size: 0.875rem; color: #a1a1aa;">Loading:</span>
+                <div style="display: flex; gap: 1rem;">
+                    <div>📝 Commits: <span id="status-commits"></span></div>
+                    <div>🚀 PRs & Reviews: <span id="status-prs"></span></div>
+                </div>
+            </div>
+
             <!-- Analysis Info -->
             <div id="analysisInfo" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;"></div>
 
@@ -640,48 +730,104 @@
 
             <!-- Charts Section -->
             <h3 style="margin: 1.5rem 0 1rem;">📈 Commits</h3>
-            <div class="charts-grid">
+            <p style="color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem;">
+                <strong>What it measures:</strong> The number of code commits made by each contributor.
+                Commits represent individual units of work pushed to the repository. Higher commit counts indicate active code contribution.
+                <em>Note: Merge commits are excluded by default for accurate measurement.</em>
+            </p>
+            <div class="charts-grid" id="commitsChartsSection">
                 <div class="chart-panel">
                     <h3>📉 Commits Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows commit activity distribution across the selected time period</p>
                     <div class="chart-container">
+                        <div class="chart-shimmer shimmer" id="commitsLineChartShimmer"></div>
                         <canvas id="commitsLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
                     <h3>📊 Total Commits by Contributor</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total commit count between contributors</p>
                     <div class="chart-container">
+                        <div class="chart-shimmer shimmer" id="commitsBarChartShimmer"></div>
                         <canvas id="commitsBarChart"></canvas>
                     </div>
                 </div>
             </div>
 
-
-            <h3 style="margin: 1.5rem 0 1rem;">📝 Lines Changed</h3>
-            <div class="charts-grid">
+            <!-- PR Merge Velocity -->
+            <h3 style="margin: 1.5rem 0 1rem;">🚀 PR Merge Velocity (Impact)</h3>
+            <p style="color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem;">
+                <strong>What it measures:</strong> The number of Pull Requests created/merged by each contributor.
+                This metric shows "Impact" - how many ideas and features were actually completed and shipped.
+                High PR velocity indicates a developer who delivers finished work regularly.
+            </p>
+            <div class="charts-grid" id="prChartsSection">
                 <div class="chart-panel">
-                    <h3 style="color: #22c55e;">📈 Lines Added Over Time</h3>
+                    <h3 style="color: #8b5cf6;">📈 PRs Merged Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation/merge activity over the selected period</p>
                     <div class="chart-container">
-                        <canvas id="linesAddedLineChart"></canvas>
+                        <div class="chart-shimmer shimmer" id="prsMergedLineChartShimmer"></div>
+                        <canvas id="prsMergedLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
-                    <h3 style="color: #22c55e;">📊 Total Lines Added by Contributor</h3>
+                    <h3 style="color: #8b5cf6;">📊 Total PRs Merged by Contributor</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total PRs created between contributors</p>
                     <div class="chart-container">
-                        <canvas id="linesAddedBarChart"></canvas>
+                        <div class="chart-shimmer shimmer" id="prsMergedBarChartShimmer"></div>
+                        <canvas id="prsMergedBarChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="charts-grid">
+
+            <!-- Review Responsiveness -->
+            <h3 style="margin: 1.5rem 0 1rem;">👥 Review Responsiveness (Team Player)</h3>
+            <p style="color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem;">
+                <strong>What it measures:</strong> The number of Pull Request reviews performed by each contributor.
+                This metric shows "Team Player" status - developers who actively help others by reviewing their code.
+                High review counts indicate strong collaboration and mentorship within the team.
+            </p>
+            <div class="charts-grid" id="reviewChartsSection">
                 <div class="chart-panel">
-                    <h3 style="color: #ef4444;">📉 Lines Deleted Over Time</h3>
+                    <h3 style="color: #3b82f6;">📈 PRs Reviewed Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows code review activity over the selected period</p>
                     <div class="chart-container">
-                        <canvas id="linesDeletedLineChart"></canvas>
+                        <div class="chart-shimmer shimmer" id="prsReviewedLineChartShimmer"></div>
+                        <canvas id="prsReviewedLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
-                    <h3 style="color: #ef4444;">📊 Total Lines Deleted by Contributor</h3>
+                    <h3 style="color: #3b82f6;">📊 Total PRs Reviewed by Contributor</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total reviews performed between contributors</p>
                     <div class="chart-container">
-                        <canvas id="linesDeletedBarChart"></canvas>
+                        <div class="chart-shimmer shimmer" id="prsReviewedBarChartShimmer"></div>
+                        <canvas id="prsReviewedBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commit Consistency / Active Days -->
+            <h3 style="margin: 1.5rem 0 1rem;">📅 Commit Consistency (Active Days)</h3>
+            <p style="color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem;">
+                <strong>What it measures:</strong> The number of days a contributor had any activity (commits, PRs, reviews, etc.).
+                This metric shows "Flow" - consistent daily engagement is better than sporadic bursts of activity.
+                High active days indicate steady, sustainable work patterns.
+            </p>
+            <div class="charts-grid" id="activeDaysChartsSection">
+                <div class="chart-panel">
+                    <h3 style="color: #10b981;">📈 Active Days Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows how many days had activity in each period</p>
+                    <div class="chart-container">
+                        <div class="chart-shimmer shimmer" id="activeDaysLineChartShimmer"></div>
+                        <canvas id="activeDaysLineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <h3 style="color: #10b981;">📊 Total Active Days by Contributor</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total active days between contributors</p>
+                    <div class="chart-container">
+                        <div class="chart-shimmer shimmer" id="activeDaysBarChartShimmer"></div>
+                        <canvas id="activeDaysBarChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -697,10 +843,7 @@
                                 <th>Commits</th>
                                 <th>PRs Merged</th>
                                 <th>PRs Reviewed</th>
-                                <th>Issues</th>
                                 <th>Active Days</th>
-                                <th>Lines Added</th>
-                                <th>Lines Deleted</th>
                             </tr>
                         </thead>
                         <tbody id="engagementTableBody"></tbody>
@@ -721,16 +864,30 @@
         let analysisData = null;
         let selectedContributorsForChart = new Set();
 
-        // Charts
+        // Charts - Commits
         let commitsLineChart = null;
         let commitsBarChart = null;
-        let linesAddedLineChart = null;
-        let linesAddedBarChart = null;
-        let linesDeletedLineChart = null;
-        let linesDeletedBarChart = null;
+
+        // Charts - PRs Merged (Impact)
+        let prsMergedLineChart = null;
+        let prsMergedBarChart = null;
+
+        // Charts - PRs Reviewed (Team Player)
+        let prsReviewedLineChart = null;
+        let prsReviewedBarChart = null;
+
+        // Charts - Active Days (Consistency)
+        let activeDaysLineChart = null;
+        let activeDaysBarChart = null;
 
         // Organizations found
         let organizations = [];
+
+        // Get session data from sessionStorage
+        function getSessionData() {
+            const data = sessionStorage.getItem('spaceAnalyticsSession');
+            return data ? JSON.parse(data) : null;
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -740,6 +897,41 @@
 
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
             document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
+
+            // Load session data if available
+            const sessionData = getSessionData();
+            if (sessionData && sessionData.token) {
+                // Set provider from session
+                selectedProvider = sessionData.provider || 'GITHUB';
+
+                // Auto-load contributors from session
+                if (sessionData.contributors && sessionData.contributors.length > 0) {
+                    contributors = sessionData.contributors.map(c => ({
+                        login: c.login,
+                        avatarUrl: c.avatarUrl,
+                        profileUrl: c.profileUrl,
+                        contributions: 0
+                    }));
+                    organizations = sessionData.organizations || [];
+
+                    // Auto-load repositories
+                    if (sessionData.repositories && sessionData.repositories.length > 0) {
+                        repositories = sessionData.repositories.map(r => r.fullName);
+                    }
+
+                    renderContributorsList();
+
+                    // Show org info
+                    document.getElementById('orgInfo').innerHTML = `
+                        🏢 <strong>${organizations.length}</strong> organizations •
+                        👥 <strong>${contributors.length}</strong> contributors •
+                        📦 <strong>${repositories.length}</strong> repositories loaded
+                    `;
+                }
+            } else {
+                // Redirect to login if no session
+                window.location.href = '/';
+            }
         });
 
         // Provider selection
@@ -751,178 +943,15 @@
             document.getElementById('custom-url-group').classList.toggle('hidden', provider !== 'GITLAB');
         }
 
-        // Step navigation
+        // Step navigation (step 2 and 3 only now - no login step)
         function goToStep(step) {
+            // Map step 1 to step 2 since there's no login panel
+            if (step === 1) step = 2;
             currentStep = step;
-            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
             document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
             document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
         }
 
-        // Fetch contributors directly from organization
-        async function fetchContributors() {
-            const token = document.getElementById('token').value.trim();
-            if (!token) {
-                showError('auth-error', 'Please enter your access token');
-                return;
-            }
-
-            hideError('auth-error');
-            showLoading('auth-loading');
-
-            try {
-                const response = await fetch('/api/engagement/members', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: token,
-                        provider: selectedProvider,
-                        baseUrl: document.getElementById('baseUrl').value || null
-                    })
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch contributors');
-
-                const data = await response.json();
-                contributors = data.contributors;
-                organizations = data.organizations || [];
-                selectedContributors.clear();
-                hideLoading('auth-loading');
-
-                // Show org info
-                if (organizations.length > 0) {
-                    document.getElementById('orgInfo').innerHTML = `
-                        <strong>🏢 Organizations:</strong> ${organizations.join(', ')}<br>
-                        <strong>👥 Total Contributors:</strong> ${data.totalCount}
-                    `;
-                } else {
-                    document.getElementById('orgInfo').innerHTML = `
-                        <strong>👥 Total Contributors:</strong> ${data.totalCount}
-                    `;
-                }
-
-                renderContributorsList();
-                goToStep(2);
-            } catch (error) {
-                hideLoading('auth-loading');
-                showError('auth-error', error.message);
-            }
-        }
-
-        // Fetch repositories (optional, for filtering)
-        async function fetchRepositories() {
-            const token = document.getElementById('token').value.trim();
-            if (!token) {
-                return;
-            }
-
-            showLoading('repos-loading');
-
-            try {
-                const response = await fetch('/api/git/repositories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: token,
-                        provider: selectedProvider,
-                        baseUrl: document.getElementById('baseUrl').value || null
-                    })
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch repositories');
-
-                const data = await response.json();
-                repositories = data.repositories;
-                selectedRepos.clear();
-                renderRepositoryList();
-                hideLoading('repos-loading');
-                document.getElementById('repo-selection').classList.remove('hidden');
-                document.getElementById('totalRepoCount').textContent = repositories.length;
-            } catch (error) {
-                hideLoading('repos-loading');
-                showError('analyze-error', error.message);
-            }
-        }
-
-        // Render repository list - compact 2 rows by default
-        let repoListExpanded = false;
-
-        function renderRepositoryList(filter = '') {
-            const container = document.getElementById('repoList');
-            const filtered = repositories.filter(repo =>
-                repo.fullName.toLowerCase().includes(filter.toLowerCase())
-            );
-
-            // Show all filtered repos (CSS will hide overflow)
-            container.innerHTML = filtered.map(repo => {
-                const shortName = repo.fullName.split('/').pop() || repo.fullName;
-                return `
-                    <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
-                         onclick="toggleRepo('${repo.fullName}')" title="${repo.fullName}">
-                        <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
-                               onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')"
-                               style="width:10px;height:10px;min-width:10px;">
-                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</span>
-                    </div>
-                `;
-            }).join('');
-
-            updateRepoCount();
-            updateExpandButton(filtered.length);
-        }
-
-        function updateExpandButton(totalCount) {
-            const btn = document.getElementById('expandReposBtn');
-            const container = document.getElementById('repoList');
-            if (totalCount > 10) {
-                btn.style.display = 'inline-block';
-                btn.textContent = repoListExpanded ? `▲ Collapse (${totalCount} repos)` : `▼ Show all ${totalCount} repos`;
-                container.classList.toggle('expanded', repoListExpanded);
-            } else {
-                btn.style.display = 'none';
-                container.classList.remove('expanded');
-            }
-        }
-
-        function toggleExpandRepos() {
-            repoListExpanded = !repoListExpanded;
-            const container = document.getElementById('repoList');
-            container.classList.toggle('expanded', repoListExpanded);
-            updateExpandButton(repositories.filter(repo =>
-                repo.fullName.toLowerCase().includes(document.getElementById('repoSearch').value.toLowerCase())
-            ).length);
-        }
-
-        function filterRepos() {
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
-
-        function toggleRepo(fullName) {
-            if (selectedRepos.has(fullName)) {
-                selectedRepos.delete(fullName);
-            } else {
-                selectedRepos.add(fullName);
-            }
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
-
-        function selectAllRepos() {
-            // Only select filtered/visible repos
-            const filter = document.getElementById('repoSearch').value.toLowerCase();
-            repositories
-                .filter(repo => repo.fullName.toLowerCase().includes(filter))
-                .forEach(repo => selectedRepos.add(repo.fullName));
-            renderRepositoryList(filter);
-        }
-
-        function deselectAllRepos() {
-            selectedRepos.clear();
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
-
-        function updateRepoCount() {
-            document.getElementById('repoCount').textContent = selectedRepos.size;
-        }
 
         // Toggle repo filter section
         function toggleRepoFilter() {
@@ -933,6 +962,11 @@
             if (checkbox.checked) {
                 section.classList.remove('hidden');
                 hint.innerHTML = '⚠️ <strong>Filter mode:</strong> Select specific repositories below to analyze.';
+
+                // Render repos from session data (already loaded)
+                if (repositories.length > 0) {
+                    renderRepoList();
+                }
             } else {
                 section.classList.add('hidden');
                 hint.innerHTML = '✅ Will analyze activity across <strong>ALL accessible repositories</strong> by default. Check the box above to filter by specific repos.';
@@ -940,6 +974,78 @@
                 updateRepoCount();
             }
         }
+
+        // Render repository list from session data
+        function renderRepoList(filter = '') {
+            const container = document.getElementById('repoList');
+            const filtered = repositories.filter(r =>
+                r.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            document.getElementById('totalRepoCount').textContent = repositories.length;
+
+            // Show max 50 repos initially, with expand button
+            const showCount = window.reposExpanded ? filtered.length : Math.min(50, filtered.length);
+            const visibleRepos = filtered.slice(0, showCount);
+
+            container.innerHTML = visibleRepos.map(repo => {
+                const repoName = repo.split('/').pop();
+                return `
+                    <div class="repo-item ${selectedRepos.has(repo) ? 'selected' : ''}"
+                         onclick="toggleRepo('${repo}')">
+                        <input type="checkbox" ${selectedRepos.has(repo) ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleRepo('${repo}')">
+                        <span title="${repo}">${repoName}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Show expand button if there are more repos
+            const expandBtn = document.getElementById('expandReposBtn');
+            if (filtered.length > 50 && !window.reposExpanded) {
+                expandBtn.style.display = 'block';
+                expandBtn.textContent = `▼ Show all ${filtered.length} repos`;
+            } else {
+                expandBtn.style.display = 'none';
+            }
+
+            updateRepoCount();
+        }
+
+        function toggleExpandRepos() {
+            window.reposExpanded = !window.reposExpanded;
+            renderRepoList(document.getElementById('repoSearch').value);
+        }
+
+        function filterRepos() {
+            renderRepoList(document.getElementById('repoSearch').value);
+        }
+
+        function toggleRepo(repo) {
+            if (selectedRepos.has(repo)) {
+                selectedRepos.delete(repo);
+            } else {
+                selectedRepos.add(repo);
+            }
+            renderRepoList(document.getElementById('repoSearch').value);
+        }
+
+        function selectAllRepos() {
+            const filter = document.getElementById('repoSearch').value.toLowerCase();
+            repositories.filter(r => r.toLowerCase().includes(filter))
+                .forEach(r => selectedRepos.add(r));
+            renderRepoList(filter);
+        }
+
+        function deselectAllRepos() {
+            selectedRepos.clear();
+            renderRepoList(document.getElementById('repoSearch').value);
+        }
+
+        function updateRepoCount() {
+            document.getElementById('repoCount').textContent = selectedRepos.size;
+        }
+
 
         // Render contributors list
         function renderContributorsList(filter = '') {
@@ -1001,7 +1107,7 @@
         }
 
 
-        // Analyze engagement
+        // Analyze engagement - PARALLEL loading for speed
         async function analyzeEngagement() {
             if (selectedContributors.size === 0) {
                 showError('analyze-error', 'Please select at least one contributor');
@@ -1010,76 +1116,565 @@
 
             const filterByRepos = document.getElementById('filterByRepos').checked;
 
-            // If filter is enabled but no repos selected, show error
             if (filterByRepos && selectedRepos.size === 0) {
                 showError('analyze-error', 'Please select at least one repository, or uncheck "Filter by specific repositories" to analyze all repos.');
                 return;
             }
 
             hideError('analyze-error');
-            showLoading('analyze-loading');
 
-            // Dynamic loading messages based on selection
-            const numContributors = selectedContributors.size;
-            const numRepos = filterByRepos ? selectedRepos.size : 'all';
-            const contributorNames = Array.from(selectedContributors).slice(0, 3).join(', ') + (numContributors > 3 ? '...' : '');
-
-            const loadingMessages = [
-                `🔗 Connecting to GitHub API...`,
-                `📋 Analyzing ${numContributors} contributor(s): ${contributorNames}`,
-                `📦 Fetching commits from ${numRepos} repository(ies)...`,
-                `⚡ Processing commit data in parallel...`,
-                `📊 Calculating line changes...`,
-                `📈 Aggregating results...`,
-                `✨ Almost done...`
-            ];
-            let msgIndex = 0;
-            const loadingMsgEl = document.getElementById('loading-message');
-            loadingMsgEl.textContent = loadingMessages[0];
-
-            const msgInterval = setInterval(() => {
-                msgIndex = (msgIndex + 1) % loadingMessages.length;
-                loadingMsgEl.textContent = loadingMessages[msgIndex];
-            }, 3000);
-
-            const token = document.getElementById('token').value.trim();
+            const sessionData = getSessionData();
+            const token = sessionData?.token || '';
             const startDate = document.getElementById('startDate').value || null;
             const endDate = document.getElementById('endDate').value || null;
             const period = document.getElementById('period').value;
-
-            // Only send repos if filter is enabled, otherwise send empty array (backend will fetch all)
             const reposToAnalyze = filterByRepos ? Array.from(selectedRepos) : [];
 
+            const requestBody = {
+                token: token,
+                provider: selectedProvider,
+                baseUrl: sessionData?.baseUrl || null,
+                repositoryFullNames: reposToAnalyze,
+                contributorLogins: Array.from(selectedContributors),
+                startDate: startDate,
+                endDate: endDate,
+                period: period,
+                excludeMergeCommits: document.getElementById('excludeMergeCommits').checked
+            };
+
+            // Go to results page immediately with shimmer loading
+            goToStep(3);
+            showShimmerLoading();
+
+            // Start BOTH API calls in PARALLEL
+            updateLoadingStatus('commits', 'loading');
+            updateLoadingStatus('prs', 'loading');
+
+            const commitsPromise = fetch('/api/engagement/analyze/commits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            }).then(r => r.ok ? r.json() : Promise.reject('Failed to fetch commits'));
+
+            const prsPromise = fetch('/api/engagement/analyze/prs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            }).then(r => {
+                if (!r.ok) {
+                    console.error('PR fetch failed with status:', r.status, r.statusText);
+                    return r.text().then(text => {
+                        console.error('PR fetch error body:', text);
+                        throw new Error(`Failed to fetch PRs: ${r.status} ${r.statusText}`);
+                    });
+                }
+                return r.json();
+            });
+
+            // Handle commits when ready (usually faster)
+            commitsPromise.then(data => {
+                analysisData = data;
+                updateLoadingStatus('commits', 'complete');
+                displayCommitsResults(data);
+            }).catch(err => {
+                updateLoadingStatus('commits', 'error');
+                console.error('Commits error:', err);
+            });
+
+            // Handle PRs when ready (usually slower)
+            prsPromise.then(prData => {
+                updateLoadingStatus('prs', 'complete');
+                mergePRDataIntoResults(prData);
+                displayPRResults();
+            }).catch(err => {
+                updateLoadingStatus('prs', 'error');
+                console.error('PRs error:', err);
+                // Hide PR shimmers on error
+                hideChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
+                // Update summary cards to show N/A instead of spinner
+                const prsMergedCard = document.getElementById('prsMergedCard');
+                const prsReviewedCard = document.getElementById('prsReviewedCard');
+                const activeDaysCard = document.getElementById('activeDaysCard');
+                if (prsMergedCard) prsMergedCard.querySelector('.card-value').textContent = 'N/A';
+                if (prsReviewedCard) prsReviewedCard.querySelector('.card-value').textContent = 'N/A';
+                if (activeDaysCard) activeDaysCard.querySelector('.card-value').textContent = 'N/A';
+            });
+
+            // Wait for both to complete (for error handling)
             try {
-                const response = await fetch('/api/engagement/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: token,
-                        provider: selectedProvider,
-                        baseUrl: document.getElementById('baseUrl').value || null,
-                        repositoryFullNames: reposToAnalyze,
-                        contributorLogins: Array.from(selectedContributors),
-                        startDate: startDate,
-                        endDate: endDate,
-                        period: period,
-                        excludeMergeCommits: document.getElementById('excludeMergeCommits').checked
-                    })
-                });
-
-                clearInterval(msgInterval);
-
-                if (!response.ok) throw new Error('Failed to analyze engagement');
-
-                analysisData = await response.json();
-                hideLoading('analyze-loading');
-                displayResults(analysisData);
-                goToStep(3);
+                await Promise.allSettled([commitsPromise, prsPromise]);
             } catch (error) {
-                clearInterval(msgInterval);
-                hideLoading('analyze-loading');
-                showError('analyze-error', error.message);
+                console.error('Analysis error:', error);
             }
+        }
+
+        // Show shimmer loading placeholders
+        function showShimmerLoading() {
+            document.getElementById('analysisInfo').innerHTML = `
+                <div class="shimmer shimmer-text" style="width: 200px; height: 24px;"></div>
+            `;
+
+            document.getElementById('summaryCards').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                    ${[1,2,3,4,5].map(() => `<div class="shimmer shimmer-card"></div>`).join('')}
+                </div>
+            `;
+
+            // Show loading status indicators
+            document.getElementById('loadingStatusPanel').classList.remove('hidden');
+            updateLoadingStatus('commits', 'pending');
+            updateLoadingStatus('prs', 'pending');
+
+            // Show shimmers on ALL chart containers
+            showChartShimmers(['commitsLineChart', 'commitsBarChart']);
+            showChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
+        }
+
+        // Show shimmer overlay on specific charts
+        function showChartShimmers(chartIds) {
+            chartIds.forEach(id => {
+                const shimmer = document.getElementById(id + 'Shimmer');
+                if (shimmer) {
+                    shimmer.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Hide shimmer overlay on specific charts
+        function hideChartShimmers(chartIds) {
+            chartIds.forEach(id => {
+                const shimmer = document.getElementById(id + 'Shimmer');
+                if (shimmer) {
+                    shimmer.classList.add('hidden');
+                }
+            });
+        }
+
+        // Update loading status indicator
+        function updateLoadingStatus(section, status) {
+            const el = document.getElementById(`status-${section}`);
+            if (!el) return;
+
+            if (status === 'pending') {
+                el.innerHTML = `<span class="status-indicator" style="background: rgba(113,113,122,0.2); color: #71717a;">⏳ Pending</span>`;
+            } else if (status === 'loading') {
+                el.innerHTML = `<span class="status-indicator status-loading"><span class="mini-spinner"></span> Loading...</span>`;
+            } else if (status === 'complete') {
+                el.innerHTML = `<span class="status-indicator status-complete">✓ Complete</span>`;
+            } else if (status === 'error') {
+                el.innerHTML = `<span class="status-indicator" style="background: rgba(239,68,68,0.2); color: #ef4444;">✗ Failed</span>`;
+            }
+        }
+
+        // Display commits results (fast)
+        function displayCommitsResults(data) {
+            selectedContributorsForChart = new Set(data.contributors.map(c => c.login));
+            window.analysisRepos = data.analyzedRepositories || [];
+
+            const repos = data.analyzedRepositories || [];
+            const repoCount = repos.length;
+
+            document.getElementById('analysisInfo').innerHTML = `
+                <div style="margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                    <strong>📁 Repositories:</strong>
+                    <span style="background:rgba(99,102,241,0.2); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.8rem;">${repoCount}</span>
+                    <button class="secondary" onclick="toggleRepoDetails()" id="repoToggleBtn"
+                        style="font-size:0.65rem; padding:0.15rem 0.4rem;">Show ▼</button>
+                </div>
+                <div id="repoDetailsBox" style="display:none;"></div>
+                <p style="font-size:0.85rem; color:#a1a1aa;">
+                    📅 ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
+                    📊 Period: ${data.period}
+                </p>
+            `;
+
+            // Summary cards - commits only first
+            const s = data.summary;
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <div class="card-icon">👥</div>
+                        <div class="card-value">${s.totalContributors}</div>
+                        <div class="card-label">Contributors</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="card-icon">📝</div>
+                        <div class="card-value">${s.totalCommits.toLocaleString()}</div>
+                        <div class="card-label">Total Commits</div>
+                    </div>
+                    <div class="summary-card" id="prsMergedCard">
+                        <div class="card-icon">🚀</div>
+                        <div class="card-value"><span class="mini-spinner"></span></div>
+                        <div class="card-label">PRs Merged</div>
+                    </div>
+                    <div class="summary-card" id="prsReviewedCard">
+                        <div class="card-icon">👀</div>
+                        <div class="card-value"><span class="mini-spinner"></span></div>
+                        <div class="card-label">PRs Reviewed</div>
+                    </div>
+                    <div class="summary-card" id="activeDaysCard">
+                        <div class="card-icon">📅</div>
+                        <div class="card-value"><span class="mini-spinner"></span></div>
+                        <div class="card-label">Active Days</div>
+                    </div>
+                </div>
+            `;
+
+            // Render commits charts immediately
+            renderCommitsCharts(data);
+            renderEngagementTable(data.contributors, true); // partial = true, no PR data yet
+
+            // Show shimmer for PR sections
+            showPRSectionsShimmer();
+        }
+
+        // Show shimmer for PR/review sections
+        function showPRSectionsShimmer() {
+            const prSection = document.getElementById('prChartsSection');
+            const reviewSection = document.getElementById('reviewChartsSection');
+            const activeDaysSection = document.getElementById('activeDaysChartsSection');
+
+            if (prSection) prSection.innerHTML = `<div class="shimmer shimmer-chart"></div>`;
+            if (reviewSection) reviewSection.innerHTML = `<div class="shimmer shimmer-chart"></div>`;
+            if (activeDaysSection) activeDaysSection.innerHTML = `<div class="shimmer shimmer-chart"></div>`;
+        }
+
+        // Merge PR data into existing results
+        function mergePRDataIntoResults(prData) {
+            if (!analysisData || !prData.contributors) return;
+
+            // Update summary
+            let totalPRs = 0, totalReviews = 0, totalActiveDays = 0;
+
+            prData.contributors.forEach(prContrib => {
+                totalPRs += prContrib.prsMerged;
+                totalReviews += prContrib.prsReviewed;
+                totalActiveDays += prContrib.activeDays;
+
+                // Merge into main data
+                const mainContrib = analysisData.contributors.find(c => c.login === prContrib.login);
+                if (mainContrib) {
+                    mainContrib.prsMerged = prContrib.prsMerged;
+                    mainContrib.prsReviewed = prContrib.prsReviewed;
+                    mainContrib.activeDays = prContrib.activeDays;
+                    mainContrib.prsMergedOverTime = prContrib.prsMergedOverTime;
+                    mainContrib.prsReviewedOverTime = prContrib.prsReviewedOverTime;
+                    mainContrib.activeDaysOverTime = prContrib.activeDaysOverTime;
+                }
+            });
+
+            analysisData.summary.totalPRsMerged = totalPRs;
+            analysisData.summary.totalPRsReviewed = totalReviews;
+            analysisData.summary.totalActiveDays = totalActiveDays;
+        }
+
+        // Display PR results after they load
+        function displayPRResults() {
+            // Update summary cards
+            const s = analysisData.summary;
+            document.getElementById('prsMergedCard').querySelector('.card-value').textContent = s.totalPRsMerged.toLocaleString();
+            document.getElementById('prsReviewedCard').querySelector('.card-value').textContent = s.totalPRsReviewed.toLocaleString();
+            document.getElementById('activeDaysCard').querySelector('.card-value').textContent = s.totalActiveDays.toLocaleString();
+
+            // Render PR charts
+            renderPRCharts(analysisData);
+            renderEngagementTable(analysisData.contributors, false); // full data now
+        }
+
+        // Render only commits charts
+        function renderCommitsCharts(data) {
+            const labels = data.periods || [];
+            const contributors = data.contributors.filter(c => selectedContributorsForChart.has(c.login));
+            const colors = generateColors(contributors.length);
+
+            // Commits Over Time Line Chart
+            if (commitsLineChart) commitsLineChart.destroy();
+            commitsLineChart = new Chart(document.getElementById('commitsLineChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: contributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.commitsOverTime?.map(d => d.value) || [],
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e4e4e7' } },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.2)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Commits Bar Chart
+            if (commitsBarChart) commitsBarChart.destroy();
+            commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: contributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Total Commits',
+                        data: contributors.map(c => c.totalCommits),
+                        backgroundColor: colors
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Hide commit chart shimmers after rendering
+            hideChartShimmers(['commitsLineChart', 'commitsBarChart']);
+        }
+
+        // Render PR and review charts
+        function renderPRCharts(data) {
+            const labels = data.periods || [];
+            const contributors = data.contributors.filter(c => selectedContributorsForChart.has(c.login));
+            const colors = generateColors(contributors.length);
+
+            // PRs Merged Over Time
+            if (prsMergedLineChart) prsMergedLineChart.destroy();
+            prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: contributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.prsMergedOverTime?.map(d => d.value) || [],
+                        borderColor: colors[i],
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e4e4e7' } },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff'
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // PRs Merged Bar Chart
+            if (prsMergedBarChart) prsMergedBarChart.destroy();
+            prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: contributors.map(c => c.login),
+                    datasets: [{
+                        label: 'PRs Merged',
+                        data: contributors.map(c => c.prsMerged || 0),
+                        backgroundColor: '#8b5cf6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // PRs Reviewed Over Time
+            if (prsReviewedLineChart) prsReviewedLineChart.destroy();
+            prsReviewedLineChart = new Chart(document.getElementById('prsReviewedLineChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: contributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.prsReviewedOverTime?.map(d => d.value) || [],
+                        borderColor: colors[i],
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e4e4e7' } },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff'
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // PRs Reviewed Bar Chart
+            if (prsReviewedBarChart) prsReviewedBarChart.destroy();
+            prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: contributors.map(c => c.login),
+                    datasets: [{
+                        label: 'PRs Reviewed',
+                        data: contributors.map(c => c.prsReviewed || 0),
+                        backgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Active Days Over Time
+            if (activeDaysLineChart) activeDaysLineChart.destroy();
+            activeDaysLineChart = new Chart(document.getElementById('activeDaysLineChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: contributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.activeDaysOverTime?.map(d => d.value) || [],
+                        borderColor: colors[i],
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e4e4e7' } },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff'
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Active Days Bar Chart
+            if (activeDaysBarChart) activeDaysBarChart.destroy();
+            activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: contributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Active Days',
+                        data: contributors.map(c => c.activeDays || 0),
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Hide PR/review/active days chart shimmers after rendering
+            hideChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
+        }
+
+        // Render engagement table
+        function renderEngagementTable(contributors, partial = false) {
+            const tbody = document.getElementById('engagementTableBody');
+            tbody.innerHTML = contributors.map(c => `
+                <tr>
+                    <td class="contributor-cell">
+                        ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
+                        <span>${c.login}</span>
+                    </td>
+                    <td>${c.totalCommits.toLocaleString()}</td>
+                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsMerged || 0).toLocaleString()}</td>
+                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsReviewed || 0).toLocaleString()}</td>
+                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.activeDays || 0).toLocaleString()}</td>
+                </tr>
+            `).join('');
         }
 
         // Toggle repo list view in results
@@ -1132,7 +1727,7 @@
                 </div>
             `;
 
-            // Summary Cards - with new GraphQL metrics
+            // Summary Cards - focused on key metrics
             document.getElementById('summaryCards').innerHTML = `
                 <div class="summary-card">
                     <h3>${data.summary.totalContributors}</h3>
@@ -1153,23 +1748,10 @@
                     <p>PRs Reviewed</p>
                     <div class="subtitle">Team player</div>
                 </div>
-                <div class="summary-card" style="background: rgba(245, 158, 11, 0.1);">
-                    <h3 style="color: #f59e0b;">${data.summary.totalIssuesClosed || 0}</h3>
-                    <p>Issues Closed</p>
-                    <div class="subtitle">Problem solving</div>
-                </div>
                 <div class="summary-card" style="background: rgba(16, 185, 129, 0.1);">
                     <h3 style="color: #10b981;">${data.summary.totalActiveDays || 0}</h3>
                     <p>Active Days</p>
-                    <div class="subtitle">Total across team</div>
-                </div>
-                <div class="summary-card" style="background: rgba(34, 197, 94, 0.1);">
-                    <h3 style="color: #22c55e;">+${(data.summary.totalLinesAdded || 0).toLocaleString()}</h3>
-                    <p>Lines Added</p>
-                </div>
-                <div class="summary-card" style="background: rgba(239, 68, 68, 0.1);">
-                    <h3 style="color: #ef4444;">-${(data.summary.totalLinesDeleted || 0).toLocaleString()}</h3>
-                    <p>Lines Deleted</p>
+                    <div class="subtitle">Consistency</div>
                 </div>
             `;
 
@@ -1244,70 +1826,106 @@
                 options: chartOptions('Commits')
             });
 
-            // Lines Added Line Chart
-            if (linesAddedLineChart) linesAddedLineChart.destroy();
-            linesAddedLineChart = new Chart(document.getElementById('linesAddedLineChart'), {
+            // ===== PRs Merged (Impact) =====
+            // PRs Merged Over Time Line Chart
+            if (prsMergedLineChart) prsMergedLineChart.destroy();
+            prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
                 type: 'line',
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
                         label: c.login,
-                        data: c.linesAddedOverTime.map(d => d.value),
-                        borderColor: '#22c55e',
-                        backgroundColor: '#22c55e20',
+                        data: c.prsMergedOverTime ? c.prsMergedOverTime.map(d => d.value) : periods.map(() => 0),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
                         fill: false,
                         tension: 0.3
                     }))
                 },
-                options: chartOptions('Lines Added')
+                options: chartOptions('PRs Merged')
             });
 
-            // Lines Added Bar Chart
-            if (linesAddedBarChart) linesAddedBarChart.destroy();
-            linesAddedBarChart = new Chart(document.getElementById('linesAddedBarChart'), {
+            // PRs Merged Bar Chart
+            if (prsMergedBarChart) prsMergedBarChart.destroy();
+            prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
                 type: 'bar',
                 data: {
                     labels: filteredContributors.map(c => c.login),
                     datasets: [{
-                        label: 'Total Lines Added',
-                        data: filteredContributors.map(c => c.totalLinesAdded),
-                        backgroundColor: '#22c55e'
+                        label: 'PRs Merged',
+                        data: filteredContributors.map(c => c.prsMerged || 0),
+                        backgroundColor: '#8b5cf6'
                     }]
                 },
-                options: chartOptions('Lines Added')
+                options: chartOptions('PRs Merged')
             });
 
-            // Lines Deleted Line Chart
-            if (linesDeletedLineChart) linesDeletedLineChart.destroy();
-            linesDeletedLineChart = new Chart(document.getElementById('linesDeletedLineChart'), {
+            // ===== PRs Reviewed (Team Player) =====
+            // PRs Reviewed Over Time Line Chart
+            if (prsReviewedLineChart) prsReviewedLineChart.destroy();
+            prsReviewedLineChart = new Chart(document.getElementById('prsReviewedLineChart'), {
                 type: 'line',
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
                         label: c.login,
-                        data: c.linesDeletedOverTime.map(d => d.value),
-                        borderColor: '#ef4444',
-                        backgroundColor: '#ef444420',
+                        data: c.prsReviewedOverTime ? c.prsReviewedOverTime.map(d => d.value) : periods.map(() => 0),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
                         fill: false,
                         tension: 0.3
                     }))
                 },
-                options: chartOptions('Lines Deleted')
+                options: chartOptions('PRs Reviewed')
             });
 
-            // Lines Deleted Bar Chart
-            if (linesDeletedBarChart) linesDeletedBarChart.destroy();
-            linesDeletedBarChart = new Chart(document.getElementById('linesDeletedBarChart'), {
+            // PRs Reviewed Bar Chart
+            if (prsReviewedBarChart) prsReviewedBarChart.destroy();
+            prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
                 type: 'bar',
                 data: {
                     labels: filteredContributors.map(c => c.login),
                     datasets: [{
-                        label: 'Total Lines Deleted',
-                        data: filteredContributors.map(c => c.totalLinesDeleted),
-                        backgroundColor: '#ef4444'
+                        label: 'PRs Reviewed',
+                        data: filteredContributors.map(c => c.prsReviewed || 0),
+                        backgroundColor: '#3b82f6'
                     }]
                 },
-                options: chartOptions('Lines Deleted')
+                options: chartOptions('PRs Reviewed')
+            });
+
+            // ===== Active Days (Consistency) =====
+            // Active Days Over Time Line Chart
+            if (activeDaysLineChart) activeDaysLineChart.destroy();
+            activeDaysLineChart = new Chart(document.getElementById('activeDaysLineChart'), {
+                type: 'line',
+                data: {
+                    labels: periods,
+                    datasets: filteredContributors.map((c, i) => ({
+                        label: c.login,
+                        data: c.activeDaysOverTime ? c.activeDaysOverTime.map(d => d.value) : periods.map(() => 0),
+                        borderColor: colors[i],
+                        backgroundColor: colors[i] + '20',
+                        fill: false,
+                        tension: 0.3
+                    }))
+                },
+                options: chartOptions('Active Days')
+            });
+
+            // Active Days Bar Chart
+            if (activeDaysBarChart) activeDaysBarChart.destroy();
+            activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: filteredContributors.map(c => c.login),
+                    datasets: [{
+                        label: 'Active Days',
+                        data: filteredContributors.map(c => c.activeDays || 0),
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: chartOptions('Active Days')
             });
         }
 
@@ -1323,10 +1941,7 @@
                     <td><strong>${c.totalCommits}</strong></td>
                     <td style="color: #8b5cf6;">${c.prsMerged || 0}</td>
                     <td style="color: #3b82f6;">${c.prsReviewed || 0}</td>
-                    <td style="color: #f59e0b;">${c.issuesClosed || 0}</td>
                     <td style="color: #10b981;">${c.activeDays || 0}</td>
-                    <td style="color: #22c55e;">+${(c.totalLinesAdded || 0).toLocaleString()}</td>
-                    <td style="color: #ef4444;">-${(c.totalLinesDeleted || 0).toLocaleString()}</td>
                 </tr>
             `).join('');
         }
@@ -1359,6 +1974,37 @@
                         ticks: { color: '#a1a1aa' },
                         grid: { color: 'rgba(255,255,255,0.1)' },
                         beginAtZero: true
+                    }
+                }
+            };
+        }
+
+        // Pie/Doughnut chart options
+        function pieChartOptions(label) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#e4e4e7',
+                            padding: 10,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#e4e4e7',
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const value = context.raw;
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
+                        }
                     }
                 }
             };

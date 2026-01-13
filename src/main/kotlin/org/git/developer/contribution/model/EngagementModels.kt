@@ -53,7 +53,7 @@ data class EngagementAnalyzeRequest(
     val token: String,
     val provider: GitProvider = GitProvider.GITHUB,
     val baseUrl: String? = null,
-    val repositoryFullNames: List<String> = emptyList(),  // Optional - can be empty to search all org repos
+    val repositoryFullNames: List<String> = emptyList(),  // Optional - empty means search all org repos
     val contributorLogins: List<String>,
     val startDate: String? = null,
     val endDate: String? = null,
@@ -76,17 +76,21 @@ data class ContributorEngagement(
     val login: String,
     val avatarUrl: String?,
     val totalCommits: Int,
-    val totalLinesAdded: Int,
-    val totalLinesDeleted: Int,
+    val totalLinesAdded: Int = 0,
+    val totalLinesDeleted: Int = 0,
     // New GraphQL-based metrics
     val prsMerged: Int = 0,           // PR Merge Velocity - shows how many ideas were finished
     val prsReviewed: Int = 0,         // Review Responsiveness - team player metric
     val issuesClosed: Int = 0,        // Issue Resolution - problem solving metric
     val activeDays: Int = 0,          // Commit Consistency - active days in period
+    // Time series data
     val commitsOverTime: List<EngagementDataPoint>,
-    val linesAddedOverTime: List<EngagementDataPoint>,
-    val linesDeletedOverTime: List<EngagementDataPoint>,
-    // Legacy fields for backward compatibility
+    val prsMergedOverTime: List<EngagementDataPoint> = emptyList(),
+    val prsReviewedOverTime: List<EngagementDataPoint> = emptyList(),
+    val activeDaysOverTime: List<EngagementDataPoint> = emptyList(),
+    // Legacy fields - kept for compatibility
+    val linesAddedOverTime: List<EngagementDataPoint> = emptyList(),
+    val linesDeletedOverTime: List<EngagementDataPoint> = emptyList(),
     val totalPRsReviewed: Int = 0,
     val reviewsOverTime: List<EngagementDataPoint> = emptyList()
 )
@@ -120,5 +124,25 @@ data class EngagementSummary(
     val totalActiveDays: Int = 0,     // Sum of active days across contributors
     // Legacy fields
     val mostActiveReviewer: String? = null
+)
+
+/**
+ * PR and Review data response for parallel loading
+ */
+data class PRReviewResponse(
+    val contributors: List<ContributorPRData>
+)
+
+/**
+ * PR data for a single contributor
+ */
+data class ContributorPRData(
+    val login: String,
+    val prsMerged: Int,
+    val prsReviewed: Int,
+    val activeDays: Int,
+    val prsMergedOverTime: List<EngagementDataPoint>,
+    val prsReviewedOverTime: List<EngagementDataPoint>,
+    val activeDaysOverTime: List<EngagementDataPoint>
 )
 

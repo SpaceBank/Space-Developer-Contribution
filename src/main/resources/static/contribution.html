@@ -492,68 +492,21 @@
 
         <!-- Step Indicator -->
         <div class="step-indicator">
-            <div class="step active" id="step1-indicator">
+            <div class="step active" id="step2-indicator">
                 <span class="step-number">1</span>
-                <span>Authenticate</span>
-            </div>
-            <div class="step" id="step2-indicator">
-                <span class="step-number">2</span>
                 <span>Select Repos</span>
             </div>
             <div class="step" id="step3-indicator">
-                <span class="step-number">3</span>
+                <span class="step-number">2</span>
                 <span>View Report</span>
             </div>
         </div>
 
-        <!-- Step 1: Authentication -->
-        <div class="panel" id="step1-panel">
-            <h2>🔐 Step 1: Connect to Git Provider</h2>
-
-            <div class="provider-select">
-                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
-                    <div class="icon">🐙</div>
-                    <div>GitHub</div>
-                </div>
-                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
-                    <div class="icon">🦊</div>
-                    <div>GitLab</div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="token">Personal Access Token</label>
-                <input type="password" id="token" placeholder="Enter your token...">
-                <div class="token-hint" id="github-hint">
-                    💡 Need a token? <a href="https://github.com/settings/tokens/new" target="_blank">Create GitHub Token</a>
-                    (requires <code>repo</code> scope)
-                </div>
-                <div class="token-hint hidden" id="gitlab-hint">
-                    💡 Need a token? <a href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank">Create GitLab Token</a>
-                    (requires <code>read_repository</code> scope)
-                </div>
-            </div>
-
-            <div class="form-group" id="custom-url-group" style="display: none;">
-                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
-                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
-            </div>
-
-            <button onclick="fetchRepositories()">
-                <span>Connect & Fetch Repositories</span>
-                <span>→</span>
-            </button>
-
-            <div id="auth-error" class="error hidden"></div>
-            <div id="auth-loading" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Fetching repositories...</span>
-            </div>
-        </div>
-
         <!-- Step 2: Repository Selection -->
-        <div class="panel hidden" id="step2-panel">
-            <h2>📁 Step 2: Select Repositories</h2>
+        <div class="panel" id="step2-panel">
+            <h2>📁 Select Repositories</h2>
+
+            <a href="/" class="secondary" style="display: inline-block; margin-bottom: 1rem; text-decoration: none;">← Back to Home</a>
 
             <div class="search-box">
                 <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
@@ -734,6 +687,12 @@
         let fullAnalysisData = null;  // Store the complete analysis data
         let selectedDevelopers = new Set();  // Selected developer emails for filtering
 
+        // Get session data from sessionStorage
+        function getSessionData() {
+            const data = sessionStorage.getItem('spaceAnalyticsSession');
+            return data ? JSON.parse(data) : null;
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -742,26 +701,34 @@
 
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
             document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
+
+            // Load session data if available
+            const sessionData = getSessionData();
+            if (sessionData && sessionData.token) {
+                // Set provider from session
+                selectedProvider = sessionData.provider || 'GITHUB';
+
+                // Auto-load repositories from session
+                if (sessionData.repositories && sessionData.repositories.length > 0) {
+                    repositories = sessionData.repositories.map(r => ({
+                        fullName: r.fullName,
+                        name: r.name || r.fullName.split('/').pop(),
+                        isPrivate: r.private || false
+                    }));
+                    renderRepositoryList();
+                    currentStep = 1;
+                }
+            } else {
+                // Redirect to login if no session
+                window.location.href = '/';
+            }
         });
-
-        // Provider selection
-        function selectProvider(provider) {
-            selectedProvider = provider;
-            document.querySelectorAll('.provider-option').forEach(el => {
-                el.classList.toggle('selected', el.dataset.provider === provider);
-            });
-
-            document.getElementById('github-hint').classList.toggle('hidden', provider !== 'GITHUB');
-            document.getElementById('gitlab-hint').classList.toggle('hidden', provider !== 'GITLAB');
-            document.getElementById('custom-url-group').style.display = provider === 'GITLAB' ? 'block' : 'none';
-        }
 
         // Step navigation
         function goToStep(step) {
             currentStep = step;
 
-            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
-            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
+            document.getElementById('step2-panel').classList.toggle('hidden', step !== 1 && step !== 2);
             document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
 
             document.getElementById('step1-indicator').classList.toggle('active', step === 1);
@@ -881,7 +848,8 @@
             hideError('analyze-error');
             showLoading('analyze-loading');
 
-            const token = document.getElementById('token').value.trim();
+            const sessionData = getSessionData();
+            const token = sessionData?.token || '';
             const startDate = document.getElementById('startDate').value || null;
             const endDate = document.getElementById('endDate').value || null;
             const period = document.getElementById('period').value;
@@ -895,7 +863,7 @@
                     body: JSON.stringify({
                         token: token,
                         provider: selectedProvider,
-                        baseUrl: document.getElementById('baseUrl').value || null,
+                        baseUrl: sessionData?.baseUrl || null,
                         repositoryFullNames: Array.from(selectedRepos),
                         startDate: startDate,
                         endDate: endDate,

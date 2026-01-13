@@ -585,46 +585,11 @@
     <div class="container">
         <h1>⚡ Engineering Matrix</h1>
 
-        <!-- Step 1: Authentication -->
-        <div class="panel" id="step1-panel">
-            <h2>🔐 Step 1: Connect to Git Provider</h2>
-
-            <div class="provider-select">
-                <div class="provider-option selected" data-provider="GITHUB" onclick="selectProvider('GITHUB')">
-                    <div class="icon">🐙</div>
-                    <div>GitHub</div>
-                </div>
-                <div class="provider-option" data-provider="GITLAB" onclick="selectProvider('GITLAB')">
-                    <div class="icon">🦊</div>
-                    <div>GitLab</div>
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-top: 1rem;">
-                <label for="token">Personal Access Token</label>
-                <input type="password" id="token" placeholder="Enter your token...">
-            </div>
-
-            <div class="form-group hidden" id="custom-url-group" style="margin-top: 1rem;">
-                <label for="baseUrl">Custom API URL (for self-hosted instances)</label>
-                <input type="text" id="baseUrl" placeholder="https://gitlab.example.com/api/v4">
-            </div>
-
-            <button onclick="fetchRepositories()" style="margin-top: 1rem;">
-                <span>Connect & Fetch Repositories</span>
-                <span>→</span>
-            </button>
-
-            <div id="auth-error" class="error hidden"></div>
-            <div id="auth-loading" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Fetching repositories...</span>
-            </div>
-        </div>
-
         <!-- Step 2: Repository Selection -->
-        <div class="panel hidden" id="step2-panel">
-            <h2>📁 Step 2: Select Repositories</h2>
+        <div class="panel" id="step2-panel">
+            <h2>📁 Select Repositories</h2>
+
+            <a href="/" class="secondary" style="display: inline-block; margin-bottom: 1rem; text-decoration: none;">← Back to Home</a>
 
             <div class="search-box">
                 <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
@@ -649,7 +614,6 @@
             </div>
 
             <div class="button-group" style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button class="secondary" onclick="goToStep(1)">← Back</button>
                 <button onclick="analyzeMetrics()" id="analyzeBtn" disabled>
                     <span>Analyze Metrics</span>
                     <span>→</span>
@@ -665,11 +629,11 @@
 
         <!-- Step 3: Results -->
         <div class="panel hidden" id="step3-panel">
-            <h2>📊 Step 3: Engineering Metrics Matrix</h2>
+            <h2>📊 Engineering Metrics Matrix</h2>
 
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
-                <button class="secondary" onclick="goToStep(1)">🔄 Start Over</button>
+                <button class="secondary" onclick="goToStep(1)">← Back to Selection</button>
+                <a href="/" class="secondary" style="text-decoration: none;">🏠 Home</a>
             </div>
 
             <!-- Analysis Info -->
@@ -891,6 +855,12 @@
         let selectedRepos = new Set();
         let trendChart = null;
 
+        // Get session data from sessionStorage
+        function getSessionData() {
+            const data = sessionStorage.getItem('spaceAnalyticsSession');
+            return data ? JSON.parse(data) : null;
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -899,22 +869,33 @@
 
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
             document.getElementById('startDate').value = threeMonthsAgo.toISOString().split('T')[0];
-        });
 
-        // Provider selection
-        function selectProvider(provider) {
-            selectedProvider = provider;
-            document.querySelectorAll('.provider-option').forEach(el => {
-                el.classList.toggle('selected', el.dataset.provider === provider);
-            });
-            document.getElementById('custom-url-group').classList.toggle('hidden', provider !== 'GITLAB');
-        }
+            // Load session data if available
+            const sessionData = getSessionData();
+            if (sessionData && sessionData.token) {
+                // Set provider from session
+                selectedProvider = sessionData.provider || 'GITHUB';
+
+                // Auto-load repositories from session
+                if (sessionData.repositories && sessionData.repositories.length > 0) {
+                    repositories = sessionData.repositories.map(r => ({
+                        fullName: r.fullName,
+                        name: r.name || r.fullName.split('/').pop(),
+                        isPrivate: r.private || false
+                    }));
+                    renderRepositoryList();
+                    currentStep = 1;
+                }
+            } else {
+                // Redirect to login if no session
+                window.location.href = '/';
+            }
+        });
 
         // Step navigation
         function goToStep(step) {
             currentStep = step;
-            document.getElementById('step1-panel').classList.toggle('hidden', step !== 1);
-            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
+            document.getElementById('step2-panel').classList.toggle('hidden', step !== 1 && step !== 2);
             document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
         }
 
@@ -1009,7 +990,8 @@
             hideError('analyze-error');
             showLoading('analyze-loading');
 
-            const token = document.getElementById('token').value.trim();
+            const sessionData = getSessionData();
+            const token = sessionData?.token || '';
             const startDate = document.getElementById('startDate').value || null;
             const endDate = document.getElementById('endDate').value || null;
 
@@ -1020,7 +1002,7 @@
                     body: JSON.stringify({
                         token: token,
                         provider: selectedProvider,
-                        baseUrl: document.getElementById('baseUrl').value || null,
+                        baseUrl: sessionData?.baseUrl || null,
                         repositoryFullNames: Array.from(selectedRepos),
                         startDate: startDate,
                         endDate: endDate
