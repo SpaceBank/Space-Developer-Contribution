@@ -82,9 +82,13 @@ class RemoteRepositoryAnalyzerService(
 
             val prCountByPeriod = calculatePRCountByPeriod(prs, request.period, result.dateRange)
 
+            // Calculate PR author stats
+            val prAuthorStats = calculatePRAuthorStats(prs)
+
             return result.copy(
                 analyzedRepositories = listOf(request.repositoryFullName),
                 prCountByPeriod = prCountByPeriod,
+                prAuthorStats = prAuthorStats,
                 summary = result.summary.copy(totalPRs = prs.size)
             )
 
@@ -199,10 +203,14 @@ class RemoteRepositoryAnalyzerService(
                 result.dateRange
             )
 
+            // Calculate PR author stats
+            val prAuthorStats = calculatePRAuthorStats(allPRs)
+
             // Return with original repo names and PR data
             return result.copy(
                 analyzedRepositories = request.repositoryFullNames,
                 prCountByPeriod = prCountByPeriod,
+                prAuthorStats = prAuthorStats,
                 summary = result.summary.copy(totalPRs = allPRs.size)
             )
 
@@ -235,6 +243,15 @@ class RemoteRepositoryAnalyzerService(
                 mergedDate != null && !mergedDate.isBefore(start) && !mergedDate.isAfter(end)
             }
         }
+    }
+
+    /**
+     * Calculate PR counts by author
+     */
+    private fun calculatePRAuthorStats(prs: List<PullRequestInfo>): List<PRAuthorStats> {
+        return prs.groupBy { it.authorName }
+            .map { (author, authorPrs) -> PRAuthorStats(author, authorPrs.size) }
+            .sortedByDescending { it.prCount }
     }
 
     /**

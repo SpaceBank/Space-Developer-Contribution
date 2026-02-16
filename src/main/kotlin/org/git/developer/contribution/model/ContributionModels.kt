@@ -89,7 +89,16 @@ data class ContributionAnalysisResponse(
     val period: AggregationPeriod,
     val developers: List<DeveloperTimeline>,
     val summary: AnalysisSummary,
-    val prCountByPeriod: List<Int> = emptyList()  // Merged PRs per period for chart
+    val prCountByPeriod: List<Int> = emptyList(),  // Merged PRs per period for chart
+    val prAuthorStats: List<PRAuthorStats> = emptyList()  // PRs by author
+)
+
+/**
+ * PR statistics by author
+ */
+data class PRAuthorStats(
+    val authorName: String,
+    val prCount: Int
 )
 
 data class DateRange(

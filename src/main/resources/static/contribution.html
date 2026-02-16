@@ -820,6 +820,13 @@
                     </div>
                 </div>
 
+                <div class="chart-wrapper">
+                    <h2>🚀 Top PR Authors</h2>
+                    <div class="chart-container">
+                        <canvas id="prAuthorsChart"></canvas>
+                    </div>
+                </div>
+
                 <!-- Filtered by developer selection -->
                 <div class="chart-wrapper">
                     <h2>📈 Commits Over Time (by Developer)</h2>
@@ -874,6 +881,7 @@
         let totalCommitsChart = null;
         let topCommittersChart = null;
         let prsChart = null;
+        let prAuthorsChart = null;
 
         // Developer filter state
         let fullAnalysisData = null;  // Store the complete analysis data
@@ -1182,6 +1190,21 @@
                 results.reduce((sum, r) => sum + (r.prCountByPeriod[idx] || 0), 0)
             );
 
+            // Merge PR author stats
+            const prAuthorMap = new Map();
+            results.forEach(result => {
+                (result.prAuthorStats || []).forEach(stat => {
+                    if (prAuthorMap.has(stat.authorName)) {
+                        prAuthorMap.set(stat.authorName, prAuthorMap.get(stat.authorName) + stat.prCount);
+                    } else {
+                        prAuthorMap.set(stat.authorName, stat.prCount);
+                    }
+                });
+            });
+            const mergedPRAuthorStats = Array.from(prAuthorMap.entries())
+                .map(([authorName, prCount]) => ({ authorName, prCount }))
+                .sort((a, b) => b.prCount - a.prCount);
+
             // Merge summaries
             const mergedSummary = {
                 totalDevelopers: mergedDevelopers.length,
@@ -1199,7 +1222,8 @@
                 period: results[0].period,
                 developers: mergedDevelopers,
                 summary: mergedSummary,
-                prCountByPeriod: mergedPRCounts
+                prCountByPeriod: mergedPRCounts,
+                prAuthorStats: mergedPRAuthorStats
             };
         }
 
@@ -1459,6 +1483,81 @@
                     }
                 }
             });
+
+            // 4. PR Authors (horizontal bar chart)
+            const prAuthorStats = fullAnalysisData.prAuthorStats || [];
+            const topPRAuthors = prAuthorStats.slice(0, 10); // Top 10 PR authors
+
+            if (prAuthorsChart) prAuthorsChart.destroy();
+
+            if (topPRAuthors.length > 0) {
+                prAuthorsChart = new Chart(document.getElementById('prAuthorsChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: topPRAuthors.map(a => a.authorName),
+                        datasets: [{
+                            label: 'PRs Merged',
+                            data: topPRAuthors.map(a => a.prCount),
+                            backgroundColor: topPRAuthors.map((_, i) => {
+                                const hue = (i * 137.5) % 360;
+                                return `hsla(${hue}, 70%, 60%, 0.8)`;
+                            }),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: `${prAuthorStats.length} developers opened PRs`,
+                                color: '#a1a1aa',
+                                font: { size: 12 }
+                            },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#e4e4e7',
+                                borderColor: '#22c55e',
+                                borderWidth: 1,
+                                padding: 12,
+                                callbacks: {
+                                    title: function(context) {
+                                        return topPRAuthors[context[0].dataIndex].authorName;
+                                    },
+                                    label: function(context) {
+                                        return `PRs Merged: ${context.parsed.x}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#a1a1aa', stepSize: 1 },
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                title: { display: true, text: 'Number of PRs', color: '#a1a1aa' }
+                            },
+                            y: { ticks: { color: '#e4e4e7' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                        }
+                    }
+                });
+            } else {
+                // No PR data - show a message
+                const canvas = document.getElementById('prAuthorsChart');
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#71717a';
+                ctx.font = '14px -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No PR data available', canvas.width / 2, canvas.height / 2);
+            }
         }
 
         // Render developer filter chips
