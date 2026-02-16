@@ -1042,6 +1042,18 @@
         let completedCount = 0;
         let totalRepoCount = 0;
         let allRepoResults = [];
+        let loadingStartTime = null;
+
+        // Logging helper
+        function log(level, message, data = null) {
+            const timestamp = new Date().toISOString();
+            const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+            if (data) {
+                console[level](`${prefix} ${message}`, data);
+            } else {
+                console[level](`${prefix} ${message}`);
+            }
+        }
 
         // Initialize parallel loading UI
         function initParallelLoading(repoList) {
@@ -1049,88 +1061,186 @@
             completedCount = 0;
             totalRepoCount = repoList.length;
             allRepoResults = [];
+            loadingStartTime = Date.now();
+
+            log('info', `🚀 Starting parallel analysis of ${repoList.length} repositories`);
+            log('info', 'Repositories:', repoList);
 
             const panel = document.getElementById('parallel-loading-panel');
             const statusList = document.getElementById('repo-status-list');
 
-            // Build status list
+            // Build status list with more detailed structure
             statusList.innerHTML = repoList.map(repo => `
                 <div class="repo-status-item pending" id="repo-status-${repo.replace(/[^a-zA-Z0-9]/g, '_')}">
                     <div class="repo-status-icon">⏳</div>
                     <div class="repo-status-name">${repo}</div>
-                    <div class="repo-status-badge">Pending</div>
+                    <div class="repo-status-detail" id="repo-detail-${repo.replace(/[^a-zA-Z0-9]/g, '_')}" style="font-size: 0.7rem; color: #71717a; margin-left: auto; margin-right: 0.5rem;"></div>
+                    <div class="repo-status-badge">Queued</div>
                 </div>
             `).join('');
 
             // Initialize statuses
             repoList.forEach(repo => {
-                repoStatuses[repo] = 'pending';
+                repoStatuses[repo] = { status: 'pending', startTime: null, detail: '' };
             });
 
-            // Show panel
+            // Show panel and start timer
             panel.classList.remove('hidden');
+            startProgressTimer();
             updateProgressBar();
-            updateCurrentAction('Starting parallel analysis...');
+            updateCurrentAction('Initializing parallel requests...');
         }
 
-        // Update repository status
-        function updateRepoStatus(repoName, status, detail = null) {
-            repoStatuses[repoName] = status;
+        // Update repository status with detailed info
+        function updateRepoStatus(repoName, status, detail = null, extraInfo = null) {
             const safeId = repoName.replace(/[^a-zA-Z0-9]/g, '_');
             const item = document.getElementById(`repo-status-${safeId}`);
+            const detailEl = document.getElementById(`repo-detail-${safeId}`);
 
-            if (!item) return;
+            if (!item) {
+                log('warn', `Could not find status element for: ${repoName}`);
+                return;
+            }
+
+            // Track status
+            if (!repoStatuses[repoName]) {
+                repoStatuses[repoName] = { status: 'pending', startTime: null, detail: '' };
+            }
+
+            const wasCompleted = repoStatuses[repoName].status === 'success' || repoStatuses[repoName].status === 'error';
+            const isNowCompleted = status === 'success' || status === 'error';
+
+            repoStatuses[repoName].status = status;
+            repoStatuses[repoName].detail = detail || '';
+
+            if (!repoStatuses[repoName].startTime && status !== 'pending') {
+                repoStatuses[repoName].startTime = Date.now();
+            }
+
+            // Log the status change
+            const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄';
+            log('info', `${emoji} [${repoName}] ${status.toUpperCase()}: ${detail || ''}`);
+            if (extraInfo) {
+                log('info', `   └─ Details:`, extraInfo);
+            }
 
             // Remove all status classes
             item.classList.remove('pending', 'loading', 'success', 'error');
-            item.classList.add(status);
 
             const icon = item.querySelector('.repo-status-icon');
             const badge = item.querySelector('.repo-status-badge');
 
             switch (status) {
-                case 'loading':
-                    icon.innerHTML = '⚙️';
-                    badge.textContent = detail || 'Analyzing...';
+                case 'pending':
+                    item.classList.add('pending');
+                    icon.innerHTML = '⏳';
+                    badge.textContent = 'Queued';
+                    break;
+                case 'starting':
+                    item.classList.add('loading');
+                    icon.innerHTML = '🔄';
+                    badge.textContent = 'Starting...';
                     break;
                 case 'cloning':
-                    icon.innerHTML = '📥';
-                    badge.textContent = 'Cloning...';
-                    item.classList.remove('loading');
                     item.classList.add('loading');
+                    icon.innerHTML = '📥';
+                    badge.textContent = 'Cloning repo...';
+                    if (detailEl) detailEl.textContent = 'Downloading repository files';
+                    break;
+                case 'analyzing':
+                    item.classList.add('loading');
+                    icon.innerHTML = '🔍';
+                    badge.textContent = 'Analyzing commits...';
+                    if (detailEl) detailEl.textContent = detail || 'Reading git history';
+                    break;
+                case 'fetching-prs':
+                    item.classList.add('loading');
+                    icon.innerHTML = '🔀';
+                    badge.textContent = 'Fetching PRs...';
+                    if (detailEl) detailEl.textContent = 'Loading merged pull requests';
+                    break;
+                case 'processing':
+                    item.classList.add('loading');
+                    icon.innerHTML = '⚙️';
+                    badge.textContent = detail || 'Processing...';
                     break;
                 case 'success':
+                    item.classList.add('success');
                     icon.innerHTML = '✅';
                     badge.textContent = detail || 'Complete';
-                    completedCount++;
+                    if (detailEl) {
+                        const elapsed = repoStatuses[repoName].startTime
+                            ? ((Date.now() - repoStatuses[repoName].startTime) / 1000).toFixed(1) + 's'
+                            : '';
+                        detailEl.textContent = elapsed;
+                    }
+                    if (!wasCompleted && isNowCompleted) {
+                        completedCount++;
+                        log('info', `📊 Progress: ${completedCount}/${totalRepoCount} repositories completed`);
+                    }
                     break;
                 case 'error':
+                    item.classList.add('error');
                     icon.innerHTML = '❌';
                     badge.textContent = detail || 'Failed';
-                    completedCount++;
+                    if (detailEl) detailEl.textContent = 'Error';
+                    if (!wasCompleted && isNowCompleted) {
+                        completedCount++;
+                    }
                     break;
             }
 
             updateProgressBar();
         }
 
-        // Update progress bar
+        // Update progress bar with percentage
         function updateProgressBar() {
             const fill = document.getElementById('loading-progress-fill');
             const text = document.getElementById('loading-progress-text');
+
+            // Calculate progress based on completed repos
             const percent = totalRepoCount > 0 ? (completedCount / totalRepoCount) * 100 : 0;
 
             fill.style.width = `${percent}%`;
-            text.textContent = `${completedCount} / ${totalRepoCount} completed`;
+            text.textContent = `${completedCount} / ${totalRepoCount} completed (${Math.round(percent)}%)`;
+
+            // Calculate elapsed time
+            if (loadingStartTime) {
+                const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(0);
+                if (elapsed > 0) {
+                    text.textContent += ` • ${elapsed}s`;
+                }
+            }
+        }
+
+        // Timer interval for updating elapsed time
+        let progressTimerInterval = null;
+
+        function startProgressTimer() {
+            if (progressTimerInterval) clearInterval(progressTimerInterval);
+            progressTimerInterval = setInterval(() => {
+                updateProgressBar();
+            }, 1000);
+        }
+
+        function stopProgressTimer() {
+            if (progressTimerInterval) {
+                clearInterval(progressTimerInterval);
+                progressTimerInterval = null;
+            }
         }
 
         // Update current action text
         function updateCurrentAction(text) {
             document.getElementById('loading-current-action').textContent = text;
+            log('info', `🔄 Current action: ${text}`);
         }
 
         // Hide parallel loading panel
         function hideParallelLoading() {
+            stopProgressTimer();
+            const totalTime = loadingStartTime ? ((Date.now() - loadingStartTime) / 1000).toFixed(2) : 0;
+            log('info', `\n✅ Loading panel hidden. Total loading time: ${totalTime}s`);
             document.getElementById('parallel-loading-panel').classList.add('hidden');
         }
 
@@ -1246,54 +1356,127 @@
 
             const repoList = Array.from(selectedRepos);
 
+            log('info', '═══════════════════════════════════════════════════════════');
+            log('info', '🚀 STARTING REPOSITORY ANALYSIS');
+            log('info', '═══════════════════════════════════════════════════════════');
+            log('info', `Provider: ${selectedProvider}`);
+            log('info', `Date Range: ${startDate || 'default'} to ${endDate || 'default'}`);
+            log('info', `Period: ${period}`);
+            log('info', `Branch: ${branch || 'all branches'}`);
+            log('info', `Exclude merges: ${excludeMerges}`);
+            log('info', `Total repositories: ${repoList.length}`);
+
             // Initialize parallel loading UI
             initParallelLoading(repoList);
             document.getElementById('analyzeBtn').disabled = true;
 
-            // Create promises for all repositories
+            // Create promises for all repositories with detailed progress simulation
             const analyzePromises = repoList.map(async (repoFullName) => {
-                updateRepoStatus(repoFullName, 'loading', 'Cloning...');
-                updateCurrentAction(`Cloning ${repoFullName}...`);
+                const repoStartTime = Date.now();
+
+                log('info', `\n┌─────────────────────────────────────────────────`);
+                log('info', `│ 📦 Starting: ${repoFullName}`);
+                log('info', `└─────────────────────────────────────────────────`);
+
+                // Stage 1: Starting
+                updateRepoStatus(repoFullName, 'starting', 'Initializing...');
+                updateCurrentAction(`Starting analysis for ${repoFullName}...`);
+
+                // Small delay to show the starting state
+                await new Promise(r => setTimeout(r, 100));
+
+                // Stage 2: Cloning
+                updateRepoStatus(repoFullName, 'cloning', 'Downloading repository...');
+                log('info', `│ 📥 [${repoFullName}] Cloning repository...`);
 
                 try {
+                    // Make the API call
+                    log('info', `│ 🌐 [${repoFullName}] Sending API request to /api/git/analyze/single`);
+
+                    const requestBody = {
+                        token: token,
+                        provider: selectedProvider,
+                        baseUrl: sessionData?.baseUrl || null,
+                        repositoryFullName: repoFullName,
+                        startDate: startDate,
+                        endDate: endDate,
+                        period: period,
+                        branch: branch,
+                        excludeMerges: excludeMerges
+                    };
+
+                    log('info', `│ 📤 [${repoFullName}] Request payload:`, {
+                        ...requestBody,
+                        token: token ? `${token.substring(0, 8)}...` : 'none'
+                    });
+
+                    // Update status to show we're waiting for server
+                    updateRepoStatus(repoFullName, 'processing', 'Server processing...');
+
                     const response = await fetch('/api/git/analyze/single', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            token: token,
-                            provider: selectedProvider,
-                            baseUrl: sessionData?.baseUrl || null,
-                            repositoryFullName: repoFullName,
-                            startDate: startDate,
-                            endDate: endDate,
-                            period: period,
-                            branch: branch,
-                            excludeMerges: excludeMerges
-                        })
+                        body: JSON.stringify(requestBody)
                     });
 
+                    log('info', `│ 📨 [${repoFullName}] Response status: ${response.status} ${response.statusText}`);
+
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
+                        const errorText = await response.text();
+                        log('error', `│ ❌ [${repoFullName}] API Error:`, errorText);
+                        throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
                     }
 
+                    // Stage 3: Processing response
+                    updateRepoStatus(repoFullName, 'analyzing', 'Parsing response...');
+
                     const data = await response.json();
+
+                    const elapsed = ((Date.now() - repoStartTime) / 1000).toFixed(2);
                     const commits = data.summary?.totalCommits || 0;
-                    updateRepoStatus(repoFullName, 'success', `${commits} commits`);
-                    return { success: true, data, repoFullName };
+                    const devs = data.developers?.length || 0;
+                    const prs = data.summary?.totalPRs || 0;
+
+                    log('info', `│ ✅ [${repoFullName}] Analysis complete in ${elapsed}s`);
+                    log('info', `│    └─ Commits: ${commits}, Developers: ${devs}, PRs: ${prs}`);
+
+                    updateRepoStatus(repoFullName, 'success', `${commits} commits, ${prs} PRs`, {
+                        commits, developers: devs, prs, elapsed
+                    });
+
+                    return { success: true, data, repoFullName, elapsed };
 
                 } catch (error) {
-                    updateRepoStatus(repoFullName, 'error', error.message);
-                    return { success: false, error: error.message, repoFullName };
+                    const elapsed = ((Date.now() - repoStartTime) / 1000).toFixed(2);
+                    log('error', `│ ❌ [${repoFullName}] Failed after ${elapsed}s: ${error.message}`);
+
+                    updateRepoStatus(repoFullName, 'error', error.message.substring(0, 30));
+                    return { success: false, error: error.message, repoFullName, elapsed };
                 }
             });
 
             // Wait for all to complete (parallel execution)
-            updateCurrentAction('Analyzing all repositories in parallel...');
+            log('info', '\n⏳ Waiting for all parallel requests to complete...');
+            updateCurrentAction(`Analyzing ${repoList.length} repositories in parallel...`);
+
             const results = await Promise.all(analyzePromises);
 
             // Filter successful results
             const successfulResults = results.filter(r => r.success).map(r => r.data);
-            const failedRepos = results.filter(r => !r.success).map(r => r.repoFullName);
+            const failedRepos = results.filter(r => !r.success);
+
+            const totalElapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
+
+            log('info', '\n═══════════════════════════════════════════════════════════');
+            log('info', '📊 ANALYSIS COMPLETE');
+            log('info', '═══════════════════════════════════════════════════════════');
+            log('info', `Total time: ${totalElapsed}s`);
+            log('info', `Successful: ${successfulResults.length}/${repoList.length}`);
+            log('info', `Failed: ${failedRepos.length}/${repoList.length}`);
+
+            if (failedRepos.length > 0) {
+                log('warn', 'Failed repositories:', failedRepos.map(r => `${r.repoFullName}: ${r.error}`));
+            }
 
             if (successfulResults.length === 0) {
                 hideParallelLoading();
@@ -1303,8 +1486,17 @@
             }
 
             // Merge all results
-            updateCurrentAction('Merging results...');
+            updateCurrentAction('Merging results from all repositories...');
+            log('info', '🔀 Merging results from all repositories...');
+
             const mergedData = mergeAnalysisResults(successfulResults);
+
+            log('info', '📈 Merged data summary:', {
+                totalCommits: mergedData.summary.totalCommits,
+                totalDevelopers: mergedData.summary.totalDevelopers,
+                totalPRs: mergedData.summary.totalPRs,
+                repositories: mergedData.analyzedRepositories.length
+            });
 
             // Brief delay to show completion
             await new Promise(resolve => setTimeout(resolve, 500));

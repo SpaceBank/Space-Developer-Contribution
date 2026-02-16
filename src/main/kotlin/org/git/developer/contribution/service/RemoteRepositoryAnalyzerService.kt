@@ -26,11 +26,21 @@ class RemoteRepositoryAnalyzerService(
      * Analyze a single remote repository (for parallel processing from frontend)
      */
     fun analyzeSingleRepository(request: SingleRepoAnalyzeRequest): ContributionAnalysisResponse {
+        val startTime = System.currentTimeMillis()
         val tempBaseDir = Files.createTempDirectory("git-analysis-single-").toFile()
-        logger.info("Analyzing single repo: ${request.repositoryFullName}")
+
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("📦 Starting analysis: ${request.repositoryFullName}")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("  Provider: ${request.provider}")
+        logger.info("  Date range: ${request.startDate ?: "default"} to ${request.endDate ?: "default"}")
+        logger.info("  Period: ${request.period}")
+        logger.info("  Branch: ${request.branch ?: "all"}")
+        logger.info("  Exclude merges: ${request.excludeMerges}")
 
         try {
-            // Get repository info
+            // Step 1: Get repository info
+            logger.info("📋 [${request.repositoryFullName}] Step 1: Fetching repository info...")
             val repoList = gitProviderService.listRepositories(
                 token = request.token,
                 provider = request.provider,
@@ -39,13 +49,15 @@ class RemoteRepositoryAnalyzerService(
 
             val repo = repoList.repositories.find { it.fullName == request.repositoryFullName }
                 ?: run {
-                    logger.warn("Repository not found: ${request.repositoryFullName}")
+                    logger.warn("❌ [${request.repositoryFullName}] Repository not found in accessible repos")
                     return emptySingleResponse(request)
                 }
+            logger.info("✅ [${request.repositoryFullName}] Repository found: ${repo.name} (${repo.defaultBranch})")
 
-            // Clone the repository
+            // Step 2: Clone the repository
             val repoDir = File(tempBaseDir, repo.name)
-            logger.info("Cloning ${repo.fullName}...")
+            logger.info("📥 [${request.repositoryFullName}] Step 2: Cloning repository...")
+            val cloneStartTime = System.currentTimeMillis()
 
             val success = gitProviderService.cloneRepository(
                 cloneUrl = repo.cloneUrl,
@@ -54,12 +66,17 @@ class RemoteRepositoryAnalyzerService(
                 targetDir = repoDir
             )
 
+            val cloneTime = System.currentTimeMillis() - cloneStartTime
             if (!success) {
-                logger.error("Failed to clone ${repo.fullName}")
+                logger.error("❌ [${request.repositoryFullName}] Failed to clone after ${cloneTime}ms")
                 return emptySingleResponse(request)
             }
+            logger.info("✅ [${request.repositoryFullName}] Clone complete in ${cloneTime}ms")
 
-            // Analyze the repository
+            // Step 3: Analyze commits
+            logger.info("🔍 [${request.repositoryFullName}] Step 3: Analyzing commits...")
+            val analyzeStartTime = System.currentTimeMillis()
+
             val analyzeRequest = AnalyzeRequest(
                 repositoryPaths = listOf(repoDir.absolutePath),
                 startDate = request.startDate?.let { LocalDate.parse(it) },
@@ -70,8 +87,14 @@ class RemoteRepositoryAnalyzerService(
             )
 
             val result = contributionAggregator.analyzeRepositories(analyzeRequest)
+            val analyzeTime = System.currentTimeMillis() - analyzeStartTime
+            logger.info("✅ [${request.repositoryFullName}] Commit analysis complete in ${analyzeTime}ms")
+            logger.info("   └─ Found ${result.summary.totalCommits} commits from ${result.developers.size} developers")
 
-            // Fetch PRs
+            // Step 4: Fetch PRs
+            logger.info("🔀 [${request.repositoryFullName}] Step 4: Fetching merged PRs...")
+            val prStartTime = System.currentTimeMillis()
+
             val prs = gitProviderService.fetchMergedPullRequests(
                 token = request.token,
                 provider = request.provider,
@@ -80,10 +103,21 @@ class RemoteRepositoryAnalyzerService(
                 baseUrl = request.baseUrl
             )
 
+            val prTime = System.currentTimeMillis() - prStartTime
+            logger.info("✅ [${request.repositoryFullName}] PR fetch complete in ${prTime}ms")
+            logger.info("   └─ Found ${prs.size} merged PRs")
+
             val prCountByPeriod = calculatePRCountByPeriod(prs, request.period, result.dateRange)
 
             // Calculate PR author stats
             val prAuthorStats = calculatePRAuthorStats(prs)
+            logger.info("   └─ ${prAuthorStats.size} unique PR authors")
+
+            val totalTime = System.currentTimeMillis() - startTime
+            logger.info("═══════════════════════════════════════════════════════════")
+            logger.info("✅ [${request.repositoryFullName}] Analysis complete in ${totalTime}ms")
+            logger.info("   └─ Commits: ${result.summary.totalCommits}, PRs: ${prs.size}, Developers: ${result.developers.size}")
+            logger.info("═══════════════════════════════════════════════════════════")
 
             return result.copy(
                 analyzedRepositories = listOf(request.repositoryFullName),
@@ -95,9 +129,9 @@ class RemoteRepositoryAnalyzerService(
         } finally {
             try {
                 tempBaseDir.deleteRecursively()
-                logger.info("Cleaned up temp directory for ${request.repositoryFullName}")
+                logger.info("🧹 [${request.repositoryFullName}] Cleaned up temp directory")
             } catch (e: Exception) {
-                logger.warn("Failed to clean up temp directory: ${e.message}")
+                logger.warn("⚠️ [${request.repositoryFullName}] Failed to clean up temp directory: ${e.message}")
             }
         }
     }
