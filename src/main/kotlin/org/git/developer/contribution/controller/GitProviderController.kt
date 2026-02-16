@@ -55,5 +55,24 @@ class GitProviderController(
         val result = remoteAnalyzerService.analyzeRemoteRepositories(request)
         return ResponseEntity.ok(result)
     }
+
+    /**
+     * Analyze a single repository (for parallel processing)
+     *
+     * POST /api/git/analyze/single
+     * {
+     *   "token": "ghp_xxxx",
+     *   "provider": "GITHUB",
+     *   "repositoryFullName": "owner/repo",
+     *   "startDate": "2025-01-01",
+     *   "endDate": "2025-12-31",
+     *   "period": "WEEKLY"
+     * }
+     */
+    @PostMapping("/analyze/single")
+    fun analyzeSingleRepository(@RequestBody request: SingleRepoAnalyzeRequest): ResponseEntity<ContributionAnalysisResponse> {
+        val result = remoteAnalyzerService.analyzeSingleRepository(request)
+        return ResponseEntity.ok(result)
+    }
 }
 

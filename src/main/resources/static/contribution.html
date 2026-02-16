@@ -328,6 +328,181 @@
             color: #a1a1aa;
         }
 
+        /* Parallel loading progress panel */
+        .parallel-loading-panel {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loading-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .loading-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #e4e4e7;
+        }
+
+        .loading-title .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: #6366f1;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+        }
+
+        .loading-progress-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .loading-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa);
+            border-radius: 3px;
+            transition: width 0.5s ease-out;
+            background-size: 200% 100%;
+            animation: shimmer 2s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .loading-status-text {
+            font-size: 0.875rem;
+            color: #a1a1aa;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .loading-status-text .current-action {
+            color: #c4b5fd;
+            font-weight: 500;
+        }
+
+        .repo-status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .repo-status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 0.875rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .repo-status-item.pending {
+            opacity: 0.6;
+        }
+
+        .repo-status-item.loading {
+            background: rgba(251, 191, 36, 0.1);
+            border-left: 3px solid #fbbf24;
+        }
+
+        .repo-status-item.success {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 3px solid #22c55e;
+        }
+
+        .repo-status-item.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+        }
+
+        .repo-status-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+        }
+
+        .repo-status-item.loading .repo-status-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        .repo-status-name {
+            flex: 1;
+            font-size: 0.875rem;
+            color: #e4e4e7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .repo-status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .repo-status-item.pending .repo-status-badge {
+            background: rgba(113, 113, 122, 0.2);
+            color: #71717a;
+        }
+
+        .repo-status-item.loading .repo-status-badge {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .repo-status-item.success .repo-status-badge {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .repo-status-item.error .repo-status-badge {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .mini-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
         .spinner {
             width: 24px;
             height: 24px;
@@ -569,9 +744,26 @@
             </div>
 
             <div id="analyze-error" class="error hidden"></div>
-            <div id="analyze-loading" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Analyzing repositories... This may take a few minutes.</span>
+
+            <!-- Parallel Loading Progress Panel -->
+            <div id="parallel-loading-panel" class="parallel-loading-panel hidden">
+                <div class="loading-header">
+                    <div class="loading-title">
+                        <div class="pulse-dot"></div>
+                        <span>Analyzing Repositories in Parallel</span>
+                    </div>
+                    <span id="loading-progress-text" style="font-size: 0.875rem; color: #a1a1aa;">0 / 0 completed</span>
+                </div>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill" id="loading-progress-fill" style="width: 0%"></div>
+                </div>
+                <div class="loading-status-text">
+                    <span>Current:</span>
+                    <span class="current-action" id="loading-current-action">Initializing...</span>
+                </div>
+                <div class="repo-status-list" id="repo-status-list">
+                    <!-- Repo status items will be inserted here -->
+                </div>
             </div>
         </div>
 
@@ -731,9 +923,8 @@
             document.getElementById('step2-panel').classList.toggle('hidden', step !== 1 && step !== 2);
             document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
 
-            document.getElementById('step1-indicator').classList.toggle('active', step === 1);
-            document.getElementById('step1-indicator').classList.toggle('completed', step > 1);
-            document.getElementById('step2-indicator').classList.toggle('active', step === 2);
+            // Update step indicators (only 2 steps: Select Repos and View Report)
+            document.getElementById('step2-indicator').classList.toggle('active', step === 1 || step === 2);
             document.getElementById('step2-indicator').classList.toggle('completed', step > 2);
             document.getElementById('step3-indicator').classList.toggle('active', step === 3);
         }
@@ -838,7 +1029,181 @@
             document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
         }
 
-        // Analyze repositories
+        // Repository status tracking for parallel loading
+        let repoStatuses = {};
+        let completedCount = 0;
+        let totalRepoCount = 0;
+        let allRepoResults = [];
+
+        // Initialize parallel loading UI
+        function initParallelLoading(repoList) {
+            repoStatuses = {};
+            completedCount = 0;
+            totalRepoCount = repoList.length;
+            allRepoResults = [];
+
+            const panel = document.getElementById('parallel-loading-panel');
+            const statusList = document.getElementById('repo-status-list');
+
+            // Build status list
+            statusList.innerHTML = repoList.map(repo => `
+                <div class="repo-status-item pending" id="repo-status-${repo.replace(/[^a-zA-Z0-9]/g, '_')}">
+                    <div class="repo-status-icon">⏳</div>
+                    <div class="repo-status-name">${repo}</div>
+                    <div class="repo-status-badge">Pending</div>
+                </div>
+            `).join('');
+
+            // Initialize statuses
+            repoList.forEach(repo => {
+                repoStatuses[repo] = 'pending';
+            });
+
+            // Show panel
+            panel.classList.remove('hidden');
+            updateProgressBar();
+            updateCurrentAction('Starting parallel analysis...');
+        }
+
+        // Update repository status
+        function updateRepoStatus(repoName, status, detail = null) {
+            repoStatuses[repoName] = status;
+            const safeId = repoName.replace(/[^a-zA-Z0-9]/g, '_');
+            const item = document.getElementById(`repo-status-${safeId}`);
+
+            if (!item) return;
+
+            // Remove all status classes
+            item.classList.remove('pending', 'loading', 'success', 'error');
+            item.classList.add(status);
+
+            const icon = item.querySelector('.repo-status-icon');
+            const badge = item.querySelector('.repo-status-badge');
+
+            switch (status) {
+                case 'loading':
+                    icon.innerHTML = '⚙️';
+                    badge.textContent = detail || 'Analyzing...';
+                    break;
+                case 'cloning':
+                    icon.innerHTML = '📥';
+                    badge.textContent = 'Cloning...';
+                    item.classList.remove('loading');
+                    item.classList.add('loading');
+                    break;
+                case 'success':
+                    icon.innerHTML = '✅';
+                    badge.textContent = detail || 'Complete';
+                    completedCount++;
+                    break;
+                case 'error':
+                    icon.innerHTML = '❌';
+                    badge.textContent = detail || 'Failed';
+                    completedCount++;
+                    break;
+            }
+
+            updateProgressBar();
+        }
+
+        // Update progress bar
+        function updateProgressBar() {
+            const fill = document.getElementById('loading-progress-fill');
+            const text = document.getElementById('loading-progress-text');
+            const percent = totalRepoCount > 0 ? (completedCount / totalRepoCount) * 100 : 0;
+
+            fill.style.width = `${percent}%`;
+            text.textContent = `${completedCount} / ${totalRepoCount} completed`;
+        }
+
+        // Update current action text
+        function updateCurrentAction(text) {
+            document.getElementById('loading-current-action').textContent = text;
+        }
+
+        // Hide parallel loading panel
+        function hideParallelLoading() {
+            document.getElementById('parallel-loading-panel').classList.add('hidden');
+        }
+
+        // Merge multiple analysis results into one
+        function mergeAnalysisResults(results) {
+            if (results.length === 0) return null;
+            if (results.length === 1) return results[0];
+
+            // Merge developers by authorName
+            const developerMap = new Map();
+
+            results.forEach(result => {
+                result.developers.forEach(dev => {
+                    const key = dev.authorName;
+                    if (developerMap.has(key)) {
+                        const existing = developerMap.get(key);
+                        // Merge data points
+                        const mergedDataPoints = existing.dataPoints.map((dp, idx) => {
+                            const otherDp = dev.dataPoints[idx] || { commits: 0, linesAdded: 0, linesDeleted: 0, filesChanged: 0 };
+                            return {
+                                ...dp,
+                                commits: dp.commits + otherDp.commits,
+                                linesAdded: dp.linesAdded + otherDp.linesAdded,
+                                linesDeleted: dp.linesDeleted + otherDp.linesDeleted,
+                                filesChanged: dp.filesChanged + otherDp.filesChanged
+                            };
+                        });
+                        developerMap.set(key, {
+                            ...existing,
+                            dataPoints: mergedDataPoints,
+                            emails: new Set([...existing.emails, ...dev.emails]),
+                            repositories: new Set([...existing.repositories, ...dev.repositories])
+                        });
+                    } else {
+                        developerMap.set(key, {
+                            ...dev,
+                            emails: new Set(dev.emails),
+                            repositories: new Set(dev.repositories)
+                        });
+                    }
+                });
+            });
+
+            // Convert Sets back to arrays and compute total commits for sorting
+            const mergedDevelopers = Array.from(developerMap.values()).map(dev => ({
+                ...dev,
+                emails: Array.from(dev.emails),
+                repositories: Array.from(dev.repositories)
+            })).sort((a, b) => {
+                const totalA = a.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+                const totalB = b.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+                return totalB - totalA;
+            });
+
+            // Merge PR counts
+            const mergedPRCounts = results[0].prCountByPeriod.map((_, idx) =>
+                results.reduce((sum, r) => sum + (r.prCountByPeriod[idx] || 0), 0)
+            );
+
+            // Merge summaries
+            const mergedSummary = {
+                totalDevelopers: mergedDevelopers.length,
+                totalCommits: results.reduce((sum, r) => sum + r.summary.totalCommits, 0),
+                totalLinesAdded: results.reduce((sum, r) => sum + r.summary.totalLinesAdded, 0),
+                totalLinesDeleted: results.reduce((sum, r) => sum + r.summary.totalLinesDeleted, 0),
+                totalPRs: results.reduce((sum, r) => sum + (r.summary.totalPRs || 0), 0),
+                mostActiveAuthor: mergedDevelopers[0]?.authorName || null,
+                mostActiveRepository: null
+            };
+
+            return {
+                analyzedRepositories: results.flatMap(r => r.analyzedRepositories),
+                dateRange: results[0].dateRange,
+                period: results[0].period,
+                developers: mergedDevelopers,
+                summary: mergedSummary,
+                prCountByPeriod: mergedPRCounts
+            };
+        }
+
+        // Analyze repositories in PARALLEL
         async function analyzeRepositories() {
             if (selectedRepos.size === 0) {
                 showError('analyze-error', 'Please select at least one repository');
@@ -846,7 +1211,6 @@
             }
 
             hideError('analyze-error');
-            showLoading('analyze-loading');
 
             const sessionData = getSessionData();
             const token = sessionData?.token || '';
@@ -856,36 +1220,80 @@
             const branch = document.getElementById('branch').value || null;
             const excludeMerges = document.getElementById('excludeMerges').checked;
 
-            try {
-                const response = await fetch('/api/git/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: token,
-                        provider: selectedProvider,
-                        baseUrl: sessionData?.baseUrl || null,
-                        repositoryFullNames: Array.from(selectedRepos),
-                        startDate: startDate,
-                        endDate: endDate,
-                        period: period,
-                        branch: branch,
-                        excludeMerges: excludeMerges
-                    })
-                });
+            const repoList = Array.from(selectedRepos);
 
-                if (!response.ok) {
-                    throw new Error('Failed to analyze repositories');
+            // Initialize parallel loading UI
+            initParallelLoading(repoList);
+            document.getElementById('analyzeBtn').disabled = true;
+
+            // Create promises for all repositories
+            const analyzePromises = repoList.map(async (repoFullName) => {
+                updateRepoStatus(repoFullName, 'loading', 'Cloning...');
+                updateCurrentAction(`Cloning ${repoFullName}...`);
+
+                try {
+                    const response = await fetch('/api/git/analyze/single', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            token: token,
+                            provider: selectedProvider,
+                            baseUrl: sessionData?.baseUrl || null,
+                            repositoryFullName: repoFullName,
+                            startDate: startDate,
+                            endDate: endDate,
+                            period: period,
+                            branch: branch,
+                            excludeMerges: excludeMerges
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const commits = data.summary?.totalCommits || 0;
+                    updateRepoStatus(repoFullName, 'success', `${commits} commits`);
+                    return { success: true, data, repoFullName };
+
+                } catch (error) {
+                    updateRepoStatus(repoFullName, 'error', error.message);
+                    return { success: false, error: error.message, repoFullName };
                 }
+            });
 
-                const data = await response.json();
-                hideLoading('analyze-loading');
-                displayResults(data);
-                goToStep(3);
+            // Wait for all to complete (parallel execution)
+            updateCurrentAction('Analyzing all repositories in parallel...');
+            const results = await Promise.all(analyzePromises);
 
-            } catch (error) {
-                hideLoading('analyze-loading');
-                showError('analyze-error', error.message);
+            // Filter successful results
+            const successfulResults = results.filter(r => r.success).map(r => r.data);
+            const failedRepos = results.filter(r => !r.success).map(r => r.repoFullName);
+
+            if (successfulResults.length === 0) {
+                hideParallelLoading();
+                document.getElementById('analyzeBtn').disabled = false;
+                showError('analyze-error', 'Failed to analyze any repositories. Please check your permissions and try again.');
+                return;
             }
+
+            // Merge all results
+            updateCurrentAction('Merging results...');
+            const mergedData = mergeAnalysisResults(successfulResults);
+
+            // Brief delay to show completion
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            hideParallelLoading();
+            document.getElementById('analyzeBtn').disabled = false;
+
+            if (failedRepos.length > 0) {
+                console.warn('Some repositories failed to analyze:', failedRepos);
+            }
+
+            displayResults(mergedData);
+            goToStep(3);
         }
 
         // Display results

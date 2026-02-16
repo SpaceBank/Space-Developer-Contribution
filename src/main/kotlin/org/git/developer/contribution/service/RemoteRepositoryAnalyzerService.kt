@@ -23,6 +23,102 @@ class RemoteRepositoryAnalyzerService(
     private val logger = LoggerFactory.getLogger(RemoteRepositoryAnalyzerService::class.java)
 
     /**
+     * Analyze a single remote repository (for parallel processing from frontend)
+     */
+    fun analyzeSingleRepository(request: SingleRepoAnalyzeRequest): ContributionAnalysisResponse {
+        val tempBaseDir = Files.createTempDirectory("git-analysis-single-").toFile()
+        logger.info("Analyzing single repo: ${request.repositoryFullName}")
+
+        try {
+            // Get repository info
+            val repoList = gitProviderService.listRepositories(
+                token = request.token,
+                provider = request.provider,
+                baseUrl = request.baseUrl
+            )
+
+            val repo = repoList.repositories.find { it.fullName == request.repositoryFullName }
+                ?: run {
+                    logger.warn("Repository not found: ${request.repositoryFullName}")
+                    return emptySingleResponse(request)
+                }
+
+            // Clone the repository
+            val repoDir = File(tempBaseDir, repo.name)
+            logger.info("Cloning ${repo.fullName}...")
+
+            val success = gitProviderService.cloneRepository(
+                cloneUrl = repo.cloneUrl,
+                token = request.token,
+                provider = request.provider,
+                targetDir = repoDir
+            )
+
+            if (!success) {
+                logger.error("Failed to clone ${repo.fullName}")
+                return emptySingleResponse(request)
+            }
+
+            // Analyze the repository
+            val analyzeRequest = AnalyzeRequest(
+                repositoryPaths = listOf(repoDir.absolutePath),
+                startDate = request.startDate?.let { LocalDate.parse(it) },
+                endDate = request.endDate?.let { LocalDate.parse(it) },
+                period = request.period,
+                branch = request.branch,
+                excludeMerges = request.excludeMerges
+            )
+
+            val result = contributionAggregator.analyzeRepositories(analyzeRequest)
+
+            // Fetch PRs
+            val prs = gitProviderService.fetchMergedPullRequests(
+                token = request.token,
+                provider = request.provider,
+                repositoryFullName = request.repositoryFullName,
+                since = request.startDate,
+                baseUrl = request.baseUrl
+            )
+
+            val prCountByPeriod = calculatePRCountByPeriod(prs, request.period, result.dateRange)
+
+            return result.copy(
+                analyzedRepositories = listOf(request.repositoryFullName),
+                prCountByPeriod = prCountByPeriod,
+                summary = result.summary.copy(totalPRs = prs.size)
+            )
+
+        } finally {
+            try {
+                tempBaseDir.deleteRecursively()
+                logger.info("Cleaned up temp directory for ${request.repositoryFullName}")
+            } catch (e: Exception) {
+                logger.warn("Failed to clean up temp directory: ${e.message}")
+            }
+        }
+    }
+
+    private fun emptySingleResponse(request: SingleRepoAnalyzeRequest): ContributionAnalysisResponse {
+        return ContributionAnalysisResponse(
+            analyzedRepositories = listOf(request.repositoryFullName),
+            dateRange = DateRange(
+                startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3),
+                endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+            ),
+            period = request.period,
+            developers = emptyList(),
+            summary = AnalysisSummary(
+                totalDevelopers = 0,
+                totalCommits = 0,
+                totalLinesAdded = 0,
+                totalLinesDeleted = 0,
+                mostActiveAuthor = null,
+                mostActiveRepository = null
+            )
+        )
+    }
+
+    /**
      * Analyze selected remote repositories
      */
     fun analyzeRemoteRepositories(request: RemoteAnalyzeRequest): ContributionAnalysisResponse {

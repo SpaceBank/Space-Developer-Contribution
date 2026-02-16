@@ -49,6 +49,21 @@ data class RemoteAnalyzeRequest(
 )
 
 /**
+ * Request to analyze a single repository (for parallel processing)
+ */
+data class SingleRepoAnalyzeRequest(
+    val token: String,
+    val provider: GitProvider = GitProvider.GITHUB,
+    val baseUrl: String? = null,
+    val repositoryFullName: String,  // e.g., "owner/repo"
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val period: AggregationPeriod = AggregationPeriod.WEEKLY,
+    val branch: String? = null,
+    val excludeMerges: Boolean = true
+)
+
+/**
  * Response with list of available repositories
  */
 data class RepositoryListResponse(
