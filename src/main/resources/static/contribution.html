@@ -453,10 +453,79 @@
             align-items: center;
             justify-content: center;
             font-size: 0.875rem;
+            transition: transform 0.3s ease;
         }
 
+        /* Pulse animation for loading states */
         .repo-status-item.loading .repo-status-icon {
-            animation: spin 1s linear infinite;
+            animation: iconPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes iconPulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+        }
+
+        /* Bounce animation for success */
+        .repo-status-item.success .repo-status-icon {
+            animation: iconBounce 0.6s ease-out;
+        }
+
+        @keyframes iconBounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        /* Shake animation for error */
+        .repo-status-item.error .repo-status-icon {
+            animation: iconShake 0.5s ease-out;
+        }
+
+        @keyframes iconShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+            20%, 40%, 60%, 80% { transform: translateX(3px); }
+        }
+
+        /* Special animations for specific loading stages */
+        @keyframes downloadBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        @keyframes rotateAnalyze {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(4px); }
+        }
+
+        @keyframes prSlide {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(4px); }
+        }
+
+        /* Override animations for specific states */
+        .repo-icon-cloning {
+            animation: downloadBounce 1s ease-in-out infinite !important;
+        }
+
+        .repo-icon-analyzing {
+            animation: rotateAnalyze 2s linear infinite !important;
+        }
+
+        .repo-icon-prs {
+            animation: prSlide 1.2s ease-in-out infinite !important;
+        }
+
+        .repo-icon-starting {
+            animation: iconPulse 1s ease-in-out infinite !important;
         }
 
         .repo-status-name {
@@ -876,6 +945,14 @@
                     </div>
                 </div>
 
+                <!-- Filtered by developer selection -->
+                <div class="chart-wrapper">
+                    <h2>📈 Commits Over Time (by Developer)</h2>
+                    <div class="chart-container">
+                        <canvas id="commitsChart"></canvas>
+                    </div>
+                </div>
+
                 <div class="chart-wrapper">
                     <h2>🔀 PRs Merged Over Time</h2>
                     <div class="chart-container">
@@ -887,14 +964,6 @@
                     <h2>🚀 Top PR Authors</h2>
                     <div class="chart-container">
                         <canvas id="prAuthorsChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Filtered by developer selection -->
-                <div class="chart-wrapper">
-                    <h2>📈 Commits Over Time (by Developer)</h2>
-                    <div class="chart-container">
-                        <canvas id="commitsChart"></canvas>
                     </div>
                 </div>
 
@@ -1255,6 +1324,9 @@
             const icon = item.querySelector('.repo-status-icon');
             const badge = item.querySelector('.repo-status-badge');
 
+            // Remove all animation classes
+            icon.classList.remove('repo-icon-starting', 'repo-icon-cloning', 'repo-icon-analyzing', 'repo-icon-prs');
+
             switch (status) {
                 case 'pending':
                     item.classList.add('pending');
@@ -1264,13 +1336,15 @@
                     break;
                 case 'starting':
                     item.classList.add('loading');
-                    icon.innerHTML = '🔄';
+                    icon.innerHTML = '🚀';
+                    icon.classList.add('repo-icon-starting');
                     badge.textContent = 'Starting...';
                     updateRepoProgress(repoName, 1, 'active');  // Step 1: Init
                     break;
                 case 'cloning':
                     item.classList.add('loading');
                     icon.innerHTML = '📥';
+                    icon.classList.add('repo-icon-cloning');
                     badge.textContent = 'Cloning repo...';
                     if (detailEl) detailEl.textContent = 'Downloading repository files';
                     updateRepoProgress(repoName, 2, 'active');  // Step 2: Clone
@@ -1278,6 +1352,7 @@
                 case 'analyzing':
                     item.classList.add('loading');
                     icon.innerHTML = '🔍';
+                    icon.classList.add('repo-icon-analyzing');
                     badge.textContent = 'Analyzing commits...';
                     if (detailEl) detailEl.textContent = detail || 'Reading git history';
                     updateRepoProgress(repoName, 3, 'active');  // Step 3: Analyze
@@ -1285,6 +1360,7 @@
                 case 'fetching-prs':
                     item.classList.add('loading');
                     icon.innerHTML = '🔀';
+                    icon.classList.add('repo-icon-prs');
                     badge.textContent = 'Fetching PRs...';
                     if (detailEl) detailEl.textContent = 'Loading merged pull requests';
                     updateRepoProgress(repoName, 4, 'active');  // Step 4: PRs
