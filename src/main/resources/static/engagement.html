@@ -1075,12 +1075,19 @@
         // Render contributors list
         function renderContributorsList(filter = '') {
             const container = document.getElementById('contributorsList');
-            const filtered = contributors.filter(c =>
-                c.login.toLowerCase().includes(filter.toLowerCase()) ||
-                (c.name && c.name.toLowerCase().includes(filter.toLowerCase()))
-            );
+
+            // Filter by login, name, or display name
+            const filtered = contributors.filter(c => {
+                const displayName = getDisplayName(c.login);
+                const searchText = filter.toLowerCase();
+
+                return c.login.toLowerCase().includes(searchText) ||
+                       (c.name && c.name.toLowerCase().includes(searchText)) ||
+                       (displayName && displayName.toLowerCase().includes(searchText));
+            });
 
             container.innerHTML = filtered.map(c => {
+                const displayName = getDisplayName(c.login);
                 const reposInfo = c.publicRepos ? `📁 ${c.publicRepos} repos` : '';
                 const contributionsInfo = c.contributions ? `${c.contributions} contributions` : '';
                 const infoText = [contributionsInfo, reposInfo].filter(x => x).join(' • ');
@@ -1093,7 +1100,7 @@
                         <img class="contributor-avatar" src="${c.avatarUrl || ''}"
                              onerror="this.style.display='none'" alt="">
                         <div class="contributor-info">
-                            <div class="contributor-login">${getDisplayName(c.login)}</div>
+                            <div class="contributor-login">${displayName}</div>
                             <div class="contributor-contributions">@${c.login}${infoText ? ' • ' + infoText : ''}</div>
                         </div>
                     </div>
