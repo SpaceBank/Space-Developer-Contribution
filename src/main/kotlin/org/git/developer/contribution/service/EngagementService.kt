@@ -271,53 +271,70 @@ class EngagementService(
      * Returns quickly for immediate display
      */
     fun analyzeCommitsOnly(request: EngagementAnalyzeRequest): EngagementAnalysisResponse {
-        val startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3)
-        val endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+        logger.info("🚀 analyzeCommitsOnly() started")
+        logger.info("📊 Request: provider=${request.provider}, repos=${request.repositoryFullNames.size}, contributors=${request.contributorLogins.size}")
+        logger.info("📅 Date range: ${request.startDate} to ${request.endDate}, period=${request.period}")
+        logger.info("🔀 Exclude merge commits: ${request.excludeMergeCommits}")
 
-        val repositories = if (request.repositoryFullNames.isEmpty()) {
-            fetchAccessibleRepos(request.token, request.provider, request.baseUrl)
-        } else {
-            request.repositoryFullNames
-        }
+        try {
+            val startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3)
+            val endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
 
-        logger.info("FAST: Analyzing commits only for ${request.contributorLogins.size} contributors")
+            val repositories = if (request.repositoryFullNames.isEmpty()) {
+                fetchAccessibleRepos(request.token, request.provider, request.baseUrl)
+            } else {
+                request.repositoryFullNames
+            }
 
-        val periods = generatePeriods(startDate, endDate, request.period.name)
-        val periodLabels = periods.map { it.first }
+            logger.info("📁 Analyzing ${repositories.size} repositories")
+            logger.info("FAST: Analyzing commits only for ${request.contributorLogins.size} contributors")
 
-        val contributorEngagements = request.contributorLogins.map { login ->
-            analyzeCommitsOnlyForContributor(
-                token = request.token,
-                login = login,
-                startDate = startDate,
-                endDate = endDate,
-                periods = periods,
-                repositories = repositories,
-                excludeMergeCommits = request.excludeMergeCommits
+            val periods = generatePeriods(startDate, endDate, request.period.name)
+            val periodLabels = periods.map { it.first }
+
+            val contributorEngagements = request.contributorLogins.mapIndexed { index, login ->
+                logger.info("Processing contributor ${index + 1}/${request.contributorLogins.size}: $login")
+                analyzeCommitsOnlyForContributor(
+                    token = request.token,
+                    login = login,
+                    startDate = startDate,
+                    endDate = endDate,
+                    periods = periods,
+                    repositories = repositories,
+                    excludeMergeCommits = request.excludeMergeCommits
+                )
+            }
+
+            val summary = EngagementSummary(
+                totalContributors = contributorEngagements.size,
+                totalCommits = contributorEngagements.sumOf { it.totalCommits },
+                totalLinesAdded = 0,
+                totalLinesDeleted = 0,
+                mostActiveCommitter = contributorEngagements.maxByOrNull { it.totalCommits }?.login,
+                mostLinesChangedBy = null,
+                totalPRsMerged = 0,
+                totalPRsReviewed = 0,
+                totalIssuesClosed = 0,
+                totalActiveDays = 0
             )
+
+            val result = EngagementAnalysisResponse(
+                analyzedRepositories = repositories,
+                dateRange = DateRange(startDate, endDate),
+                period = request.period,
+                contributors = contributorEngagements.sortedByDescending { it.totalCommits },
+                periods = periodLabels,
+                summary = summary
+            )
+
+            logger.info("✅ analyzeCommitsOnly() completed successfully")
+            logger.info("📈 Result: ${contributorEngagements.size} contributors, ${summary.totalCommits} total commits")
+            return result
+
+        } catch (e: Exception) {
+            logger.error("❌ Error in analyzeCommitsOnly(): ${e.message}", e)
+            throw e
         }
-
-        val summary = EngagementSummary(
-            totalContributors = contributorEngagements.size,
-            totalCommits = contributorEngagements.sumOf { it.totalCommits },
-            totalLinesAdded = 0,
-            totalLinesDeleted = 0,
-            mostActiveCommitter = contributorEngagements.maxByOrNull { it.totalCommits }?.login,
-            mostLinesChangedBy = null,
-            totalPRsMerged = 0,
-            totalPRsReviewed = 0,
-            totalIssuesClosed = 0,
-            totalActiveDays = 0
-        )
-
-        return EngagementAnalysisResponse(
-            analyzedRepositories = repositories,
-            dateRange = DateRange(startDate, endDate),
-            period = request.period,
-            contributors = contributorEngagements.sortedByDescending { it.totalCommits },
-            periods = periodLabels,
-            summary = summary
-        )
     }
 
     /**
@@ -1344,7 +1361,4 @@ class EngagementService(
         return builder.build()
     }
 }
-
-// Helper class for returning 4 values
-data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 

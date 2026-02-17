@@ -601,9 +601,114 @@
         .chart-shimmer.hidden {
             display: none;
         }
+
+        /* Custom Modal/Popup */
+        .custom-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #e4e4e7;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-message {
+            font-size: 0.95rem;
+            color: #a1a1aa;
+            text-align: center;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        .modal-button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-button.primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .chart-shimmer.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <!-- Custom Modal/Popup -->
+    <div id="customModal" class="custom-modal">
+        <div class="modal-content">
+            <div class="modal-icon" id="modalIcon">⚠️</div>
+            <div class="modal-title" id="modalTitle">Alert</div>
+            <div class="modal-message" id="modalMessage">This is a message</div>
+            <div class="modal-buttons">
+                <button class="modal-button primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
     <a href="/" class="back-button">← Back to Home</a>
 
     <div class="container">
@@ -624,40 +729,30 @@
             </div>
 
             <div class="selection-controls">
-                <button class="secondary" onclick="selectAllContributors()">Select All</button>
                 <button class="secondary" onclick="deselectAllContributors()">Deselect All</button>
                 <span style="margin-left: auto; color: #a1a1aa;"><span id="contributorCount">0</span> selected</span>
             </div>
 
             <div class="contributors-container" id="contributorsList"></div>
 
-            <!-- Optional: Repository Filter -->
+            <!-- Repository Filter -->
             <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border-radius: 8px;">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-                    <input type="checkbox" id="filterByRepos" onchange="toggleRepoFilter()"
-                           style="width: 18px; height: 18px; accent-color: #6366f1;">
-                    <label for="filterByRepos" style="font-weight: 500; cursor: pointer;">
-                        📁 Filter by specific repositories
-                    </label>
-                </div>
-                <p id="repoFilterHint" style="font-size: 0.8rem; color: #71717a; margin-bottom: 0.5rem;">
-                    ✅ Will analyze activity across <strong>ALL accessible repositories</strong> by default.
-                    Check the box above to filter by specific repos.
+                <h3 style="margin-bottom: 0.75rem;">📁 Select Repositories (1-10 required)</h3>
+                <p style="font-size: 0.8rem; color: #71717a; margin-bottom: 0.75rem;">
+                    Select between 1 and 10 repositories to analyze.
                 </p>
 
-                <div id="repo-filter-section" class="hidden">
-                    <div id="repo-selection">
-                        <div class="search-box">
-                            <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
-                        </div>
-
-                        <div class="selection-info">
-                            <span id="repoCount">0</span> repositories selected
-                            <button class="secondary" style="float: right; padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="selectAllRepos()">Select All</button>
-                        </div>
-
-                        <div class="repo-list" id="repoList"></div>
+                <div id="repo-selection">
+                    <div class="search-box">
+                        <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
                     </div>
+
+                    <div class="selection-controls">
+                        <button class="secondary" onclick="deselectAllRepos()">Deselect All</button>
+                        <span style="margin-left: auto; color: #a1a1aa;"><span id="repoCount">0</span> selected</span>
+                    </div>
+
+                    <div class="repo-list" id="repoList"></div>
                 </div>
             </div>
 
@@ -916,6 +1011,25 @@
             return data ? JSON.parse(data) : null;
         }
 
+        // Custom Modal Functions
+        function showModal(icon, title, message) {
+            document.getElementById('modalIcon').textContent = icon;
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('customModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.remove('show');
+        }
+
+        // Close modal on background click
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'customModal') {
+                closeModal();
+            }
+        });
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -956,6 +1070,9 @@
                     // Auto-load repositories
                     if (sessionData.repositories && sessionData.repositories.length > 0) {
                         repositories = sessionData.repositories.map(r => r.fullName);
+
+                        // Render repository list
+                        renderRepoList();
                     }
 
                     renderContributorsList();
@@ -991,30 +1108,7 @@
             document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
         }
 
-
-        // Toggle repo filter section
-        function toggleRepoFilter() {
-            const checkbox = document.getElementById('filterByRepos');
-            const section = document.getElementById('repo-filter-section');
-            const hint = document.getElementById('repoFilterHint');
-
-            if (checkbox.checked) {
-                section.classList.remove('hidden');
-                hint.innerHTML = '⚠️ <strong>Filter mode:</strong> Select specific repositories below to analyze.';
-
-                // Render repos from session data (already loaded)
-                if (repositories.length > 0) {
-                    renderRepoList();
-                }
-            } else {
-                section.classList.add('hidden');
-                hint.innerHTML = '✅ Will analyze activity across <strong>ALL accessible repositories</strong> by default. Check the box above to filter by specific repos.';
-                selectedRepos.clear();
-                updateRepoCount();
-            }
-        }
-
-        // Render repository list from session data
+        // Repository list rendering
         function renderRepoList(filter = '') {
             const container = document.getElementById('repoList');
             const filtered = repositories.filter(r =>
@@ -1044,18 +1138,17 @@
         }
 
         function toggleRepo(repo) {
+            // Check if adding would exceed limit
+            if (!selectedRepos.has(repo) && selectedRepos.size >= 10) {
+                showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
+                return;
+            }
+
             if (selectedRepos.has(repo)) {
                 selectedRepos.delete(repo);
             } else {
                 selectedRepos.add(repo);
             }
-            renderRepoList(document.getElementById('repoSearch').value);
-        }
-
-        function selectAllRepos() {
-            const filter = document.getElementById('repoSearch').value.toLowerCase();
-            repositories.filter(r => r.toLowerCase().includes(filter))
-                .forEach(r => selectedRepos.add(r));
             renderRepoList(document.getElementById('repoSearch').value);
         }
 
@@ -1123,11 +1216,6 @@
             renderContributorsList(document.getElementById('contributorSearch').value);
         }
 
-        function selectAllContributors() {
-            contributors.forEach(c => selectedContributors.add(c.login));
-            renderContributorsList(document.getElementById('contributorSearch').value);
-        }
-
         function deselectAllContributors() {
             selectedContributors.clear();
             renderContributorsList(document.getElementById('contributorSearch').value);
@@ -1141,109 +1229,213 @@
 
         // Analyze engagement - PARALLEL loading for speed
         async function analyzeEngagement() {
-            if (selectedContributors.size === 0) {
-                showError('analyze-error', 'Please select at least one contributor');
-                return;
-            }
+            console.log('🚀 analyzeEngagement() started');
 
-            const filterByRepos = document.getElementById('filterByRepos').checked;
-
-            if (filterByRepos && selectedRepos.size === 0) {
-                showError('analyze-error', 'Please select at least one repository, or uncheck "Filter by specific repositories" to analyze all repos.');
-                return;
-            }
-
-            hideError('analyze-error');
-
-            const sessionData = getSessionData();
-            const token = sessionData?.token || '';
-            const startDate = document.getElementById('startDate').value || null;
-            const endDate = document.getElementById('endDate').value || null;
-            const period = document.getElementById('period').value;
-            const reposToAnalyze = filterByRepos ? Array.from(selectedRepos) : [];
-
-            const requestBody = {
-                token: token,
-                provider: selectedProvider,
-                baseUrl: sessionData?.baseUrl || null,
-                repositoryFullNames: reposToAnalyze,
-                contributorLogins: Array.from(selectedContributors),
-                startDate: startDate,
-                endDate: endDate,
-                period: period,
-                excludeMergeCommits: document.getElementById('excludeMergeCommits').checked
-            };
-
-            // Go to results page immediately with shimmer loading
-            goToStep(3);
-            showShimmerLoading();
-
-            // Start BOTH API calls in PARALLEL
-            updateLoadingStatus('commits', 'loading');
-            updateLoadingStatus('prs', 'loading');
-
-            const commitsPromise = fetch('/api/engagement/analyze/commits', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            }).then(r => r.ok ? r.json() : Promise.reject('Failed to fetch commits'));
-
-            const prsPromise = fetch('/api/engagement/analyze/prs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            }).then(r => {
-                if (!r.ok) {
-                    console.error('PR fetch failed with status:', r.status, r.statusText);
-                    return r.text().then(text => {
-                        console.error('PR fetch error body:', text);
-                        throw new Error(`Failed to fetch PRs: ${r.status} ${r.statusText}`);
-                    });
-                }
-                return r.json();
-            });
-
-            // Handle commits when ready (usually faster)
-            commitsPromise.then(data => {
-                analysisData = data;
-                updateLoadingStatus('commits', 'complete');
-                displayCommitsResults(data);
-            }).catch(err => {
-                updateLoadingStatus('commits', 'error');
-                console.error('Commits error:', err);
-            });
-
-            // Handle PRs when ready (usually slower)
-            prsPromise.then(prData => {
-                // Calculate totals for status display
-                if (prData && prData.contributors && Array.isArray(prData.contributors)) {
-                    const totalPRs = prData.contributors.reduce((sum, c) => sum + (c.prsMerged || 0), 0);
-                    const totalReviews = prData.contributors.reduce((sum, c) => sum + (c.prsReviewed || 0), 0);
-                    updateLoadingStatus('prs', 'complete', `${totalPRs} PRs, ${totalReviews} Reviews`);
-                } else {
-                    updateLoadingStatus('prs', 'complete');
-                }
-                mergePRDataIntoResults(prData);
-                displayPRResults();
-            }).catch(err => {
-                updateLoadingStatus('prs', 'error');
-                console.error('PRs error:', err);
-                // Hide PR shimmers on error
-                hideChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
-                // Update summary cards to show N/A instead of spinner
-                const prsMergedCard = document.getElementById('prsMergedCard');
-                const prsReviewedCard = document.getElementById('prsReviewedCard');
-                const activeDaysCard = document.getElementById('activeDaysCard');
-                if (prsMergedCard) prsMergedCard.querySelector('.card-value').textContent = 'N/A';
-                if (prsReviewedCard) prsReviewedCard.querySelector('.card-value').textContent = 'N/A';
-                if (activeDaysCard) activeDaysCard.querySelector('.card-value').textContent = 'N/A';
-            });
-
-            // Wait for both to complete (for error handling)
             try {
-                await Promise.allSettled([commitsPromise, prsPromise]);
+                // Validate contributors
+                console.log('📊 Validating contributors...', { count: selectedContributors.size });
+                if (selectedContributors.size === 0) {
+                    console.warn('❌ No contributors selected');
+                    showModal('👥', 'Contributors Required', 'Please select at least one contributor to analyze.');
+                    return;
+                }
+
+                // Validate repositories (1-10 required)
+                console.log('📁 Validating repositories...', { count: selectedRepos.size });
+                if (selectedRepos.size === 0) {
+                    console.warn('❌ No repositories selected');
+                    showModal('📁', 'Repositories Required', 'Please select at least 1 repository to analyze.');
+                    return;
+                }
+
+                if (selectedRepos.size > 10) {
+                    console.warn('❌ Too many repositories selected:', selectedRepos.size);
+                    showModal('⚠️', 'Too Many Repositories', 'You can select a maximum of 10 repositories. Please deselect some repositories.');
+                    return;
+                }
+
+                console.log('✅ Validation passed');
+                hideError('analyze-error');
+
+                // Reset all state before new analysis
+                console.log('🔄 Resetting state for new analysis...');
+                analysisData = null;
+                selectedContributorsForChart = new Set();
+
+                // Destroy all existing charts
+                if (commitsLineChart) { commitsLineChart.destroy(); commitsLineChart = null; }
+                if (commitsBarChart) { commitsBarChart.destroy(); commitsBarChart = null; }
+                if (prsMergedLineChart) { prsMergedLineChart.destroy(); prsMergedLineChart = null; }
+                if (prsMergedBarChart) { prsMergedBarChart.destroy(); prsMergedBarChart = null; }
+                if (prsReviewedLineChart) { prsReviewedLineChart.destroy(); prsReviewedLineChart = null; }
+                if (prsReviewedBarChart) { prsReviewedBarChart.destroy(); prsReviewedBarChart = null; }
+                if (activeDaysLineChart) { activeDaysLineChart.destroy(); activeDaysLineChart = null; }
+                if (activeDaysBarChart) { activeDaysBarChart.destroy(); activeDaysBarChart = null; }
+                console.log('✅ State reset complete');
+
+                const sessionData = getSessionData();
+                console.log('📦 Session data retrieved:', {
+                    hasToken: !!sessionData?.token,
+                    provider: sessionData?.provider,
+                    hasBaseUrl: !!sessionData?.baseUrl
+                });
+
+                const token = sessionData?.token || '';
+                const startDate = document.getElementById('startDate').value || null;
+                const endDate = document.getElementById('endDate').value || null;
+                const period = document.getElementById('period').value;
+                const reposToAnalyze = Array.from(selectedRepos);
+
+                const requestBody = {
+                    token: token,
+                    provider: selectedProvider,
+                    baseUrl: sessionData?.baseUrl || null,
+                    repositoryFullNames: reposToAnalyze,
+                    contributorLogins: Array.from(selectedContributors),
+                    startDate: startDate,
+                    endDate: endDate,
+                    period: period,
+                    excludeMergeCommits: document.getElementById('excludeMergeCommits').checked
+                };
+
+                console.log('📝 Request body prepared:', {
+                    provider: requestBody.provider,
+                    repoCount: requestBody.repositoryFullNames.length,
+                    contributorCount: requestBody.contributorLogins.length,
+                    dateRange: `${startDate} to ${endDate}`,
+                    period: period,
+                    excludeMergeCommits: requestBody.excludeMergeCommits
+                });
+
+                // Go to results page immediately with shimmer loading
+                console.log('🎬 Navigating to results page...');
+                goToStep(3);
+                showShimmerLoading();
+
+                // Start BOTH API calls in PARALLEL
+                console.log('🔄 Starting parallel API calls...');
+                updateLoadingStatus('commits', 'loading');
+                updateLoadingStatus('prs', 'loading');
+
+                const commitsPromise = fetch('/api/engagement/analyze/commits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                }).then(r => {
+                    console.log('📡 Commits API response received:', { status: r.status, ok: r.ok });
+                    if (!r.ok) {
+                        return r.text().then(text => {
+                            console.error('❌ Commits API error response body:', text);
+                            throw new Error(`Failed to fetch commits: ${r.status} ${r.statusText}`);
+                        });
+                    }
+                    return r.json();
+                }).then(data => {
+                    console.log('✅ Commits data parsed successfully:', {
+                        hasContributors: !!data?.contributors,
+                        contributorCount: data?.contributors?.length || 0,
+                        hasAnalyzedRepos: !!data?.analyzedRepositories
+                    });
+                    return data;
+                });
+
+                const prsPromise = fetch('/api/engagement/analyze/prs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                }).then(r => {
+                    console.log('📡 PRs API response received:', { status: r.status, ok: r.ok });
+                    if (!r.ok) {
+                        return r.text().then(text => {
+                            console.error('❌ PRs API error response body:', text);
+                            throw new Error(`Failed to fetch PRs: ${r.status} ${r.statusText}`);
+                        });
+                    }
+                    return r.json();
+                }).then(data => {
+                    console.log('✅ PRs data parsed successfully:', {
+                        hasContributors: !!data?.contributors,
+                        contributorCount: data?.contributors?.length || 0
+                    });
+                    return data;
+                });
+
+                // Handle commits when ready (usually faster)
+                commitsPromise.then(data => {
+                    console.log('🎯 Processing commits data...');
+                    try {
+                        analysisData = data;
+                        updateLoadingStatus('commits', 'complete');
+                        displayCommitsResults(data);
+                        console.log('✅ Commits results displayed successfully');
+                    } catch (err) {
+                        console.error('❌ Error displaying commits results:', err);
+                        throw err;
+                    }
+                }).catch(err => {
+                    console.error('❌ Commits promise error:', err);
+                    updateLoadingStatus('commits', 'error');
+                    showModal('❌', 'Commits Loading Failed', `Failed to load commits data: ${err.message}`);
+                });
+
+                // Handle PRs when ready (usually slower)
+                prsPromise.then(prData => {
+                    console.log('🎯 Processing PRs data...');
+                    try {
+                        // Calculate totals for status display
+                        if (prData && prData.contributors && Array.isArray(prData.contributors)) {
+                            const totalPRs = prData.contributors.reduce((sum, c) => sum + (c.prsMerged || 0), 0);
+                            const totalReviews = prData.contributors.reduce((sum, c) => sum + (c.prsReviewed || 0), 0);
+                            console.log('📊 PRs stats:', { totalPRs, totalReviews });
+                            updateLoadingStatus('prs', 'complete', `${totalPRs} PRs, ${totalReviews} Reviews`);
+                        } else {
+                            console.warn('⚠️ PRs data structure unexpected:', prData);
+                            updateLoadingStatus('prs', 'complete');
+                        }
+                        mergePRDataIntoResults(prData);
+                        displayPRResults();
+                        console.log('✅ PRs results displayed successfully');
+                    } catch (err) {
+                        console.error('❌ Error displaying PRs results:', err);
+                        throw err;
+                    }
+                }).catch(err => {
+                    console.error('❌ PRs promise error:', err);
+                    updateLoadingStatus('prs', 'error');
+                    console.log('🔄 Hiding PR chart shimmers...');
+                    // Hide PR shimmers on error
+                    hideChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
+                    // Update summary cards to show N/A instead of spinner
+                    const prsMergedCard = document.getElementById('prsMergedCard');
+                    const prsReviewedCard = document.getElementById('prsReviewedCard');
+                    const activeDaysCard = document.getElementById('activeDaysCard');
+                    if (prsMergedCard) prsMergedCard.querySelector('.card-value').textContent = 'N/A';
+                    if (prsReviewedCard) prsReviewedCard.querySelector('.card-value').textContent = 'N/A';
+                    if (activeDaysCard) activeDaysCard.querySelector('.card-value').textContent = 'N/A';
+                    showModal('⚠️', 'PRs Loading Failed', `Failed to load PRs data: ${err.message}`);
+                });
+
+                // Wait for both to complete (for error handling)
+                console.log('⏳ Waiting for both API calls to complete...');
+                const results = await Promise.allSettled([commitsPromise, prsPromise]);
+                console.log('✅ Both API calls completed:', {
+                    commits: results[0].status,
+                    prs: results[1].status
+                });
+
+                if (results[0].status === 'rejected') {
+                    console.error('❌ Commits failed:', results[0].reason);
+                }
+                if (results[1].status === 'rejected') {
+                    console.error('❌ PRs failed:', results[1].reason);
+                }
+
             } catch (error) {
-                console.error('Analysis error:', error);
+                console.error('❌ FATAL ERROR in analyzeEngagement():', error);
+                console.error('Error stack:', error.stack);
+                showModal('❌', 'Analysis Failed', `An unexpected error occurred: ${error.message}`);
+                updateLoadingStatus('commits', 'error');
+                updateLoadingStatus('prs', 'error');
             }
         }
 
@@ -1306,66 +1498,82 @@
             }
         }
 
-        // Display commits results (fast)
+        // Display commits results
         function displayCommitsResults(data) {
-            selectedContributorsForChart = new Set(data.contributors.map(c => c.login));
-            window.analysisRepos = data.analyzedRepositories || [];
+            console.log('📊 displayCommitsResults() called', {
+                hasData: !!data,
+                hasContributors: !!data?.contributors,
+                contributorCount: data?.contributors?.length || 0,
+                hasSummary: !!data?.summary,
+                hasDateRange: !!data?.dateRange
+            });
 
-            const repos = data.analyzedRepositories || [];
-            const repoCount = repos.length;
+            try {
+                selectedContributorsForChart = new Set(data.contributors.map(c => c.login));
+                console.log('👥 Contributors for chart filter:', selectedContributorsForChart.size);
 
-            document.getElementById('analysisInfo').innerHTML = `
-                <div style="margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                    <strong>📁 Repositories:</strong>
-                    <span style="background:rgba(99,102,241,0.2); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.8rem;">${repoCount}</span>
-                    <button class="secondary" onclick="toggleRepoDetails()" id="repoToggleBtn"
-                        style="font-size:0.65rem; padding:0.15rem 0.4rem;">Show ▼</button>
-                </div>
-                <div id="repoDetailsBox" style="display:none;"></div>
-                <p style="font-size:0.85rem; color:#a1a1aa;">
-                    📅 ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
-                    📊 Period: ${data.period}
-                </p>
-            `;
+                const repos = data.analyzedRepositories || [];
+                const repoCount = repos.length;
 
-            // Summary cards - commits only first
-            const s = data.summary;
-            document.getElementById('summaryCards').innerHTML = `
-                <div class="summary-cards">
-                    <div class="summary-card">
-                        <div class="card-icon">👥</div>
-                        <div class="card-value">${s.totalContributors}</div>
-                        <div class="card-label">Contributors</div>
+                document.getElementById('analysisInfo').innerHTML = `
+                    <div style="margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                        <strong>📁 Repositories:</strong>
+                        <span style="background:rgba(99,102,241,0.2); padding:0.15rem 0.5rem; border-radius:10px; font-size:0.8rem;">${repoCount}</span>
+                        <button class="secondary" onclick="toggleRepoDetails()" id="repoToggleBtn"
+                            style="font-size:0.65rem; padding:0.15rem 0.4rem;">Show ▼</button>
                     </div>
-                    <div class="summary-card">
-                        <div class="card-icon">📝</div>
-                        <div class="card-value">${s.totalCommits.toLocaleString()}</div>
-                        <div class="card-label">Total Commits</div>
-                    </div>
-                    <div class="summary-card" id="prsMergedCard">
-                        <div class="card-icon">🚀</div>
-                        <div class="card-value"><span class="mini-spinner"></span></div>
-                        <div class="card-label">PRs Merged</div>
-                    </div>
-                    <div class="summary-card" id="prsReviewedCard">
-                        <div class="card-icon">👀</div>
-                        <div class="card-value"><span class="mini-spinner"></span></div>
-                        <div class="card-label">PRs Reviewed</div>
-                    </div>
-                    <div class="summary-card" id="activeDaysCard">
-                        <div class="card-icon">📅</div>
-                        <div class="card-value"><span class="mini-spinner"></span></div>
-                        <div class="card-label">Active Days</div>
-                    </div>
-                </div>
-            `;
+                    <div id="repoDetailsBox" style="display:none;"></div>
+                    <p style="font-size:0.85rem; color:#a1a1aa;">
+                        📅 ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
+                        📊 Period: ${data.period}
+                    </p>
+                `;
 
-            // Render commits charts immediately
-            renderCommitsCharts(data);
-            renderEngagementTable(data.contributors, true); // partial = true, no PR data yet
+                // Summary cards - commits only first
+                const s = data.summary;
+                document.getElementById('summaryCards').innerHTML = `
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="card-icon">👥</div>
+                            <div class="card-value">${s.totalContributors}</div>
+                            <div class="card-label">Contributors</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="card-icon">📝</div>
+                            <div class="card-value">${s.totalCommits.toLocaleString()}</div>
+                            <div class="card-label">Total Commits</div>
+                        </div>
+                        <div class="summary-card" id="prsMergedCard">
+                            <div class="card-icon">🚀</div>
+                            <div class="card-value"><span class="mini-spinner"></span></div>
+                            <div class="card-label">PRs Merged</div>
+                        </div>
+                        <div class="summary-card" id="prsReviewedCard">
+                            <div class="card-icon">👀</div>
+                            <div class="card-value"><span class="mini-spinner"></span></div>
+                            <div class="card-label">PRs Reviewed</div>
+                        </div>
+                        <div class="summary-card" id="activeDaysCard">
+                            <div class="card-icon">📅</div>
+                            <div class="card-value"><span class="mini-spinner"></span></div>
+                            <div class="card-label">Active Days</div>
+                        </div>
+                    </div>
+                `;
 
-            // Show shimmer for PR sections
-            showPRSectionsShimmer();
+                // Render commits charts immediately
+                renderCommitsCharts(data);
+                renderEngagementTable(data.contributors, true); // partial = true, no PR data yet
+
+                // Show shimmer for PR sections
+                showPRSectionsShimmer();
+            } catch (err) {
+                console.error('❌ Error in displayCommitsResults():', err);
+                console.error('Error stack:', err.stack);
+                throw err;
+            }
+
+            console.log('✅ displayCommitsResults() completed successfully');
         }
 
         // Show shimmer for PR/review sections
@@ -1381,47 +1589,81 @@
 
         // Merge PR data into existing results
         function mergePRDataIntoResults(prData) {
-            if (!analysisData || !prData.contributors) return;
-
-            // Update summary
-            let totalPRs = 0, totalReviews = 0, totalActiveDays = 0;
-
-            prData.contributors.forEach(prContrib => {
-                totalPRs += prContrib.prsMerged;
-                totalReviews += prContrib.prsReviewed;
-                totalActiveDays += prContrib.activeDays;
-
-                // Merge into main data
-                const mainContrib = analysisData.contributors.find(c => c.login === prContrib.login);
-                if (mainContrib) {
-                    mainContrib.prsMerged = prContrib.prsMerged;
-                    mainContrib.prsReviewed = prContrib.prsReviewed;
-                    mainContrib.activeDays = prContrib.activeDays;
-                    mainContrib.prsMergedOverTime = prContrib.prsMergedOverTime;
-                    mainContrib.prsReviewedOverTime = prContrib.prsReviewedOverTime;
-                    mainContrib.activeDaysOverTime = prContrib.activeDaysOverTime;
-                }
+            console.log('🔄 mergePRDataIntoResults() called', {
+                hasPRData: !!prData,
+                hasContributors: !!prData?.contributors,
+                contributorCount: prData?.contributors?.length || 0
             });
 
-            analysisData.summary.totalPRsMerged = totalPRs;
-            analysisData.summary.totalPRsReviewed = totalReviews;
-            analysisData.summary.totalActiveDays = totalActiveDays;
+            try {
+                if (!prData || !prData.contributors) {
+                    console.warn('⚠️ No PR data to merge');
+                    return;
+                }
+
+                console.log('🔀 Merging PR data into analysis data...');
+                // Update summary
+                let totalPRs = 0, totalReviews = 0, totalActiveDays = 0;
+
+                prData.contributors.forEach(prContrib => {
+                    totalPRs += prContrib.prsMerged;
+                    totalReviews += prContrib.prsReviewed;
+                    totalActiveDays += prContrib.activeDays;
+
+                    // Merge into main data
+                    const mainContrib = analysisData.contributors.find(c => c.login === prContrib.login);
+                    if (mainContrib) {
+                        mainContrib.prsMerged = prContrib.prsMerged;
+                        mainContrib.prsReviewed = prContrib.prsReviewed;
+                        mainContrib.activeDays = prContrib.activeDays;
+                        mainContrib.prsMergedOverTime = prContrib.prsMergedOverTime;
+                        mainContrib.prsReviewedOverTime = prContrib.prsReviewedOverTime;
+                        mainContrib.activeDaysOverTime = prContrib.activeDaysOverTime;
+                    }
+                });
+
+                analysisData.summary.totalPRsMerged = totalPRs;
+                analysisData.summary.totalPRsReviewed = totalReviews;
+                analysisData.summary.totalActiveDays = totalActiveDays;
+
+                console.log('✅ PR data merged successfully');
+            } catch (err) {
+                console.error('❌ Error in mergePRDataIntoResults():', err);
+                console.error('Error stack:', err.stack);
+                throw err;
+            }
         }
 
-        // Display PR results after they load
+        // Display PR results
         function displayPRResults() {
-            // Restore PR chart sections (they were replaced by shimmer)
-            restorePRChartSections();
-            
-            // Update summary cards
-            const s = analysisData.summary;
-            document.getElementById('prsMergedCard').querySelector('.card-value').textContent = s.totalPRsMerged.toLocaleString();
-            document.getElementById('prsReviewedCard').querySelector('.card-value').textContent = s.totalPRsReviewed.toLocaleString();
-            document.getElementById('activeDaysCard').querySelector('.card-value').textContent = s.totalActiveDays.toLocaleString();
+            console.log('🚀 displayPRResults() called');
 
-            // Render PR charts
-            renderPRCharts(analysisData);
-            renderEngagementTable(analysisData.contributors, false); // full data now
+            try {
+                if (!analysisData || !analysisData.contributors) {
+                    console.error('❌ No analysis data available for PR display');
+                    return;
+                }
+
+                console.log('📊 Rendering PR charts...');
+                // Restore PR chart sections (they were replaced by shimmer)
+                restorePRChartSections();
+
+                // Update summary cards
+                const s = analysisData.summary;
+                document.getElementById('prsMergedCard').querySelector('.card-value').textContent = s.totalPRsMerged.toLocaleString();
+                document.getElementById('prsReviewedCard').querySelector('.card-value').textContent = s.totalPRsReviewed.toLocaleString();
+                document.getElementById('activeDaysCard').querySelector('.card-value').textContent = s.totalActiveDays.toLocaleString();
+
+                // Render PR charts
+                renderPRCharts(analysisData);
+                renderEngagementTable(analysisData.contributors, false); // full data now
+
+                console.log('✅ displayPRResults() completed successfully');
+            } catch (err) {
+                console.error('❌ Error in displayPRResults():', err);
+                console.error('Error stack:', err.stack);
+                throw err;
+            }
         }
 
         // Restore PR chart sections that were replaced by shimmer
@@ -1901,196 +2143,160 @@
         }
 
         function renderCharts(data) {
-            const filteredContributors = data.contributors.filter(c =>
-                selectedContributorsForChart.has(c.login)
-            );
-            const colors = generateColors(filteredContributors.length);
-            const periods = data.periods;
-
-            // Commits Line Chart
-            if (commitsLineChart) commitsLineChart.destroy();
-            commitsLineChart = new Chart(document.getElementById('commitsLineChart'), {
-                type: 'line',
-                data: {
-                    labels: periods,
-                    datasets: filteredContributors.map((c, i) => ({
-                        label: getDisplayName(c.login),
-                        data: c.commitsOverTime.map(d => d.value),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
-                        fill: false,
-                        tension: 0.3
-                    }))
-                },
-                options: chartOptions('Commits')
+            console.log('📈 renderCharts() called', {
+                hasData: !!data,
+                hasContributors: !!data?.contributors,
+                contributorCount: data?.contributors?.length || 0
             });
 
-            // Commits Bar Chart
-            if (commitsBarChart) commitsBarChart.destroy();
-            commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
-                type: 'bar',
-                data: {
-                    labels: filteredContributors.map(c => getDisplayName(c.login)),
-                    datasets: [{
-                        label: 'Total Commits',
-                        data: filteredContributors.map(c => c.totalCommits),
-                        backgroundColor: colors
-                    }]
-                },
-                options: chartOptions('Commits')
-            });
+            try {
+                const filteredContributors = data.contributors.filter(c =>
+                    selectedContributorsForChart.has(c.login)
+                );
+                const colors = generateColors(filteredContributors.length);
+                const periods = data.periods;
 
-            // ===== PRs Merged (Impact) =====
-            // PRs Merged Over Time Line Chart
-            if (prsMergedLineChart) prsMergedLineChart.destroy();
-            prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
-                type: 'line',
-                data: {
-                    labels: periods,
-                    datasets: filteredContributors.map((c, i) => ({
-                        label: getDisplayName(c.login),
-                        data: c.prsMergedOverTime ? c.prsMergedOverTime.map(d => d.value) : periods.map(() => 0),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
-                        fill: false,
-                        tension: 0.3
-                    }))
-                },
-                options: chartOptions('PRs Merged')
-            });
-
-            // PRs Merged Bar Chart
-            if (prsMergedBarChart) prsMergedBarChart.destroy();
-            prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
-                type: 'bar',
-                data: {
-                    labels: filteredContributors.map(c => getDisplayName(c.login)),
-                    datasets: [{
-                        label: 'PRs Merged',
-                        data: filteredContributors.map(c => c.prsMerged || 0),
-                        backgroundColor: '#8b5cf6'
-                    }]
-                },
-                options: chartOptions('PRs Merged')
-            });
-
-            // ===== PRs Reviewed (Team Player) =====
-            // PRs Reviewed Over Time Line Chart
-            if (prsReviewedLineChart) prsReviewedLineChart.destroy();
-            prsReviewedLineChart = new Chart(document.getElementById('prsReviewedLineChart'), {
-                type: 'line',
-                data: {
-                    labels: periods,
-                    datasets: filteredContributors.map((c, i) => ({
-                        label: getDisplayName(c.login),
-                        data: c.prsReviewedOverTime ? c.prsReviewedOverTime.map(d => d.value) : periods.map(() => 0),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
-                        fill: false,
-                        tension: 0.3
-                    }))
-                },
-                options: chartOptions('PRs Reviewed')
-            });
-
-            // PRs Reviewed Bar Chart
-            if (prsReviewedBarChart) prsReviewedBarChart.destroy();
-            prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
-                type: 'bar',
-                data: {
-                    labels: filteredContributors.map(c => getDisplayName(c.login)),
-                    datasets: [{
-                        label: 'PRs Reviewed',
-                        data: filteredContributors.map(c => c.prsReviewed || 0),
-                        backgroundColor: '#3b82f6'
-                    }]
-                },
-                options: chartOptions('PRs Reviewed')
-            });
-
-            // ===== Active Days (Consistency) =====
-            // Active Days Over Time Line Chart
-            if (activeDaysLineChart) activeDaysLineChart.destroy();
-            activeDaysLineChart = new Chart(document.getElementById('activeDaysLineChart'), {
-                type: 'line',
-                data: {
-                    labels: periods,
-                    datasets: filteredContributors.map((c, i) => ({
-                        label: getDisplayName(c.login),
-                        data: c.activeDaysOverTime ? c.activeDaysOverTime.map(d => d.value) : periods.map(() => 0),
-                        borderColor: colors[i],
-                        backgroundColor: colors[i] + '20',
-                        fill: false,
-                        tension: 0.3
-                    }))
-                },
-                options: chartOptions('Active Days')
-            });
-
-            // Active Days Bar Chart
-            if (activeDaysBarChart) activeDaysBarChart.destroy();
-            activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
-                type: 'bar',
-                data: {
-                    labels: filteredContributors.map(c => getDisplayName(c.login)),
-                    datasets: [{
-                        label: 'Active Days',
-                        data: filteredContributors.map(c => c.activeDays || 0),
-                        backgroundColor: '#10b981'
-                    }]
-                },
-                options: chartOptions('Active Days')
-            });
-        }
-
-        function renderEngagementTable(contributors) {
-            document.getElementById('engagementTableBody').innerHTML = contributors.map(c => `
-                <tr>
-                    <td>
-                        <div class="contributor-cell">
-                            ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1.2em;">👤</span>'}
-                            <span>${getDisplayName(c.login)}</span>
-                        </div>
-                    </td>
-                    <td><strong>${c.totalCommits}</strong></td>
-                    <td style="color: #8b5cf6;">${c.prsMerged || 0}</td>
-                    <td style="color: #3b82f6;">${c.prsReviewed || 0}</td>
-                    <td style="color: #10b981;">${c.activeDays || 0}</td>
-                </tr>
-            `).join('');
-        }
-
-        // Chart options
-        function chartOptions(label) {
-            return {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        labels: { color: '#e4e4e7' }
+                // Commits Line Chart
+                if (commitsLineChart) commitsLineChart.destroy();
+                commitsLineChart = new Chart(document.getElementById('commitsLineChart'), {
+                    type: 'line',
+                    data: {
+                        labels: periods,
+                        datasets: filteredContributors.map((c, i) => ({
+                            label: getDisplayName(c.login),
+                            data: c.commitsOverTime.map(d => d.value),
+                            borderColor: colors[i],
+                            backgroundColor: colors[i] + '20',
+                            fill: false,
+                            tension: 0.3
+                        }))
                     },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#e4e4e7'
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#a1a1aa' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    options: chartOptions('Commits')
+                });
+
+                // Commits Bar Chart
+                if (commitsBarChart) commitsBarChart.destroy();
+                commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: filteredContributors.map(c => getDisplayName(c.login)),
+                        datasets: [{
+                            label: 'Total Commits',
+                            data: filteredContributors.map(c => c.totalCommits),
+                            backgroundColor: colors
+                        }]
                     },
-                    y: {
-                        ticks: { color: '#a1a1aa' },
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        beginAtZero: true
-                    }
-                }
-            };
+                    options: chartOptions('Commits')
+                });
+
+                // ===== PRs Merged (Impact) =====
+                // PRs Merged Over Time Line Chart
+                if (prsMergedLineChart) prsMergedLineChart.destroy();
+                prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
+                    type: 'line',
+                    data: {
+                        labels: periods,
+                        datasets: filteredContributors.map((c, i) => ({
+                            label: getDisplayName(c.login),
+                            data: c.prsMergedOverTime ? c.prsMergedOverTime.map(d => d.value) : periods.map(() => 0),
+                            borderColor: colors[i],
+                            backgroundColor: colors[i] + '20',
+                            fill: false,
+                            tension: 0.3
+                        }))
+                    },
+                    options: chartOptions('PRs Merged')
+                });
+
+                // PRs Merged Bar Chart
+                if (prsMergedBarChart) prsMergedBarChart.destroy();
+                prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: filteredContributors.map(c => getDisplayName(c.login)),
+                        datasets: [{
+                            label: 'PRs Merged',
+                            data: filteredContributors.map(c => c.prsMerged || 0),
+                            backgroundColor: '#8b5cf6'
+                        }]
+                    },
+                    options: chartOptions('PRs Merged')
+                });
+
+                // ===== PRs Reviewed (Team Player) =====
+                // PRs Reviewed Over Time Line Chart
+                if (prsReviewedLineChart) prsReviewedLineChart.destroy();
+                prsReviewedLineChart = new Chart(document.getElementById('prsReviewedLineChart'), {
+                    type: 'line',
+                    data: {
+                        labels: periods,
+                        datasets: filteredContributors.map((c, i) => ({
+                            label: getDisplayName(c.login),
+                            data: c.prsReviewedOverTime ? c.prsReviewedOverTime.map(d => d.value) : periods.map(() => 0),
+                            borderColor: colors[i],
+                            backgroundColor: colors[i] + '20',
+                            fill: false,
+                            tension: 0.3
+                        }))
+                    },
+                    options: chartOptions('PRs Reviewed')
+                });
+
+                // PRs Reviewed Bar Chart
+                if (prsReviewedBarChart) prsReviewedBarChart.destroy();
+                prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: filteredContributors.map(c => getDisplayName(c.login)),
+                        datasets: [{
+                            label: 'PRs Reviewed',
+                            data: filteredContributors.map(c => c.prsReviewed || 0),
+                            backgroundColor: '#3b82f6'
+                        }]
+                    },
+                    options: chartOptions('PRs Reviewed')
+                });
+
+                // ===== Active Days (Consistency) =====
+                // Active Days Over Time Line Chart
+                if (activeDaysLineChart) activeDaysLineChart.destroy();
+                activeDaysLineChart = new Chart(document.getElementById('activeDaysLineChart'), {
+                    type: 'line',
+                    data: {
+                        labels: periods,
+                        datasets: filteredContributors.map((c, i) => ({
+                            label: getDisplayName(c.login),
+                            data: c.activeDaysOverTime ? c.activeDaysOverTime.map(d => d.value) : periods.map(() => 0),
+                            borderColor: colors[i],
+                            backgroundColor: colors[i] + '20',
+                            fill: false,
+                            tension: 0.3
+                        }))
+                    },
+                    options: chartOptions('Active Days')
+                });
+
+                // Active Days Bar Chart
+                if (activeDaysBarChart) activeDaysBarChart.destroy();
+                activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: filteredContributors.map(c => getDisplayName(c.login)),
+                        datasets: [{
+                            label: 'Active Days',
+                            data: filteredContributors.map(c => c.activeDays || 0),
+                            backgroundColor: '#10b981'
+                        }]
+                    },
+                    options: chartOptions('Active Days')
+                });
+
+                console.log('✅ renderCharts() completed successfully');
+            } catch (err) {
+                console.error('❌ Error in renderCharts():', err);
+                console.error('Error stack:', err.stack);
+                showModal('❌', 'Chart Rendering Failed', `Failed to render charts: ${err.message}`);
+            }
         }
 
         // Pie/Doughnut chart options
