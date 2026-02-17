@@ -110,7 +110,7 @@ class EngagementService(
                         publicRepos = publicRepos
                     )
                 } catch (e: Exception) {
-                    // Ignore
+                    logger.error("Error fetching details for user ${member.login}: ${e.message}")
                 }
             }
 
@@ -342,39 +342,70 @@ class EngagementService(
      * Called separately for progressive loading
      */
     fun analyzePRsOnly(request: EngagementAnalyzeRequest): PRReviewResponse {
-        val startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3)
-        val endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+        logger.info("🚀 analyzePRsOnly() started")
+        logger.info("📊 Request: provider=${request.provider}, repos=${request.repositoryFullNames.size}, contributors=${request.contributorLogins.size}")
 
-        val repositories = if (request.repositoryFullNames.isEmpty()) {
-            fetchAccessibleRepos(request.token, request.provider, request.baseUrl)
-        } else {
-            request.repositoryFullNames
-        }
+        try {
+            val startDate = request.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now().minusMonths(3)
+            val endDate = request.endDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+            logger.info("📅 Date range: $startDate to $endDate")
 
-        logger.info("SLOW: Analyzing PRs/reviews for ${request.contributorLogins.size} contributors")
+            val repositories = if (request.repositoryFullNames.isEmpty()) {
+                logger.info("📁 No repos specified, fetching accessible repos...")
+                fetchAccessibleRepos(request.token, request.provider, request.baseUrl)
+            } else {
+                request.repositoryFullNames
+            }
+            logger.info("📁 Analyzing ${repositories.size} repositories")
 
-        val periods = generatePeriods(startDate, endDate, request.period.name)
+            logger.info("SLOW: Analyzing PRs/reviews for ${request.contributorLogins.size} contributors")
 
-        val contributorPRData = request.contributorLogins.map { login ->
-            val stats = fetchPRAndReviewStats(request.token, login, repositories, startDate, endDate, periods)
-            ContributorPRData(
-                login = login,
-                prsMerged = stats.totalPRs,
-                prsReviewed = stats.totalReviews,
-                activeDays = stats.activeDays,
-                prsMergedOverTime = periods.map { (label, _, _) ->
-                    EngagementDataPoint(label, stats.prsPerPeriod[label] ?: 0)
-                },
-                prsReviewedOverTime = periods.map { (label, _, _) ->
-                    EngagementDataPoint(label, stats.reviewsPerPeriod[label] ?: 0)
-                },
-                activeDaysOverTime = periods.map { (label, _, _) ->
-                    EngagementDataPoint(label, stats.activeDaysPerPeriod[label] ?: 0)
+            val periods = generatePeriods(startDate, endDate, request.period.name)
+            logger.info("📆 Generated ${periods.size} periods")
+
+            val contributorPRData = request.contributorLogins.mapIndexed { index, login ->
+                logger.info("🔄 Processing contributor ${index + 1}/${request.contributorLogins.size}: $login")
+                try {
+                    val stats = fetchPRAndReviewStats(request.token, login, repositories, startDate, endDate, periods)
+                    logger.info("✓ $login: ${stats.totalPRs} PRs, ${stats.totalReviews} reviews, ${stats.activeDays} active days")
+                    ContributorPRData(
+                        login = login,
+                        prsMerged = stats.totalPRs,
+                        prsReviewed = stats.totalReviews,
+                        activeDays = stats.activeDays,
+                        prsMergedOverTime = periods.map { (label, _, _) ->
+                            EngagementDataPoint(label, stats.prsPerPeriod[label] ?: 0)
+                        },
+                        prsReviewedOverTime = periods.map { (label, _, _) ->
+                            EngagementDataPoint(label, stats.reviewsPerPeriod[label] ?: 0)
+                        },
+                        activeDaysOverTime = periods.map { (label, _, _) ->
+                            EngagementDataPoint(label, stats.activeDaysPerPeriod[label] ?: 0)
+                        }
+                    )
+                } catch (e: Exception) {
+                    logger.error("❌ Error processing $login: ${e.message}")
+                    // Return empty data for this contributor instead of failing completely
+                    ContributorPRData(
+                        login = login,
+                        prsMerged = 0,
+                        prsReviewed = 0,
+                        activeDays = 0,
+                        prsMergedOverTime = periods.map { (label, _, _) -> EngagementDataPoint(label, 0) },
+                        prsReviewedOverTime = periods.map { (label, _, _) -> EngagementDataPoint(label, 0) },
+                        activeDaysOverTime = periods.map { (label, _, _) -> EngagementDataPoint(label, 0) }
+                    )
                 }
-            )
-        }
+            }
 
-        return PRReviewResponse(contributors = contributorPRData)
+            val result = PRReviewResponse(contributors = contributorPRData)
+            logger.info("✅ analyzePRsOnly() completed successfully with ${contributorPRData.size} contributors")
+            return result
+
+        } catch (e: Exception) {
+            logger.error("❌ Error in analyzePRsOnly(): ${e.message}", e)
+            throw e
+        }
     }
 
     /**
@@ -399,14 +430,20 @@ class EngagementService(
             displayName = displayName,
             avatarUrl = null,
             totalCommits = stats.commitsPerPeriod.values.sum(),
-            totalLinesAdded = 0,
-            totalLinesDeleted = 0,
+            totalLinesAdded = stats.totalLinesAdded,
+            totalLinesDeleted = stats.totalLinesDeleted,
             prsMerged = 0,
             prsReviewed = 0,
             issuesClosed = 0,
             activeDays = 0,
             commitsOverTime = periods.map { (label, _, _) ->
                 EngagementDataPoint(label, stats.commitsPerPeriod[label] ?: 0)
+            },
+            linesAddedOverTime = periods.map { (label, _, _) ->
+                EngagementDataPoint(label, stats.linesAddedPerPeriod[label] ?: 0)
+            },
+            linesDeletedOverTime = periods.map { (label, _, _) ->
+                EngagementDataPoint(label, stats.linesDeletedPerPeriod[label] ?: 0)
             }
         )
     }
@@ -802,8 +839,8 @@ class EngagementService(
             .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
             .build()
 
-        val totalAdded = 0
-        val totalDeleted = 0
+        var totalAdded = 0
+        var totalDeleted = 0
         val addedPerPeriod = mutableMapOf<String, Int>()
         val deletedPerPeriod = mutableMapOf<String, Int>()
         val commitsPerPeriod = mutableMapOf<String, Int>()
@@ -817,6 +854,7 @@ class EngagementService(
         val reposToCheck = repositories.take(200) // Check up to 200 repos
         val processedShas = mutableSetOf<String>()
         var totalCommitCount = 0
+        val commitsToFetchStats = mutableListOf<Pair<String, String>>() // (repoFullName, sha)
 
         try {
             // For each repo, fetch ALL pages of commits (with pagination)
@@ -824,7 +862,7 @@ class EngagementService(
                 var page = 1
                 var hasMore = true
 
-                while (hasMore && page <= 15) { // Max 15 pages = 1500 commits per repo
+                while (hasMore && page <= 50) { // Max 15 pages = 1500 commits per repo
                     try {
                         val commits = webClient.get()
                             .uri("/repos/$repoFullName/commits?author=$login&since=${startDate}T00:00:00Z&until=${endDate}T23:59:59Z&per_page=100&page=$page")
@@ -863,6 +901,10 @@ class EngagementService(
                                 val period = findPeriod(commitDate, periods)
                                 if (period != null) {
                                     commitsPerPeriod[period] = (commitsPerPeriod[period] ?: 0) + 1
+                                    // Store for later line stats fetching (limit to first 500 commits for reasonable performance)
+                                    if (commitsToFetchStats.size < 500) {
+                                        commitsToFetchStats.add(Pair(repoFullName, sha))
+                                    }
                                 }
                             }
 
@@ -880,6 +922,45 @@ class EngagementService(
             }
 
             logger.info("Found $totalCommitCount commits for $login across ${reposToCheck.size} repos (with pagination)")
+
+            // Fetch line stats for up to 500 commits (to keep it reasonably fast)
+            if (commitsToFetchStats.isNotEmpty()) {
+                logger.info("Fetching line stats for ${commitsToFetchStats.size} commits for $login (total commits: $totalCommitCount)")
+                for ((repoFullName, sha) in commitsToFetchStats) {
+                    try {
+                        val commitDetail = webClient.get()
+                            .uri("/repos/$repoFullName/commits/$sha")
+                            .retrieve()
+                            .bodyToMono<Map<String, Any?>>()
+                            .block()
+
+                        val stats = commitDetail?.get("stats") as? Map<*, *>
+                        val additions = (stats?.get("additions") as? Number)?.toInt() ?: 0
+                        val deletions = (stats?.get("deletions") as? Number)?.toInt() ?: 0
+
+                        totalAdded += additions
+                        totalDeleted += deletions
+
+                        // Get commit date for period assignment
+                        val commitData = commitDetail?.get("commit") as? Map<*, *>
+                        val author = commitData?.get("author") as? Map<*, *>
+                        val dateStr = author?.get("date") as? String
+                        if (dateStr != null) {
+                            try {
+                                val commitDate = LocalDate.parse(dateStr.substring(0, 10))
+                                val period = findPeriod(commitDate, periods)
+                                if (period != null) {
+                                    addedPerPeriod[period] = (addedPerPeriod[period] ?: 0) + additions
+                                    deletedPerPeriod[period] = (deletedPerPeriod[period] ?: 0) + deletions
+                                }
+                            } catch (e: Exception) { }
+                        }
+                    } catch (e: Exception) {
+                        // Skip commit if error
+                    }
+                }
+                logger.info("Line stats for $login: +$totalAdded / -$totalDeleted")
+            }
 
         } catch (e: Exception) {
             logger.warn("Error fetching commits for $login: ${e.message}")
@@ -968,17 +1049,25 @@ class EngagementService(
                 while (hasMore && page <= 10) {
                     try {
                         val searchQuery = "$repoQuery+type:pr+author:$login+created:$startDate..$endDate"
+                        logger.debug("PR Search query: $searchQuery")
                         val response = webClient.get()
                             .uri("/search/issues?q=$searchQuery&per_page=100&page=$page&sort=created&order=desc")
                             .retrieve()
                             .bodyToMono<Map<String, Any?>>()
                             .block()
 
-                        @Suppress("UNCHECKED_CAST")
-                        val items = response?.get("items") as? List<Map<String, Any?>> ?: emptyList()
-                        val totalCount = (response?.get("total_count") as? Number)?.toInt() ?: 0
+                        // Check for rate limit
+                        if (response == null) {
+                            logger.warn("⚠️ Null response from PR search for $login - possible rate limit")
+                            hasMore = false
+                            continue
+                        }
 
-                        if (page == 1 && reposToSearch.size == 1) {
+                        @Suppress("UNCHECKED_CAST")
+                        val items = response["items"] as? List<Map<String, Any?>> ?: emptyList()
+                        val totalCount = (response["total_count"] as? Number)?.toInt() ?: 0
+
+                        if (page == 1) {
                             logger.info("Search found $totalCount PRs created by $login")
                         }
 
@@ -1018,17 +1107,25 @@ class EngagementService(
                 while (hasMore && page <= 10) {
                     try {
                         val searchQuery = "$repoQuery+type:pr+reviewed-by:$login+created:$startDate..$endDate"
+                        logger.debug("Review Search query: $searchQuery")
                         val response = webClient.get()
                             .uri("/search/issues?q=$searchQuery&per_page=100&page=$page&sort=created&order=desc")
                             .retrieve()
                             .bodyToMono<Map<String, Any?>>()
                             .block()
 
-                        @Suppress("UNCHECKED_CAST")
-                        val items = response?.get("items") as? List<Map<String, Any?>> ?: emptyList()
-                        val totalCount = (response?.get("total_count") as? Number)?.toInt() ?: 0
+                        // Check for rate limit
+                        if (response == null) {
+                            logger.warn("⚠️ Null response from review search for $login - possible rate limit")
+                            hasMore = false
+                            continue
+                        }
 
-                        if (page == 1 && reposToSearch.size == 1) {
+                        @Suppress("UNCHECKED_CAST")
+                        val items = response["items"] as? List<Map<String, Any?>> ?: emptyList()
+                        val totalCount = (response["total_count"] as? Number)?.toInt() ?: 0
+
+                        if (page == 1) {
                             logger.info("Search found $totalCount PRs reviewed by $login")
                         }
 
@@ -1224,7 +1321,7 @@ class EngagementService(
                             linesAddedPerPeriod[period] = (linesAddedPerPeriod[period] ?: 0) + additions
                             linesDeletedPerPeriod[period] = (linesDeletedPerPeriod[period] ?: 0) + deletions
                         } catch (e: Exception) {
-                            // Ignore
+                            logger.error("Error fetching commit details for $sha in $repoFullName: ${e.message}")
                         }
                     }
                 }

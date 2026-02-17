@@ -940,6 +940,8 @@
                             <tr>
                                 <th>Contributor</th>
                                 <th>Commits</th>
+                                <th style="color: #22c55e;">Lines Added</th>
+                                <th style="color: #ef4444;">Lines Deleted</th>
                                 <th>PRs Merged</th>
                                 <th>PRs Reviewed</th>
                                 <th>Active Days</th>
@@ -1261,6 +1263,7 @@
                 console.log('🔄 Resetting state for new analysis...');
                 analysisData = null;
                 selectedContributorsForChart = new Set();
+                window.pendingPRData = null; // Clear any pending PR data from previous run
 
                 // Destroy all existing charts
                 if (commitsLineChart) { commitsLineChart.destroy(); commitsLineChart = null; }
@@ -1343,20 +1346,62 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
-                }).then(r => {
-                    console.log('📡 PRs API response received:', { status: r.status, ok: r.ok });
-                    if (!r.ok) {
-                        return r.text().then(text => {
-                            console.error('❌ PRs API error response body:', text);
-                            throw new Error(`Failed to fetch PRs: ${r.status} ${r.statusText}`);
-                        });
-                    }
-                    return r.json();
-                }).then(data => {
-                    console.log('✅ PRs data parsed successfully:', {
-                        hasContributors: !!data?.contributors,
-                        contributorCount: data?.contributors?.length || 0
+                }).then(async r => {
+                    console.log('📡 PRs API response received:', {
+                        status: r.status,
+                        ok: r.ok,
+                        statusText: r.statusText,
+                        headers: {
+                            contentType: r.headers.get('content-type'),
+                            contentLength: r.headers.get('content-length')
+                        }
                     });
+
+                    // Get raw text first to see what we're dealing with
+                    const rawText = await r.text();
+                    console.log('📄 PRs raw response text (first 500 chars):', rawText.substring(0, 500));
+                    console.log('📄 PRs raw response length:', rawText.length);
+
+                    if (!r.ok) {
+                        console.error('❌ PRs API error response body:', rawText);
+                        throw new Error(`Failed to fetch PRs: ${r.status} ${r.statusText} - ${rawText.substring(0, 200)}`);
+                    }
+
+                    // Try to parse JSON
+                    let data;
+                    try {
+                        data = JSON.parse(rawText);
+                        console.log('✅ PRs JSON parsed successfully');
+                    } catch (parseError) {
+                        console.error('❌ Failed to parse PRs JSON:', parseError);
+                        console.error('❌ Raw text was:', rawText.substring(0, 1000));
+                        throw new Error(`Failed to parse PR response as JSON: ${parseError.message}`);
+                    }
+
+                    console.log('📦 PRs parsed data:', data);
+                    console.log('📦 PRs data type:', typeof data);
+                    console.log('📦 PRs data keys:', data ? Object.keys(data) : 'null');
+                    console.log('📦 PRs contributors check:', {
+                        hasData: !!data,
+                        hasContributors: data ? ('contributors' in data) : false,
+                        contributorsType: data?.contributors ? typeof data.contributors : 'undefined',
+                        isArray: Array.isArray(data?.contributors),
+                        contributorCount: data?.contributors?.length || 0,
+                        firstContributor: data?.contributors?.[0] || null
+                    });
+
+                    if (!data) {
+                        console.error('❌ PRs data is null or undefined after parsing!');
+                        throw new Error('PR response data is null');
+                    }
+
+                    if (!data.contributors) {
+                        console.error('❌ PRs data.contributors is missing!');
+                        console.error('❌ Full data object:', JSON.stringify(data, null, 2));
+                        throw new Error('PR response missing contributors field');
+                    }
+
+                    console.log('✅ PRs data validated successfully');
                     return data;
                 });
 
@@ -1381,16 +1426,24 @@
                 // Handle PRs when ready (usually slower)
                 prsPromise.then(prData => {
                     console.log('🎯 Processing PRs data...');
+                    console.log('📦 Raw prData:', prData);
                     try {
+                        // Validate prData before processing
+                        if (!prData) {
+                            console.error('❌ prData is null or undefined');
+                            throw new Error('PR response data is null');
+                        }
+
                         // Calculate totals for status display
-                        if (prData && prData.contributors && Array.isArray(prData.contributors)) {
+                        if (prData.contributors && Array.isArray(prData.contributors)) {
                             const totalPRs = prData.contributors.reduce((sum, c) => sum + (c.prsMerged || 0), 0);
                             const totalReviews = prData.contributors.reduce((sum, c) => sum + (c.prsReviewed || 0), 0);
                             console.log('📊 PRs stats:', { totalPRs, totalReviews });
                             updateLoadingStatus('prs', 'complete', `${totalPRs} PRs, ${totalReviews} Reviews`);
                         } else {
                             console.warn('⚠️ PRs data structure unexpected:', prData);
-                            updateLoadingStatus('prs', 'complete');
+                            console.warn('⚠️ prData.contributors:', prData.contributors);
+                            updateLoadingStatus('prs', 'complete', 'No PR data');
                         }
                         mergePRDataIntoResults(prData);
                         displayPRResults();
@@ -1402,16 +1455,34 @@
                 }).catch(err => {
                     console.error('❌ PRs promise error:', err);
                     updateLoadingStatus('prs', 'error');
-                    console.log('🔄 Hiding PR chart shimmers...');
+                    console.log('🔄 Handling PR error - restoring chart sections...');
+
+                    // Restore PR chart sections with error message
+                    restorePRChartSectionsWithError();
+
                     // Hide PR shimmers on error
                     hideChartShimmers(['prsMergedLineChart', 'prsMergedBarChart', 'prsReviewedLineChart', 'prsReviewedBarChart', 'activeDaysLineChart', 'activeDaysBarChart']);
+
                     // Update summary cards to show N/A instead of spinner
                     const prsMergedCard = document.getElementById('prsMergedCard');
                     const prsReviewedCard = document.getElementById('prsReviewedCard');
                     const activeDaysCard = document.getElementById('activeDaysCard');
-                    if (prsMergedCard) prsMergedCard.querySelector('.card-value').textContent = 'N/A';
-                    if (prsReviewedCard) prsReviewedCard.querySelector('.card-value').textContent = 'N/A';
-                    if (activeDaysCard) activeDaysCard.querySelector('.card-value').textContent = 'N/A';
+                    if (prsMergedCard) {
+                        const cardValue = prsMergedCard.querySelector('.card-value');
+                        if (cardValue) cardValue.textContent = 'N/A';
+                    }
+                    if (prsReviewedCard) {
+                        const cardValue = prsReviewedCard.querySelector('.card-value');
+                        if (cardValue) cardValue.textContent = 'N/A';
+                    }
+                    if (activeDaysCard) {
+                        const cardValue = activeDaysCard.querySelector('.card-value');
+                        if (cardValue) cardValue.textContent = 'N/A';
+                    }
+
+                    // Update table to show N/A for PR columns
+                    updateTableWithPRError();
+
                     showModal('⚠️', 'PRs Loading Failed', `Failed to load PRs data: ${err.message}`);
                 });
 
@@ -1450,6 +1521,22 @@
                     ${[1,2,3,4,5].map(() => `<div class="shimmer shimmer-card"></div>`).join('')}
                 </div>
             `;
+
+            // Clear contributor filter
+            const contributorFilter = document.getElementById('contributorFilter');
+            if (contributorFilter) {
+                contributorFilter.innerHTML = '<div class="shimmer" style="height: 32px; width: 100%;"></div>';
+            }
+
+            // Clear engagement table
+            const engagementTableBody = document.getElementById('engagementTableBody');
+            if (engagementTableBody) {
+                engagementTableBody.innerHTML = `
+                    <tr><td colspan="7"><div class="shimmer" style="height: 40px; width: 100%;"></div></td></tr>
+                    <tr><td colspan="7"><div class="shimmer" style="height: 40px; width: 100%;"></div></td></tr>
+                    <tr><td colspan="7"><div class="shimmer" style="height: 40px; width: 100%;"></div></td></tr>
+                `;
+            }
 
             // Show loading status indicators
             document.getElementById('loadingStatusPanel').classList.remove('hidden');
@@ -1561,12 +1648,28 @@
                     </div>
                 `;
 
+                // Render contributor filter chips
+                console.log('🔄 About to render contributor filter:', {
+                    contributorsArray: data.contributors,
+                    contributorLogins: data.contributors?.map(c => c.login),
+                    selectedContributorsForChart: Array.from(selectedContributorsForChart)
+                });
+                renderContributorFilter(data.contributors);
+
                 // Render commits charts immediately
                 renderCommitsCharts(data);
                 renderEngagementTable(data.contributors, true); // partial = true, no PR data yet
 
                 // Show shimmer for PR sections
                 showPRSectionsShimmer();
+
+                // Check if PR data arrived before commits (was stored as pending)
+                if (window.pendingPRData) {
+                    console.log('📦 Found pending PR data, merging now...');
+                    mergePRDataIntoResults(window.pendingPRData);
+                    displayPRResults();
+                    window.pendingPRData = null;
+                }
             } catch (err) {
                 console.error('❌ Error in displayCommitsResults():', err);
                 console.error('Error stack:', err.stack);
@@ -1592,7 +1695,9 @@
             console.log('🔄 mergePRDataIntoResults() called', {
                 hasPRData: !!prData,
                 hasContributors: !!prData?.contributors,
-                contributorCount: prData?.contributors?.length || 0
+                contributorCount: prData?.contributors?.length || 0,
+                hasAnalysisData: !!analysisData,
+                analysisDataContributors: analysisData?.contributors?.length || 0
             });
 
             try {
@@ -1601,14 +1706,22 @@
                     return;
                 }
 
+                // Check if analysisData is ready
+                if (!analysisData || !analysisData.contributors) {
+                    console.warn('⚠️ analysisData is not ready yet, storing PR data for later merge');
+                    // Store PR data to merge later when analysisData is ready
+                    window.pendingPRData = prData;
+                    return;
+                }
+
                 console.log('🔀 Merging PR data into analysis data...');
                 // Update summary
                 let totalPRs = 0, totalReviews = 0, totalActiveDays = 0;
 
                 prData.contributors.forEach(prContrib => {
-                    totalPRs += prContrib.prsMerged;
-                    totalReviews += prContrib.prsReviewed;
-                    totalActiveDays += prContrib.activeDays;
+                    totalPRs += prContrib.prsMerged || 0;
+                    totalReviews += prContrib.prsReviewed || 0;
+                    totalActiveDays += prContrib.activeDays || 0;
 
                     // Merge into main data
                     const mainContrib = analysisData.contributors.find(c => c.login === prContrib.login);
@@ -1619,28 +1732,36 @@
                         mainContrib.prsMergedOverTime = prContrib.prsMergedOverTime;
                         mainContrib.prsReviewedOverTime = prContrib.prsReviewedOverTime;
                         mainContrib.activeDaysOverTime = prContrib.activeDaysOverTime;
+                    } else {
+                        console.warn(`⚠️ Could not find contributor ${prContrib.login} in analysisData to merge PR data`);
                     }
                 });
 
-                analysisData.summary.totalPRsMerged = totalPRs;
-                analysisData.summary.totalPRsReviewed = totalReviews;
-                analysisData.summary.totalActiveDays = totalActiveDays;
+                if (analysisData.summary) {
+                    analysisData.summary.totalPRsMerged = totalPRs;
+                    analysisData.summary.totalPRsReviewed = totalReviews;
+                    analysisData.summary.totalActiveDays = totalActiveDays;
+                }
 
-                console.log('✅ PR data merged successfully');
+                console.log('✅ PR data merged successfully', { totalPRs, totalReviews, totalActiveDays });
             } catch (err) {
                 console.error('❌ Error in mergePRDataIntoResults():', err);
                 console.error('Error stack:', err.stack);
-                throw err;
+                // Don't throw - let the page continue working even if merge fails
             }
         }
 
         // Display PR results
         function displayPRResults() {
-            console.log('🚀 displayPRResults() called');
+            console.log('🚀 displayPRResults() called', {
+                hasAnalysisData: !!analysisData,
+                hasContributors: !!analysisData?.contributors,
+                hasSummary: !!analysisData?.summary
+            });
 
             try {
                 if (!analysisData || !analysisData.contributors) {
-                    console.error('❌ No analysis data available for PR display');
+                    console.warn('⚠️ No analysis data available for PR display, skipping');
                     return;
                 }
 
@@ -1648,11 +1769,24 @@
                 // Restore PR chart sections (they were replaced by shimmer)
                 restorePRChartSections();
 
-                // Update summary cards
-                const s = analysisData.summary;
-                document.getElementById('prsMergedCard').querySelector('.card-value').textContent = s.totalPRsMerged.toLocaleString();
-                document.getElementById('prsReviewedCard').querySelector('.card-value').textContent = s.totalPRsReviewed.toLocaleString();
-                document.getElementById('activeDaysCard').querySelector('.card-value').textContent = s.totalActiveDays.toLocaleString();
+                // Update summary cards safely
+                const s = analysisData.summary || {};
+                const prsMergedCard = document.getElementById('prsMergedCard');
+                const prsReviewedCard = document.getElementById('prsReviewedCard');
+                const activeDaysCard = document.getElementById('activeDaysCard');
+
+                if (prsMergedCard) {
+                    const cardValue = prsMergedCard.querySelector('.card-value');
+                    if (cardValue) cardValue.textContent = (s.totalPRsMerged || 0).toLocaleString();
+                }
+                if (prsReviewedCard) {
+                    const cardValue = prsReviewedCard.querySelector('.card-value');
+                    if (cardValue) cardValue.textContent = (s.totalPRsReviewed || 0).toLocaleString();
+                }
+                if (activeDaysCard) {
+                    const cardValue = activeDaysCard.querySelector('.card-value');
+                    if (cardValue) cardValue.textContent = (s.totalActiveDays || 0).toLocaleString();
+                }
 
                 // Render PR charts
                 renderPRCharts(analysisData);
@@ -1662,7 +1796,7 @@
             } catch (err) {
                 console.error('❌ Error in displayPRResults():', err);
                 console.error('Error stack:', err.stack);
-                throw err;
+                // Don't throw - let the page continue working
             }
         }
 
@@ -1734,6 +1868,51 @@
                     </div>
                 `;
             }
+        }
+
+        // Restore PR chart sections with error state
+        function restorePRChartSectionsWithError() {
+            const prSection = document.getElementById('prChartsSection');
+            const reviewSection = document.getElementById('reviewChartsSection');
+            const activeDaysSection = document.getElementById('activeDaysChartsSection');
+
+            const errorHtml = `
+                <div class="chart-panel" style="display: flex; align-items: center; justify-content: center; min-height: 150px;">
+                    <div style="text-align: center; color: #ef4444;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+                        <div style="font-size: 0.9rem;">Failed to load PR data</div>
+                        <div style="font-size: 0.75rem; color: #a1a1aa; margin-top: 0.25rem;">GitHub API rate limit may have been reached</div>
+                    </div>
+                </div>
+            `;
+
+            if (prSection) {
+                prSection.innerHTML = errorHtml + errorHtml;
+            }
+            if (reviewSection) {
+                reviewSection.innerHTML = errorHtml + errorHtml;
+            }
+            if (activeDaysSection) {
+                activeDaysSection.innerHTML = errorHtml + errorHtml;
+            }
+        }
+
+        // Update table to show N/A for PR columns when PR loading fails
+        function updateTableWithPRError() {
+            const tbody = document.getElementById('engagementTableBody');
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                // Cells: Contributor, Commits, Lines Added, Lines Deleted, PRs Merged, PRs Reviewed, Active Days
+                // Update cells 4, 5, 6 (0-indexed)
+                if (cells.length >= 7) {
+                    cells[4].textContent = 'N/A';
+                    cells[5].textContent = 'N/A';
+                    cells[6].textContent = 'N/A';
+                }
+            });
         }
 
         // Render only commits charts
@@ -2025,6 +2204,8 @@
                         <span>${getDisplayName(c.login)}</span>
                     </td>
                     <td>${c.totalCommits.toLocaleString()}</td>
+                    <td style="color: #22c55e;">+${(c.totalLinesAdded || 0).toLocaleString()}</td>
+                    <td style="color: #ef4444;">-${(c.totalLinesDeleted || 0).toLocaleString()}</td>
                     <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsMerged || 0).toLocaleString()}</td>
                     <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsReviewed || 0).toLocaleString()}</td>
                     <td>${partial ? '<span class="mini-spinner"></span>' : (c.activeDays || 0).toLocaleString()}</td>
@@ -2121,7 +2302,23 @@
         }
 
         function renderContributorFilter(contributors) {
+            console.log('🎯 renderContributorFilter() called', {
+                hasContributors: !!contributors,
+                count: contributors?.length || 0,
+                selectedForChart: selectedContributorsForChart?.size || 0
+            });
+
             const container = document.getElementById('contributorFilter');
+            if (!container) {
+                console.error('❌ contributorFilter container not found!');
+                return;
+            }
+
+            if (!contributors || contributors.length === 0) {
+                container.innerHTML = '<div style="color: #a1a1aa; padding: 0.5rem;">No contributors to display</div>';
+                return;
+            }
+
             container.innerHTML = contributors.map(c => `
                 <div class="filter-chip ${selectedContributorsForChart.has(c.login) ? 'selected' : ''}"
                      onclick="toggleChartContributor('${c.login}')"
@@ -2130,6 +2327,8 @@
                     <span>${getDisplayName(c.login)}</span>
                 </div>
             `).join('');
+
+            console.log('✅ renderContributorFilter() completed, rendered', contributors.length, 'chips');
         }
 
         function toggleChartContributor(login) {
@@ -2297,6 +2496,45 @@
                 console.error('Error stack:', err.stack);
                 showModal('❌', 'Chart Rendering Failed', `Failed to render charts: ${err.message}`);
             }
+        }
+
+        // Chart options for line and bar charts
+        function chartOptions(label) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#e4e4e7'
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#e4e4e7',
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#a1a1aa' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    y: {
+                        ticks: { color: '#a1a1aa' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    }
+                }
+            };
         }
 
         // Pie/Doughnut chart options
