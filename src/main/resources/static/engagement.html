@@ -741,19 +741,19 @@
             </p>
             <div class="charts-grid" id="commitsChartsSection">
                 <div class="chart-panel">
-                    <h3>📉 Commits Over Time</h3>
-                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows commit activity distribution across the selected time period</p>
-                    <div class="chart-container">
-                        <div class="chart-shimmer shimmer" id="commitsLineChartShimmer"></div>
-                        <canvas id="commitsLineChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-panel">
                     <h3>📊 Total Commits by Contributor</h3>
                     <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total commit count between contributors</p>
                     <div class="chart-container">
                         <div class="chart-shimmer shimmer" id="commitsBarChartShimmer"></div>
                         <canvas id="commitsBarChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel">
+                    <h3>📉 Commits Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows commit activity distribution across the selected time period</p>
+                    <div class="chart-container">
+                        <div class="chart-shimmer shimmer" id="commitsLineChartShimmer"></div>
+                        <canvas id="commitsLineChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -887,6 +887,29 @@
         // Organizations found
         let organizations = [];
 
+        // Display name lookup map (populated from session)
+        window.displayNameMap = {};
+
+        /**
+         * Get display name for a contributor login
+         * Uses the displayNameMap populated from session data
+         */
+        function getDisplayName(login) {
+            if (!login) {
+                console.warn('⚠️ getDisplayName called with no login');
+                return 'Unknown';
+            }
+            const displayName = window.displayNameMap[login.toLowerCase()];
+            const result = displayName || login;
+
+            // Debug logging (can be removed in production)
+            if (displayName && displayName !== login) {
+                console.debug(`✅ getDisplayName('${login}') -> '${displayName}'`);
+            }
+
+            return result;
+        }
+
         // Get session data from sessionStorage
         function getSessionData() {
             const data = sessionStorage.getItem('spaceAnalyticsSession');
@@ -912,11 +935,23 @@
                 if (sessionData.contributors && sessionData.contributors.length > 0) {
                     contributors = sessionData.contributors.map(c => ({
                         login: c.login,
-                        avatarUrl: c.avatarUrl,
-                        profileUrl: c.profileUrl,
+                        name: c.name || null,  // Include name for display
+                        avatarUrl: c.avatarUrl || c.avatar_url,
+                        profileUrl: c.profileUrl || c.html_url,
                         contributions: 0
                     }));
                     organizations = sessionData.organizations || [];
+
+                    // Create display name lookup map from session contributors
+                    window.displayNameMap = {};
+                    sessionData.contributors.forEach(c => {
+                        if (c.login) {
+                            window.displayNameMap[c.login.toLowerCase()] = c.name || c.login;
+                        }
+                    });
+                    console.log('✅ Created displayNameMap with', Object.keys(window.displayNameMap).length, 'entries');
+                    console.log('📋 Sample displayNameMap:', Object.entries(window.displayNameMap).slice(0, 5));
+                    console.log('📋 Contributors with names:', sessionData.contributors.filter(c => c.name && c.name !== c.login).length, '/', sessionData.contributors.length);
 
                     // Auto-load repositories
                     if (sessionData.repositories && sessionData.repositories.length > 0) {
@@ -1465,7 +1500,7 @@
                 data: {
                     labels: labels,
                     datasets: contributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.commitsOverTime?.map(d => d.value) || [],
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -1507,7 +1542,7 @@
             commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: contributors.map(c => c.login),
+                    labels: contributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'Total Commits',
                         data: contributors.map(c => c.totalCommits),
@@ -1542,7 +1577,7 @@
                 data: {
                     labels: labels,
                     datasets: contributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.prsMergedOverTime?.map(d => d.value) || [],
                         borderColor: colors[i],
                         tension: 0.3,
@@ -1581,7 +1616,7 @@
             prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: contributors.map(c => c.login),
+                    labels: contributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'PRs Merged',
                         data: contributors.map(c => c.prsMerged || 0),
@@ -1606,7 +1641,7 @@
                 data: {
                     labels: labels,
                     datasets: contributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.prsReviewedOverTime?.map(d => d.value) || [],
                         borderColor: colors[i],
                         tension: 0.3,
@@ -1645,7 +1680,7 @@
             prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: contributors.map(c => c.login),
+                    labels: contributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'PRs Reviewed',
                         data: contributors.map(c => c.prsReviewed || 0),
@@ -1670,7 +1705,7 @@
                 data: {
                     labels: labels,
                     datasets: contributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.activeDaysOverTime?.map(d => d.value) || [],
                         borderColor: colors[i],
                         tension: 0.3,
@@ -1709,7 +1744,7 @@
             activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: contributors.map(c => c.login),
+                    labels: contributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'Active Days',
                         data: contributors.map(c => c.activeDays || 0),
@@ -1737,8 +1772,8 @@
             tbody.innerHTML = contributors.map(c => `
                 <tr>
                     <td class="contributor-cell">
-                        ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
-                        <span>${c.login}</span>
+                        ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1.2em;">👤</span>'}
+                        <span>${getDisplayName(c.login)}</span>
                     </td>
                     <td>${c.totalCommits.toLocaleString()}</td>
                     <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsMerged || 0).toLocaleString()}</td>
@@ -1840,9 +1875,10 @@
             const container = document.getElementById('contributorFilter');
             container.innerHTML = contributors.map(c => `
                 <div class="filter-chip ${selectedContributorsForChart.has(c.login) ? 'selected' : ''}"
-                     onclick="toggleChartContributor('${c.login}')">
-                    ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
-                    <span>${c.login}</span>
+                     onclick="toggleChartContributor('${c.login}')"
+                     title="${getDisplayName(c.login)}">
+                    ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1em;">👤</span>'}
+                    <span>${getDisplayName(c.login)}</span>
                 </div>
             `).join('');
         }
@@ -1871,7 +1907,7 @@
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.commitsOverTime.map(d => d.value),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -1887,7 +1923,7 @@
             commitsBarChart = new Chart(document.getElementById('commitsBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: filteredContributors.map(c => c.login),
+                    labels: filteredContributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'Total Commits',
                         data: filteredContributors.map(c => c.totalCommits),
@@ -1905,7 +1941,7 @@
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.prsMergedOverTime ? c.prsMergedOverTime.map(d => d.value) : periods.map(() => 0),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -1921,7 +1957,7 @@
             prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: filteredContributors.map(c => c.login),
+                    labels: filteredContributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'PRs Merged',
                         data: filteredContributors.map(c => c.prsMerged || 0),
@@ -1939,7 +1975,7 @@
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.prsReviewedOverTime ? c.prsReviewedOverTime.map(d => d.value) : periods.map(() => 0),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -1955,7 +1991,7 @@
             prsReviewedBarChart = new Chart(document.getElementById('prsReviewedBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: filteredContributors.map(c => c.login),
+                    labels: filteredContributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'PRs Reviewed',
                         data: filteredContributors.map(c => c.prsReviewed || 0),
@@ -1973,7 +2009,7 @@
                 data: {
                     labels: periods,
                     datasets: filteredContributors.map((c, i) => ({
-                        label: c.login,
+                        label: getDisplayName(c.login),
                         data: c.activeDaysOverTime ? c.activeDaysOverTime.map(d => d.value) : periods.map(() => 0),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -1989,7 +2025,7 @@
             activeDaysBarChart = new Chart(document.getElementById('activeDaysBarChart'), {
                 type: 'bar',
                 data: {
-                    labels: filteredContributors.map(c => c.login),
+                    labels: filteredContributors.map(c => getDisplayName(c.login)),
                     datasets: [{
                         label: 'Active Days',
                         data: filteredContributors.map(c => c.activeDays || 0),
@@ -2005,8 +2041,8 @@
                 <tr>
                     <td>
                         <div class="contributor-cell">
-                            ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : ''}
-                            <span>${c.login}</span>
+                            ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1.2em;">👤</span>'}
+                            <span>${getDisplayName(c.login)}</span>
                         </div>
                     </td>
                     <td><strong>${c.totalCommits}</strong></td>

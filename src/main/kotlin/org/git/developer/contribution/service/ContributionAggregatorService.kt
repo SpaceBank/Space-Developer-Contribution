@@ -125,7 +125,7 @@ class ContributionAggregatorService(
             logger.error("Contributor cache is empty - nickname extraction may not work properly")
 
         val commitsWithNickname = commits.map { commit ->
-            val nickname = contributorCacheService.getDisplayNameByEmail(commit.authorEmail)
+            val nickname = commit.authorName
             Pair(nickname, commit)
         }
 
@@ -133,7 +133,7 @@ class ContributionAggregatorService(
 
         return commitsByNickname.map { (nickname, pairs) ->
             val developerCommits = pairs.map { it.second }
-            val allNames = developerCommits.map { contributorCacheService.getDisplayNameByEmail(it.authorEmail) }.toSet()
+            val allNames = developerCommits.map { it.authorName }.toSet()
             val allEmails = developerCommits.map { it.authorEmail.lowercase() }.toSet()
             val primaryEmail = allEmails.first()
 

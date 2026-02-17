@@ -17,7 +17,9 @@ import java.util.*
  * Uses GitHub GraphQL API for fast, comprehensive data fetching
  */
 @Service
-class EngagementService {
+class EngagementService(
+    private val contributorCacheService: ContributorCacheService
+) {
     private val logger = LoggerFactory.getLogger(EngagementService::class.java)
 
     companion object {
@@ -372,8 +374,12 @@ class EngagementService {
     ): ContributorEngagement {
         val stats = fetchCommitAndLineStatsForContributor(token, login, repositories, startDate, endDate, periods, excludeMergeCommits)
 
+        // Get display name from cache
+        val displayName = contributorCacheService.getDisplayNameByUsername(login)
+
         return ContributorEngagement(
             login = login,
+            displayName = displayName,
             avatarUrl = null,
             totalCommits = stats.commitsPerPeriod.values.sum(),
             totalLinesAdded = 0,
@@ -726,8 +732,12 @@ class EngagementService {
             EngagementDataPoint(label, activeDaysPerPeriod[label] ?: 0)
         }
 
+        // Get display name from cache
+        val displayName = contributorCacheService.getDisplayNameByUsername(login)
+
         val result = ContributorEngagement(
             login = login,
+            displayName = displayName,
             avatarUrl = avatarUrl,
             totalCommits = totalCommits,
             totalLinesAdded = totalLinesAdded,
@@ -1115,8 +1125,12 @@ class EngagementService {
             }
         }
 
+        // Get display name from cache
+        val displayName = contributorCacheService.getDisplayNameByUsername(login)
+
         return ContributorEngagement(
             login = login,
+            displayName = displayName,
             avatarUrl = avatarUrl,
             totalCommits = commitsPerPeriod.values.sum(),
             totalLinesAdded = linesAddedPerPeriod.values.sum(),

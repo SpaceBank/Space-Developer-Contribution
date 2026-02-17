@@ -137,39 +137,65 @@ class ContributorCacheService {
     }
 
     /**
-     * Get display name for a login
+     * Get display name for a contributor
+     * Returns displayName if available, otherwise login, otherwise null
      */
-    fun getDisplayName(contributor: CachedContributor?): String {
-
-        if (contributor?.login == null)
-            logger.warn("No cached contributor found for login '${contributor?.login}'")
-        return contributor?.displayName ?: contributor?.login!!
+    fun getDisplayName(contributor: CachedContributor?): String? {
+        if (contributor == null) {
+            return null
+        }
+        // Return displayName if it exists and is different from login, otherwise return login
+        return if (!contributor.displayName.isNullOrBlank() && contributor.displayName != contributor.login) {
+            contributor.displayName
+        } else {
+            contributor.login
+        }
     }
 
     /**
-     * Get display name by  username
+     * Get display name by username/login
+     * Returns displayName if found, otherwise returns the input username
      */
     fun getDisplayNameByUsername(userName: String): String {
         val contributor = contributorsByLogin[userName.lowercase()]
-        return getDisplayName(contributor)
+        return getDisplayName(contributor) ?: userName
     }
 
 
     /**
      * Get display name by email address
      * Searches by full email or email username (part before @)
+     * Returns displayName if found, otherwise returns null
      */
-    fun getDisplayNameByEmail(email: String): String {
+    fun getDisplayNameByEmail(email: String): String? {
+        if (email.isBlank()) return null
 
         val emailLower = email.lowercase()
+        val emailUsername = emailLower.substringBefore("@")
 
-        val contributorByEmailField = contributorsByLogin.values.find {
+        // Strategy 1: Find by exact email match in contributor data
+        var contributor = contributorsByLogin.values.find {
             it.email?.lowercase() == emailLower
         }
 
-        logger.debug("Found contributor by email field: $email -> ${contributorByEmailField?.displayName}")
+        // Strategy 2: Try email username as login
+        if (contributor == null) {
+            contributor = contributorsByLogin[emailUsername]
+        }
 
-        return getDisplayName(contributorByEmailField)
+        // Strategy 3: Check emailToLogin map
+        if (contributor == null) {
+            val loginFromEmail = emailToLogin[emailUsername]
+            if (loginFromEmail != null) {
+                contributor = contributorsByLogin[loginFromEmail]
+            }
+        }
+
+        val result = getDisplayName(contributor)
+        if (result != null) {
+            logger.debug("Found display name for email '$email': $result")
+        }
+        return result
     }
 
     /**

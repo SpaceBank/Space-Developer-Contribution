@@ -1019,6 +1019,50 @@
         let fullAnalysisData = null;  // Store the complete analysis data
         let selectedDevelopers = new Set();  // Selected developer emails for filtering
 
+        // Display name lookup map (populated from session)
+        window.displayNameMap = {};
+
+        /**
+         * Get display name for a contributor login/nickname
+         * Uses the displayNameMap populated from session data
+         */
+        function getDisplayName(loginOrNickname) {
+            if (!loginOrNickname) return 'Unknown';
+
+            // Remove @ prefix if present (nicknames have @)
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+            const displayName = window.displayNameMap[cleanLogin];
+            const result = displayName || loginOrNickname;
+
+            // Debug logging
+            if (displayName && displayName !== loginOrNickname) {
+                console.debug(`✅ getDisplayName('${loginOrNickname}') -> '${displayName}'`);
+            }
+
+            return result;
+        }
+
+        /**
+         * Get avatar URL for a contributor login/nickname
+         * Uses session data to find avatar
+         */
+        function getAvatarUrl(loginOrNickname) {
+            if (!loginOrNickname) return null;
+
+            const sessionData = getSessionData();
+            if (!sessionData?.contributors) return null;
+
+            // Remove @ prefix if present
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+
+            // Find contributor by login
+            const contributor = sessionData.contributors.find(c =>
+                c.login && c.login.toLowerCase() === cleanLogin
+            );
+
+            return contributor?.avatarUrl || contributor?.avatar_url || null;
+        }
+
         // Get session data from sessionStorage
         function getSessionData() {
             const data = sessionStorage.getItem('spaceAnalyticsSession');
@@ -1039,6 +1083,18 @@
             if (sessionData && sessionData.token) {
                 // Set provider from session
                 selectedProvider = sessionData.provider || 'GITHUB';
+
+                // Create display name lookup map from session contributors
+                if (sessionData.contributors && sessionData.contributors.length > 0) {
+                    window.displayNameMap = {};
+                    sessionData.contributors.forEach(c => {
+                        if (c.login) {
+                            window.displayNameMap[c.login.toLowerCase()] = c.name || c.login;
+                        }
+                    });
+                    console.log('✅ Created displayNameMap with', Object.keys(window.displayNameMap).length, 'entries');
+                    console.log('📋 Sample displayNameMap:', Object.entries(window.displayNameMap).slice(0, 5));
+                }
 
                 // Auto-load repositories from session
                 if (sessionData.repositories && sessionData.repositories.length > 0) {
@@ -1815,7 +1871,7 @@
 
             // 2. Top Committers (horizontal bar chart)
             const developerCommits = allDevelopers.map(dev => ({
-                name: dev.authorName,
+                name: getDisplayName(dev.authorName),
                 commits: dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0)
             })).sort((a, b) => b.commits - a.commits).slice(0, 10); // Top 10
 
@@ -1912,7 +1968,7 @@
                 prAuthorsChart = new Chart(document.getElementById('prAuthorsChart'), {
                     type: 'bar',
                     data: {
-                        labels: topPRAuthors.map(a => a.authorName),
+                        labels: topPRAuthors.map(a => getDisplayName(a.authorName)),
                         datasets: [{
                             label: 'PRs Merged',
                             data: topPRAuthors.map(a => a.prCount),
@@ -1949,7 +2005,7 @@
                                 padding: 12,
                                 callbacks: {
                                     title: function(context) {
-                                        return topPRAuthors[context[0].dataIndex].authorName;
+                                        return getDisplayName(topPRAuthors[context[0].dataIndex].authorName);
                                     },
                                     label: function(context) {
                                         return `PRs Merged: ${context.parsed.x}`;
@@ -1985,13 +2041,19 @@
 
             container.innerHTML = developers.map(dev => {
                 const totalCommits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+                const displayName = getDisplayName(dev.authorName);
+                const avatarUrl = getAvatarUrl(dev.authorName);
                 const isSelected = selectedDevelopers.has(dev.authorName);
                 const escapedName = dev.authorName.replace(/'/g, "\\'");
                 return `
                     <div class="dev-chip ${isSelected ? 'selected' : ''}"
                          onclick="toggleDeveloper('${escapedName}')"
-                         title="${dev.nickname || ''} - ${dev.authorName}">
-                        <span>👤 ${dev.authorName}</span>
+                         title="${displayName} - ${totalCommits} commits">
+                        ${avatarUrl
+                            ? `<img src="${avatarUrl}" alt="${displayName}" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid #6366f1;">`
+                            : '<span style="font-size: 1.2em;">👤</span>'
+                        }
+                        <span>${displayName}</span>
                         <span class="dev-commits">${totalCommits} commits</span>
                     </div>
                 `;
@@ -2068,9 +2130,6 @@
             if (developers.length === 0) {
                 document.getElementById('developerTableBody').innerHTML = '<tr><td colspan="6">No developers selected</td></tr>';
                 // Clear charts
-                if (commitsChart) commitsChart.destroy();
-                if (linesChart) linesChart.destroy();
-                if (pieChart) pieChart.destroy();
                 return;
             }
 
@@ -2084,7 +2143,7 @@
                 data: {
                     labels: labels,
                     datasets: developers.map((dev, i) => ({
-                        label: dev.authorName,
+                        label: getDisplayName(dev.authorName),
                         data: dev.dataPoints.map(dp => dp.commits),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -2102,7 +2161,7 @@
                 data: {
                     labels: labels,
                     datasets: developers.map((dev, i) => ({
-                        label: dev.authorName,
+                        label: getDisplayName(dev.authorName),
                         data: dev.dataPoints.map(dp => dp.linesAdded),
                         backgroundColor: colors[i],
                         stack: 'added'
@@ -2117,7 +2176,7 @@
             pieChart = new Chart(document.getElementById('developerPieChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: developers.map(dev => dev.authorName),
+                    labels: developers.map(dev => getDisplayName(dev.authorName)),
                     datasets: [{ data: commitTotals, backgroundColor: colors }]
                 },
                 options: {
@@ -2132,10 +2191,21 @@
                 const commits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
                 const added = dev.dataPoints.reduce((sum, dp) => sum + dp.linesAdded, 0);
                 const deleted = dev.dataPoints.reduce((sum, dp) => sum + dp.linesDeleted, 0);
+                const displayName = getDisplayName(dev.authorName);
+                const avatarUrl = getAvatarUrl(dev.authorName);
+
                 return `
                     <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                ${avatarUrl
+                                    ? `<img src="${avatarUrl}" alt="${displayName}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #6366f1;">`
+                                    : '<span style="font-size: 1.5em;">👤</span>'
+                                }
+                                <span style="font-weight: 500;">${displayName}</span>
+                            </div>
+                        </td>
                         <td>${dev.authorName}</td>
-                        <td style="color: #6366f1;">${dev.nickname || ''}</td>
                         <td>${commits}</td>
                         <td style="color: #22c55e;">+${added.toLocaleString()}</td>
                         <td style="color: #ef4444;">-${deleted.toLocaleString()}</td>

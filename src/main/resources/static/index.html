@@ -682,7 +682,7 @@
 
                 // Step 5: Fetch full user profiles for contributors (in parallel batches)
                 updateLoadingText(`Fetching contributor profiles (0/${allContributors.length})...`);
-                const BATCH_SIZE = 10;  // Fetch 10 users at a time to avoid rate limiting
+                const BATCH_SIZE = 50;  // Fetch 10 users at a time to avoid rate limiting
 
                 for (let i = 0; i < allContributors.length; i += BATCH_SIZE) {
                     const batch = allContributors.slice(i, i + BATCH_SIZE);

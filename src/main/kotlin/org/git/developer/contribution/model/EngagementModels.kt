@@ -74,6 +74,7 @@ data class EngagementDataPoint(
  */
 data class ContributorEngagement(
     val login: String,
+    val displayName: String? = null,  // Real display name from cache (e.g., "John Doe")
     val avatarUrl: String?,
     val totalCommits: Int,
     val totalLinesAdded: Int = 0,
