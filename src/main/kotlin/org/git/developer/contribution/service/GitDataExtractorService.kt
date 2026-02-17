@@ -13,13 +13,46 @@ import java.time.format.DateTimeFormatter
  * Service for extracting Git commit data from local repositories
  */
 @Service
-class GitDataExtractorService {
+class GitDataExtractorService(
+    private val contributorCacheService: ContributorCacheService
+) {
 
     private val logger = LoggerFactory.getLogger(GitDataExtractorService::class.java)
 
     companion object {
         private const val COMMIT_DELIMITER = "---COMMIT_END---"
         private const val FIELD_DELIMITER = "|||"
+    }
+
+    /**
+     * Extract GitHub username from email address (fallback method)
+     *
+     * GitHub email formats:
+     * 1. username@users.noreply.github.com -> username
+     * 2. 12345678+username@users.noreply.github.com -> username
+     * 3. regular@company.com -> regular (part before @)
+     */
+    private fun extractNicknameFromEmail(email: String): String {
+        val emailLower = email.lowercase().trim()
+
+        // GitHub noreply format: username@users.noreply.github.com
+        // OR: 12345678+username@users.noreply.github.com
+        if (emailLower.contains("noreply.github.com")) {
+            val localPart = emailLower.substringBefore("@")
+            return if (localPart.contains("+")) {
+                localPart.substringAfter("+")
+            } else {
+                localPart
+            }
+        }
+
+        // GitLab noreply format
+        if (emailLower.contains("noreply.gitlab.com")) {
+            return emailLower.substringBefore("@")
+        }
+
+        // Regular email: extract part before @
+        return emailLower.substringBefore("@")
     }
 
     /**
@@ -86,6 +119,7 @@ class GitDataExtractorService {
             "--pretty=format:$formatString",
             "--shortstat"
         )
+
 
         // Add branch or --all
         if (branch.isNullOrBlank()) {
@@ -203,11 +237,17 @@ class GitDataExtractorService {
                         LocalDateTime.now()
                     }
 
+                    // Get GitHub login (nickname) from cache using email
+                    // This links the commit email to the actual GitHub username
+                    val nickname = contributorCacheService.getLoginByEmail(authorEmail)
+                        ?: extractNicknameFromEmail(authorEmail)  // Fallback to extracting from email
+
                     commits.add(
                         CommitInfo(
                             hash = hash,
                             authorName = authorName,
                             authorEmail = authorEmail,
+                            nickname = nickname,
                             date = dateTime,
                             message = message,
                             linesAdded = linesAdded,

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.annotation.PostConstruct
+import org.slf4j.ILoggerFactory
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
@@ -168,10 +169,12 @@ class ContributorCacheService {
      * Returns displayName if found, otherwise returns null
      */
     fun getDisplayNameByEmail(email: String): String? {
+
         if (email.isBlank()) return null
 
         val emailLower = email.lowercase()
         val emailUsername = emailLower.substringBefore("@")
+
 
         // Strategy 1: Find by exact email match in contributor data
         var contributor = contributorsByLogin.values.find {
@@ -196,6 +199,67 @@ class ContributorCacheService {
             logger.debug("Found display name for email '$email': $result")
         }
         return result
+    }
+
+    /**
+     * Get GitHub login (username) by email address
+     * This is the actual GitHub username like "gioqemoklidze", not the display name
+     */
+    fun getLoginByEmail(email: String): String? {
+        if (email.isBlank()) return null
+
+        if (email == "Giorgi.Kemoklidze@space.ge")
+            logger.info("Looking up display name for email: $email")
+
+        val emailLower = email.lowercase()
+        val emailUsername = emailLower.substringBefore("@")
+
+        val displayName = emailUsername.replace(".", " ")
+
+        // Strategy 1: Check if it's a GitHub noreply email
+        // Format: username@users.noreply.github.com OR 12345+username@users.noreply.github.com
+        if (emailLower.contains("noreply.github.com")) {
+            val login = if (emailUsername.contains("+")) {
+                emailUsername.substringAfter("+")
+            } else {
+                emailUsername
+            }
+            // Verify this login exists in our cache
+            if (contributorsByLogin.containsKey(login)) {
+                return login
+            }
+            return login  // Return anyway as it's from GitHub
+        }
+
+        // Strategy 2: Find contributor by exact email match
+        val contributorByEmail = contributorsByLogin.values.find {
+            it.email?.lowercase() == emailLower
+        }
+        if (contributorByEmail != null) {
+            return contributorByEmail.login
+        }
+
+        // Strategy 3: Check emailToLogin map
+        val loginFromMap = emailToLogin[emailUsername]
+        if (loginFromMap != null && contributorsByLogin.containsKey(loginFromMap)) {
+            return contributorsByLogin[loginFromMap]?.login
+        }
+
+        // Strategy 4: Try display name match (if display name is same as email username)
+        val contributorByDisplayName = contributorsByLogin.values.find {
+            it.displayName?.lowercase() == displayName
+        }
+        if (contributorByDisplayName != null) {
+            return contributorByDisplayName.login
+        }
+
+        // Strategy 5: Try email username as login
+        if (contributorsByLogin.containsKey(emailUsername)) {
+            return contributorsByLogin[emailUsername]?.login
+        }
+
+
+        return null
     }
 
     /**

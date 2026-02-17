@@ -894,17 +894,17 @@
          * Get display name for a contributor login
          * Uses the displayNameMap populated from session data
          */
-        function getDisplayName(login) {
-            if (!login) {
-                console.warn('⚠️ getDisplayName called with no login');
-                return 'Unknown';
-            }
-            const displayName = window.displayNameMap[login.toLowerCase()];
-            const result = displayName || login;
+        function getDisplayName(loginOrNickname) {
+            if (!loginOrNickname) return 'Unknown';
 
-            // Debug logging (can be removed in production)
-            if (displayName && displayName !== login) {
-                console.debug(`✅ getDisplayName('${login}') -> '${displayName}'`);
+            // Remove @ prefix if present (nicknames have @)
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+            const displayName = window.displayNameMap[cleanLogin];
+            const result = displayName || loginOrNickname;
+
+            // Debug logging
+            if (displayName && displayName !== loginOrNickname) {
+                console.debug(`✅ getDisplayName('${loginOrNickname}') -> '${displayName}'`);
             }
 
             return result;
@@ -1093,7 +1093,7 @@
                         <img class="contributor-avatar" src="${c.avatarUrl || ''}"
                              onerror="this.style.display='none'" alt="">
                         <div class="contributor-info">
-                            <div class="contributor-login">${c.name || c.login}</div>
+                            <div class="contributor-login">${getDisplayName(c.login)}</div>
                             <div class="contributor-contributions">@${c.login}${infoText ? ' • ' + infoText : ''}</div>
                         </div>
                     </div>

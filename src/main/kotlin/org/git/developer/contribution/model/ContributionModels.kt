@@ -10,6 +10,7 @@ data class CommitInfo(
     val hash: String,
     val authorName: String,
     val authorEmail: String,
+    val nickname: String? = null,
     val date: LocalDateTime,
     val message: String,
     val linesAdded: Int = 0,
@@ -25,6 +26,7 @@ data class CommitInfo(
 data class DeveloperContribution(
     val authorName: String,
     val authorEmail: String,
+    val nickname: String? = null,
     val totalCommits: Int,
     val totalLinesAdded: Int,
     val totalLinesDeleted: Int,
@@ -52,9 +54,9 @@ data class ContributionDataPoint(
  */
 data class DeveloperTimeline(
     val authorName: String,
-    val authorEmail: String,  // Primary email (first one found)
-    val nickname: String,     // Extracted from email (e.g., "levan.karanadze" from email or GitHub username)
-    val emails: Set<String>,  // All emails associated with this developer
+    val authorEmail: String,
+    val nickname: String,
+    val emails: Set<String>,
     val dataPoints: List<ContributionDataPoint>,
     val repositories: Set<String>
 )

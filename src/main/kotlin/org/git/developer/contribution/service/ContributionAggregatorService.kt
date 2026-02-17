@@ -120,12 +120,13 @@ class ContributionAggregatorService(
         dateRange: DateRange
     ): List<DeveloperTimeline> {
 
+        val cacheSize = contributorCacheService.size()
+        logger.info("Aggregating ${commits.size} commits by developer (cache has $cacheSize entries)")
 
-        if (contributorCacheService.getContributorsMap().isEmpty())
-            logger.error("Contributor cache is empty - nickname extraction may not work properly")
-
+        // Group commits by nickname (GitHub username) instead of authorName
+        // Use nickname if available, otherwise fall back to authorName
         val commitsWithNickname = commits.map { commit ->
-            val nickname = commit.authorName
+            val nickname = commit.nickname ?: commit.authorName
             Pair(nickname, commit)
         }
 

@@ -1871,7 +1871,7 @@
 
             // 2. Top Committers (horizontal bar chart)
             const developerCommits = allDevelopers.map(dev => ({
-                name: getDisplayName(dev.authorName),
+                name: getDisplayName(dev.nickname),
                 commits: dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0)
             })).sort((a, b) => b.commits - a.commits).slice(0, 10); // Top 10
 
@@ -1968,7 +1968,7 @@
                 prAuthorsChart = new Chart(document.getElementById('prAuthorsChart'), {
                     type: 'bar',
                     data: {
-                        labels: topPRAuthors.map(a => getDisplayName(a.authorName)),
+                        labels: topPRAuthors.map(a => getDisplayName(a.nickname)),
                         datasets: [{
                             label: 'PRs Merged',
                             data: topPRAuthors.map(a => a.prCount),
@@ -2005,7 +2005,7 @@
                                 padding: 12,
                                 callbacks: {
                                     title: function(context) {
-                                        return getDisplayName(topPRAuthors[context[0].dataIndex].authorName);
+                                        return getDisplayName(topPRAuthors[context[0].dataIndex].nickname);
                                     },
                                     label: function(context) {
                                         return `PRs Merged: ${context.parsed.x}`;
@@ -2041,8 +2041,8 @@
 
             container.innerHTML = developers.map(dev => {
                 const totalCommits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
-                const displayName = getDisplayName(dev.authorName);
-                const avatarUrl = getAvatarUrl(dev.authorName);
+                const displayName = getDisplayName(dev.nickname);
+                const avatarUrl = getAvatarUrl(dev.nickname);
                 const isSelected = selectedDevelopers.has(dev.authorName);
                 const escapedName = dev.authorName.replace(/'/g, "\\'");
                 return `
@@ -2143,7 +2143,7 @@
                 data: {
                     labels: labels,
                     datasets: developers.map((dev, i) => ({
-                        label: getDisplayName(dev.authorName),
+                        label: getDisplayName(dev.nickname),
                         data: dev.dataPoints.map(dp => dp.commits),
                         borderColor: colors[i],
                         backgroundColor: colors[i] + '20',
@@ -2161,7 +2161,7 @@
                 data: {
                     labels: labels,
                     datasets: developers.map((dev, i) => ({
-                        label: getDisplayName(dev.authorName),
+                        label: getDisplayName(dev.nickname),
                         data: dev.dataPoints.map(dp => dp.linesAdded),
                         backgroundColor: colors[i],
                         stack: 'added'
@@ -2176,7 +2176,7 @@
             pieChart = new Chart(document.getElementById('developerPieChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: developers.map(dev => getDisplayName(dev.authorName)),
+                    labels: developers.map(dev => getDisplayName(dev.nickname)),
                     datasets: [{ data: commitTotals, backgroundColor: colors }]
                 },
                 options: {
@@ -2191,8 +2191,8 @@
                 const commits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
                 const added = dev.dataPoints.reduce((sum, dp) => sum + dp.linesAdded, 0);
                 const deleted = dev.dataPoints.reduce((sum, dp) => sum + dp.linesDeleted, 0);
-                const displayName = getDisplayName(dev.authorName);
-                const avatarUrl = getAvatarUrl(dev.authorName);
+                const displayName = getDisplayName(dev.nickname);
+                const avatarUrl = getAvatarUrl(dev.nickname);
 
                 return `
                     <tr>
@@ -2205,7 +2205,7 @@
                                 <span style="font-weight: 500;">${displayName}</span>
                             </div>
                         </td>
-                        <td>${dev.authorName}</td>
+                        <td>${dev.nickname}</td>
                         <td>${commits}</td>
                         <td style="color: #22c55e;">+${added.toLocaleString()}</td>
                         <td style="color: #ef4444;">-${deleted.toLocaleString()}</td>
