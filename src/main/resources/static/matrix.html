@@ -855,6 +855,45 @@
         let selectedRepos = new Set();
         let trendChart = null;
 
+        // Display name lookup map (populated from session)
+        window.displayNameMap = {};
+
+        /**
+         * Get display name for a contributor login/nickname
+         * Uses the displayNameMap populated from session data
+         */
+        function getDisplayName(loginOrNickname) {
+            if (!loginOrNickname) return 'Unknown';
+
+            // Remove @ prefix if present
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+            const displayName = window.displayNameMap[cleanLogin];
+            const result = displayName || loginOrNickname;
+
+            return result;
+        }
+
+        /**
+         * Get avatar URL for a contributor login/nickname
+         * Uses session data to find avatar
+         */
+        function getAvatarUrl(loginOrNickname) {
+            if (!loginOrNickname) return null;
+
+            const sessionData = getSessionData();
+            if (!sessionData?.contributors) return null;
+
+            // Remove @ prefix if present
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+
+            // Find contributor by login
+            const contributor = sessionData.contributors.find(c =>
+                c.login && c.login.toLowerCase() === cleanLogin
+            );
+
+            return contributor?.avatarUrl || contributor?.avatar_url || null;
+        }
+
         // Get session data from sessionStorage
         function getSessionData() {
             const data = sessionStorage.getItem('spaceAnalyticsSession');
@@ -875,6 +914,17 @@
             if (sessionData && sessionData.token) {
                 // Set provider from session
                 selectedProvider = sessionData.provider || 'GITHUB';
+
+                // Create display name lookup map from session contributors
+                if (sessionData.contributors && sessionData.contributors.length > 0) {
+                    window.displayNameMap = {};
+                    sessionData.contributors.forEach(c => {
+                        if (c.login) {
+                            window.displayNameMap[c.login.toLowerCase()] = c.name || c.login;
+                        }
+                    });
+                    console.log('✅ Created displayNameMap with', Object.keys(window.displayNameMap).length, 'entries');
+                }
 
                 // Auto-load repositories from session
                 if (sessionData.repositories && sessionData.repositories.length > 0) {
@@ -1139,11 +1189,23 @@
         function renderDeveloperMatrix(developers) {
             const tbody = document.getElementById('developerMatrixBody');
 
-            tbody.innerHTML = developers.map(dev => `
+            tbody.innerHTML = developers.map(dev => {
+                const displayName = getDisplayName(dev.nickname);
+                const avatarUrl = getAvatarUrl(dev.nickname);
+
+                return `
                 <tr>
                     <td>
-                        <strong>${dev.developerName}</strong><br>
-                        <span style="color: #6366f1; font-size: 0.8rem;">${dev.nickname}</span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            ${avatarUrl
+                                ? `<img src="${avatarUrl}" alt="${displayName}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #6366f1;">`
+                                : '<span style="font-size: 1.5em;">👤</span>'
+                            }
+                            <div>
+                                <strong style="display: block;">${displayName}</strong>
+                                <span style="color: #6366f1; font-size: 0.8rem;">@${dev.nickname}</span>
+                            </div>
+                        </div>
                     </td>
                     <td>${dev.totalPRs}</td>
                     <td>${renderMatrixCell(dev.codingTime)}</td>
@@ -1153,7 +1215,8 @@
                     <td>${renderMatrixCell(dev.mergeFrequency)}</td>
                     <td>${renderMatrixCell(dev.prSize)}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function renderMatrixCell(metric) {
