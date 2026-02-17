@@ -660,6 +660,7 @@
                                         if (!allContributors.find(c => c.login === m.login)) {
                                             allContributors.push({
                                                 login: m.login,
+                                                name: null,  // Will be fetched below
                                                 avatarUrl: m.avatar_url,
                                                 profileUrl: m.html_url
                                             });
@@ -679,7 +680,84 @@
                     }
                 }
 
-                // Save session data
+                // Step 5: Fetch full user profiles for contributors (in parallel batches)
+                updateLoadingText(`Fetching contributor profiles (0/${allContributors.length})...`);
+                const BATCH_SIZE = 10;  // Fetch 10 users at a time to avoid rate limiting
+
+                for (let i = 0; i < allContributors.length; i += BATCH_SIZE) {
+                    const batch = allContributors.slice(i, i + BATCH_SIZE);
+                    const promises = batch.map(async (contributor) => {
+                        try {
+                            // Fetch user profile
+                            const userResponse = await fetch(`https://api.github.com/users/${contributor.login}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (userResponse.ok) {
+                                const u = await userResponse.json();
+                                // Store all available user profile fields
+                                contributor.id = u.id;
+                                contributor.node_id = u.node_id;
+                                contributor.avatar_url = u.avatar_url;
+                                contributor.gravatar_id = u.gravatar_id;
+                                contributor.html_url = u.html_url;
+                                contributor.type = u.type;
+                                contributor.site_admin = u.site_admin;
+                                contributor.name = u.name || null;
+                                contributor.company = u.company || null;
+                                contributor.blog = u.blog || null;
+                                contributor.location = u.location || null;
+                                contributor.email = u.email || null;  // Often null (private)
+                                contributor.hireable = u.hireable;
+                                contributor.bio = u.bio || null;
+                                contributor.twitter_username = u.twitter_username || null;
+                                contributor.public_repos = u.public_repos;
+                                contributor.public_gists = u.public_gists;
+                                contributor.followers = u.followers;
+                                contributor.following = u.following;
+                                contributor.created_at = u.created_at;
+                                contributor.updated_at = u.updated_at;
+
+                                // If email is null, try to get it from user's public events (commits)
+                                if (!contributor.email) {
+                                    try {
+                                        const eventsResponse = await fetch(`https://api.github.com/users/${contributor.login}/events/public?per_page=10`, {
+                                            headers: { 'Authorization': `Bearer ${token}` }
+                                        });
+                                        if (eventsResponse.ok) {
+                                            const events = await eventsResponse.json();
+                                            // Look for PushEvent which contains commit author email
+                                            for (const event of events) {
+                                                if (event.type === 'PushEvent' && event.payload?.commits) {
+                                                    for (const commit of event.payload.commits) {
+                                                        if (commit.author?.email && !commit.author.email.includes('noreply.github.com')) {
+                                                            contributor.email = commit.author.email;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                if (contributor.email) break;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // Ignore - email extraction is best-effort
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`Could not fetch profile for ${contributor.login}`);
+                        }
+                    });
+                    await Promise.all(promises);
+                    updateLoadingText(`Fetching contributor profiles (${Math.min(i + BATCH_SIZE, allContributors.length)}/${allContributors.length})...`);
+                }
+
+                console.log('Contributors loaded:', allContributors.length);
+                console.log('With names:', allContributors.filter(c => c.name).length);
+                console.log('With emails:', allContributors.filter(c => c.email).length);
+                console.log('With company:', allContributors.filter(c => c.company).length);
+                console.log('With location:', allContributors.filter(c => c.location).length);
+
+                // Save session data locally
                 const sessionData = {
                     token: token,
                     provider: selectedProvider,
@@ -696,6 +774,23 @@
                 };
 
                 saveSessionData(sessionData);
+
+                // Cache contributors on backend for name resolution
+                updateLoadingText('Caching contributor data...');
+                try {
+                    const cacheResponse = await fetch('/api/git/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contributors: allContributors })
+                    });
+                    if (cacheResponse.ok) {
+                        const cacheResult = await cacheResponse.json();
+                        console.log('✅ Cached', cacheResult.contributorsCached, 'contributors on backend');
+                    }
+                } catch (e) {
+                    console.warn('Could not cache contributors on backend:', e);
+                }
+
                 showLoading(false);
                 showLoggedInState(sessionData);
 

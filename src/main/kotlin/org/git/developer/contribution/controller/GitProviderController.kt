@@ -1,6 +1,7 @@
 package org.git.developer.contribution.controller
 
 import org.git.developer.contribution.model.*
+import org.git.developer.contribution.service.ContributorCacheService
 import org.git.developer.contribution.service.GitProviderService
 import org.git.developer.contribution.service.RemoteRepositoryAnalyzerService
 import org.springframework.http.ResponseEntity
@@ -14,8 +15,29 @@ import org.springframework.web.bind.annotation.*
 @CrossOrigin(origins = ["*"])
 class GitProviderController(
     private val gitProviderService: GitProviderService,
-    private val remoteAnalyzerService: RemoteRepositoryAnalyzerService
+    private val remoteAnalyzerService: RemoteRepositoryAnalyzerService,
+    private val contributorCacheService: ContributorCacheService
 ) {
+
+    /**
+     * Store session data (contributors) after frontend login
+     * This caches contributor info so services can look up display names
+     *
+     * POST /api/git/session
+     * {
+     *   "contributors": [{ "login": "johndoe", "name": "John Doe", ... }]
+     * }
+     */
+    @PostMapping("/session")
+    fun storeSessionData(@RequestBody request: SessionDataRequest): ResponseEntity<SessionDataResponse> {
+        if (!request.contributors.isNullOrEmpty()) {
+            contributorCacheService.storeContributors(request.contributors)
+        }
+        return ResponseEntity.ok(SessionDataResponse(
+            contributorsCached = contributorCacheService.size(),
+            success = true
+        ))
+    }
 
     /**
      * List all repositories accessible with the provided token

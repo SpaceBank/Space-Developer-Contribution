@@ -14,7 +14,8 @@ import java.util.*
  */
 @Service
 class ContributionAggregatorService(
-    private val gitDataExtractor: GitDataExtractorService
+    private val gitDataExtractor: GitDataExtractorService,
+    private val contributorCacheService: ContributorCacheService
 ) {
     private val logger = LoggerFactory.getLogger(ContributionAggregatorService::class.java)
 
@@ -118,10 +119,13 @@ class ContributionAggregatorService(
         period: AggregationPeriod,
         dateRange: DateRange
     ): List<DeveloperTimeline> {
-        // First, extract nickname for each commit and group by nickname
-        // This ensures "levan9999" and "Levan Karanadze" with same email are grouped together
+
+
+        if (contributorCacheService.getContributorsMap().isEmpty())
+            logger.error("Contributor cache is empty - nickname extraction may not work properly")
+
         val commitsWithNickname = commits.map { commit ->
-            val nickname = extractNicknameFromEmail(commit.authorEmail)
+            val nickname = contributorCacheService.getDisplayNameByEmail(commit.authorEmail)
             Pair(nickname, commit)
         }
 
@@ -129,7 +133,7 @@ class ContributionAggregatorService(
 
         return commitsByNickname.map { (nickname, pairs) ->
             val developerCommits = pairs.map { it.second }
-            val allNames = developerCommits.map { it.authorName }.toSet()
+            val allNames = developerCommits.map { contributorCacheService.getDisplayNameByEmail(it.authorEmail) }.toSet()
             val allEmails = developerCommits.map { it.authorEmail.lowercase() }.toSet()
             val primaryEmail = allEmails.first()
 

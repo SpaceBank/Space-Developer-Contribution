@@ -85,3 +85,18 @@ data class PullRequestInfo(
     val repositoryFullName: String
 )
 
+/**
+ * Request to store session data (contributors) after login
+ */
+data class SessionDataRequest(
+    val contributors: List<Map<String, Any?>>? = null
+)
+
+/**
+ * Response after storing session data
+ */
+data class SessionDataResponse(
+    val contributorsCached: Int,
+    val success: Boolean
+)
+
