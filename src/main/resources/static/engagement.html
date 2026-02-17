@@ -1007,6 +1007,27 @@
             return result;
         }
 
+        /**
+         * Get avatar URL for a contributor login
+         * Fetches from cached session data
+         */
+        function getAvatarUrl(loginOrNickname) {
+            if (!loginOrNickname) return null;
+
+            const sessionData = getSessionData();
+            if (!sessionData?.contributors) return null;
+
+            // Remove @ prefix if present
+            const cleanLogin = loginOrNickname.replace('@', '').toLowerCase();
+
+            // Find contributor by login
+            const contributor = sessionData.contributors.find(c =>
+                c.login && c.login.toLowerCase() === cleanLogin
+            );
+
+            return contributor?.avatarUrl || contributor?.avatar_url || null;
+        }
+
         // Get session data from sessionStorage
         function getSessionData() {
             const data = sessionStorage.getItem('spaceAnalyticsSession');
@@ -2197,20 +2218,23 @@
         // Render engagement table
         function renderEngagementTable(contributors, partial = false) {
             const tbody = document.getElementById('engagementTableBody');
-            tbody.innerHTML = contributors.map(c => `
-                <tr>
-                    <td class="contributor-cell">
-                        ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1.2em;">👤</span>'}
-                        <span>${getDisplayName(c.login)}</span>
-                    </td>
-                    <td>${c.totalCommits.toLocaleString()}</td>
-                    <td style="color: #22c55e;">+${(c.totalLinesAdded || 0).toLocaleString()}</td>
-                    <td style="color: #ef4444;">-${(c.totalLinesDeleted || 0).toLocaleString()}</td>
-                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsMerged || 0).toLocaleString()}</td>
-                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsReviewed || 0).toLocaleString()}</td>
-                    <td>${partial ? '<span class="mini-spinner"></span>' : (c.activeDays || 0).toLocaleString()}</td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = contributors.map(c => {
+                const avatarUrl = getAvatarUrl(c.login);
+                return `
+                    <tr>
+                        <td class="contributor-cell">
+                            ${avatarUrl ? `<img src="${avatarUrl}" alt="${getDisplayName(c.login)}">` : '<span style="font-size: 1.2em;">👤</span>'}
+                            <span>${getDisplayName(c.login)}</span>
+                        </td>
+                        <td>${c.totalCommits.toLocaleString()}</td>
+                        <td style="color: #22c55e;">+${(c.totalLinesAdded || 0).toLocaleString()}</td>
+                        <td style="color: #ef4444;">-${(c.totalLinesDeleted || 0).toLocaleString()}</td>
+                        <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsMerged || 0).toLocaleString()}</td>
+                        <td>${partial ? '<span class="mini-spinner"></span>' : (c.prsReviewed || 0).toLocaleString()}</td>
+                        <td>${partial ? '<span class="mini-spinner"></span>' : (c.activeDays || 0).toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // Toggle repo list view in results
@@ -2319,14 +2343,17 @@
                 return;
             }
 
-            container.innerHTML = contributors.map(c => `
-                <div class="filter-chip ${selectedContributorsForChart.has(c.login) ? 'selected' : ''}"
-                     onclick="toggleChartContributor('${c.login}')"
-                     title="${getDisplayName(c.login)}">
-                    ${c.avatarUrl ? `<img src="${c.avatarUrl}" alt="">` : '<span style="font-size: 1em;">👤</span>'}
-                    <span>${getDisplayName(c.login)}</span>
-                </div>
-            `).join('');
+            container.innerHTML = contributors.map(c => {
+                const avatarUrl = getAvatarUrl(c.login);
+                return `
+                    <div class="filter-chip ${selectedContributorsForChart.has(c.login) ? 'selected' : ''}"
+                         onclick="toggleChartContributor('${c.login}')"
+                         title="${getDisplayName(c.login)}">
+                        ${avatarUrl ? `<img src="${avatarUrl}" alt="${getDisplayName(c.login)}">` : '<span style="font-size: 1em;">👤</span>'}
+                        <span>${getDisplayName(c.login)}</span>
+                    </div>
+                `;
+            }).join('');
 
             console.log('✅ renderContributorFilter() completed, rendered', contributors.length, 'chips');
         }
