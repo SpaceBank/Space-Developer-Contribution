@@ -19,6 +19,15 @@
             color: #e4e4e7;
         }
 
+        /* Hide back button when in iframe */
+        body.in-iframe .back-home-btn {
+            display: none !important;
+        }
+
+        body.in-iframe .container {
+            padding-top: 1rem;
+        }
+
         .back-button {
             position: fixed;
             top: 1.5rem;
@@ -1251,6 +1260,11 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Detect if running in iframe
+            if (window.self !== window.top) {
+                document.body.classList.add('in-iframe');
+            }
+
             const today = new Date();
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
