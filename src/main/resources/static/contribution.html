@@ -879,73 +879,44 @@
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
         }
 
-        /* Floating Navigation */
-        .floating-nav {
+        /* Simple Back to Home Button */
+        .back-home-btn {
             position: fixed;
             top: 1.5rem;
             left: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: #e4e4e7;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
             z-index: 1000;
+            backdrop-filter: blur(10px);
         }
 
-        .nav-toggle {
+        .back-home-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .back-home-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .back-home-btn .icon {
+            font-size: 1.2rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 1.25rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-        }
-
-        .nav-toggle:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-        }
-
-        .nav-menu {
-            position: absolute;
-            top: 56px;
-            left: 0;
-            background: rgba(30, 30, 46, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 0.5rem;
-            min-width: 200px;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-10px);
-            transition: all 0.3s;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .nav-menu.show {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            color: #e4e4e7;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.2s;
-            font-size: 0.9rem;
-        }
-
-        .nav-item:hover {
-            background: rgba(99, 102, 241, 0.2);
-            color: #a5b4fc;
         }
 
         .nav-item.active {
@@ -973,19 +944,11 @@
         </div>
     </div>
 
-    <!-- Floating Navigation -->
-    <div class="floating-nav">
-        <button class="nav-toggle" onclick="toggleNavMenu()" title="Navigation">
-            ☰
-        </button>
-        <div class="nav-menu" id="navMenu">
-            <a href="/" class="nav-item">🏠 Home</a>
-            <div class="nav-divider"></div>
-            <a href="/contribution.html" class="nav-item active">📊 Contribution</a>
-            <a href="/engagement.html" class="nav-item">👥 Engagement</a>
-            <a href="/matrix.html" class="nav-item">📈 Matrix</a>
-        </div>
-    </div>
+    <!-- Back to Home Button -->
+    <a href="/" class="back-home-btn">
+        <span class="icon">🏠</span>
+        <span>Home</span>
+    </a>
 
     <div class="container">
         <h1 style="margin-bottom: 1.5rem;">📊 Developer Contribution Dashboard</h1>
@@ -1285,20 +1248,6 @@
             }
         });
 
-        // Navigation menu toggle
-        function toggleNavMenu() {
-            const menu = document.getElementById('navMenu');
-            menu.classList.toggle('show');
-        }
-
-        // Close nav menu when clicking outside
-        document.addEventListener('click', (e) => {
-            const nav = document.querySelector('.floating-nav');
-            const menu = document.getElementById('navMenu');
-            if (nav && menu && !nav.contains(e.target)) {
-                menu.classList.remove('show');
-            }
-        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
