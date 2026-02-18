@@ -678,6 +678,300 @@
         .loading-progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width 0.3s; }
         .loading-status { font-size: 0.875rem; color: #a1a1aa; }
         .pulse-dot { width: 10px; height: 10px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; }
+
+        /* PR List Section */
+        .pr-list-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .pr-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .pr-list-header h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+            color: #e4e4e7;
+        }
+
+        .pr-count-badge {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .pr-search-box {
+            margin-bottom: 1rem;
+        }
+
+        .pr-search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            font-size: 0.9rem;
+        }
+
+        .pr-search-box input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        .pr-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .pr-list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .pr-list-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .pr-list-container::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 3px;
+        }
+
+        .pr-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .pr-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .pr-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+            height: 30px;
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .pr-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pr-title {
+            font-weight: 500;
+            color: #e4e4e7;
+            margin-bottom: 0.35rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pr-title a {
+            color: #a5b4fc;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .pr-title a:hover {
+            color: #818cf8;
+            text-decoration: underline;
+        }
+
+        .pr-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+            color: #71717a;
+        }
+
+        .pr-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .pr-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .pr-metric-tag {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.2rem 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: #a1a1aa;
+        }
+
+        .pr-metric-tag.elite { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+        .pr-metric-tag.good { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+        .pr-metric-tag.fair { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .pr-metric-tag.needs-focus { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+        /* Contributor PR Popup Modal */
+        .pr-popup-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pr-popup-modal.show {
+            display: flex;
+        }
+
+        .pr-popup-content {
+            background: linear-gradient(135deg, #1e1e2e 0%, #16213e 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 85vh;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        .pr-popup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .pr-popup-user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .pr-popup-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid #6366f1;
+        }
+
+        .pr-popup-name {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .pr-popup-login {
+            font-size: 0.85rem;
+            color: #6366f1;
+        }
+
+        .pr-popup-close {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #9ca3af;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pr-popup-close:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .pr-popup-stats {
+            display: flex;
+            gap: 1.5rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .pr-popup-stat {
+            text-align: center;
+        }
+
+        .pr-popup-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .pr-popup-stat-label {
+            font-size: 0.75rem;
+            color: #71717a;
+        }
+
+        .pr-popup-body {
+            padding: 1rem 1.5rem;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .pr-popup-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .pr-popup-body::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 3px;
+        }
+
+        /* Clickable developer row */
+        .matrix-table tbody tr {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .matrix-table tbody tr:hover {
+            background: rgba(99, 102, 241, 0.1) !important;
+        }
         @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
     </style>
 </head>
@@ -690,6 +984,28 @@
             <div class="modal-message" id="modalMessage">This is a message</div>
             <div class="modal-buttons">
                 <button class="modal-button primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contributor PR Popup Modal -->
+    <div id="prPopupModal" class="pr-popup-modal" onclick="closePRPopup(event)">
+        <div class="pr-popup-content" onclick="event.stopPropagation()">
+            <div class="pr-popup-header">
+                <div class="pr-popup-user-info">
+                    <img id="prPopupAvatar" class="pr-popup-avatar" src="" alt="">
+                    <div>
+                        <div class="pr-popup-name" id="prPopupName">Developer Name</div>
+                        <div class="pr-popup-login" id="prPopupLogin">@username</div>
+                    </div>
+                </div>
+                <button class="pr-popup-close" onclick="closePRPopup()">×</button>
+            </div>
+            <div class="pr-popup-stats" id="prPopupStats">
+                <!-- Stats will be populated here -->
+            </div>
+            <div class="pr-popup-body" id="prPopupBody">
+                <!-- PR list will be populated here -->
             </div>
         </div>
     </div>
@@ -776,6 +1092,7 @@
             <!-- Developer Matrix -->
             <div class="panel">
                 <h3>👥 Developer Metrics Matrix</h3>
+                <p style="font-size: 0.85rem; color: #71717a; margin-bottom: 1rem;">💡 Click on a developer row to view their PR details</p>
                 <div class="matrix-table-container">
                     <table class="matrix-table" id="developerMatrix">
                         <thead>
@@ -792,6 +1109,19 @@
                         </thead>
                         <tbody id="developerMatrixBody"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Analyzed PRs List -->
+            <div class="pr-list-panel" id="prListPanel" style="display: none;">
+                <div class="pr-list-header">
+                    <h3>📋 Analyzed Pull Requests <span class="pr-count-badge" id="prCountBadge">0</span></h3>
+                </div>
+                <div class="pr-search-box">
+                    <input type="text" id="prSearchInput" placeholder="Search PRs by title, author, or number..." oninput="filterPRList()">
+                </div>
+                <div class="pr-list-container" id="prListContainer">
+                    <!-- PR items will be populated here -->
                 </div>
             </div>
 
@@ -1283,8 +1613,29 @@
             }
         }
 
+        // Store metrics data globally for popup access
+        let currentMetricsData = null;
+        let allPRsList = [];
+
         // Display results
         function displayResults(data) {
+            // Store data globally
+            currentMetricsData = data;
+
+            // Collect all PRs from all developers
+            allPRsList = [];
+            data.developerMetrics.forEach(dev => {
+                if (dev.prDetails && dev.prDetails.length > 0) {
+                    dev.prDetails.forEach(pr => {
+                        allPRsList.push({
+                            ...pr,
+                            developerName: dev.developerName,
+                            nickname: dev.nickname
+                        });
+                    });
+                }
+            });
+
             // Analysis Info
             document.getElementById('analysisInfo').innerHTML = `
                 <strong>📁 Repositories:</strong> ${data.analyzedRepositories.join(', ')}<br>
@@ -1301,6 +1652,9 @@
 
             // Developer Matrix
             renderDeveloperMatrix(data.developerMetrics);
+
+            // PR List
+            renderPRList(allPRsList, data.analyzedRepositories);
         }
 
         function renderTeamMetrics(metrics) {
@@ -1401,12 +1755,12 @@
         function renderDeveloperMatrix(developers) {
             const tbody = document.getElementById('developerMatrixBody');
 
-            tbody.innerHTML = developers.map(dev => {
+            tbody.innerHTML = developers.map((dev, index) => {
                 const displayName = getDisplayName(dev.nickname);
                 const avatarUrl = getAvatarUrl(dev.nickname);
 
                 return `
-                <tr>
+                <tr onclick="showDeveloperPRs(${index})" title="Click to view ${displayName}'s PRs">
                     <td>
                         <div style="display: flex; align-items: center; gap: 10px;">
                             ${avatarUrl
@@ -1459,7 +1813,214 @@
         function hideLoading(id) {
             document.getElementById(id).classList.add('hidden');
         }
+
+        // ==================== PR LIST FUNCTIONS ====================
+
+        // Render PR list section
+        function renderPRList(prs, repositories) {
+            const panel = document.getElementById('prListPanel');
+            const container = document.getElementById('prListContainer');
+            const countBadge = document.getElementById('prCountBadge');
+
+            if (!prs || prs.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = 'block';
+            countBadge.textContent = prs.length;
+
+            // Build PR URL base from repositories
+            const repoUrlMap = {};
+            repositories.forEach(repo => {
+                repoUrlMap[repo] = `https://github.com/${repo}/pull/`;
+            });
+
+            container.innerHTML = prs.map(pr => {
+                const displayName = getDisplayName(pr.nickname || pr.author);
+                const avatarUrl = getAvatarUrl(pr.nickname || pr.author);
+                const prUrl = buildPRUrl(pr, repositories);
+
+                return `
+                    <div class="pr-item">
+                        <div class="pr-number">#${pr.prNumber}</div>
+                        <div class="pr-info">
+                            <div class="pr-title">
+                                <a href="${prUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(pr.prTitle)}</a>
+                            </div>
+                            <div class="pr-meta">
+                                <span class="pr-meta-item">
+                                    ${avatarUrl ? `<img src="${avatarUrl}" style="width: 16px; height: 16px; border-radius: 50%;">` : '👤'}
+                                    ${displayName}
+                                </span>
+                                <span class="pr-meta-item">📅 ${formatDate(pr.createdAt)}</span>
+                                ${pr.mergedAt ? `<span class="pr-meta-item">✅ Merged ${formatDate(pr.mergedAt)}</span>` : ''}
+                                <span class="pr-meta-item">📏 ${pr.prSize} lines</span>
+                            </div>
+                            <div class="pr-metrics">
+                                ${pr.cycleTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.cycleTimeHours, 'cycleTime')}">🔄 ${formatHours(pr.cycleTimeHours)}</span>` : ''}
+                                ${pr.codingTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.codingTimeHours, 'codingTime')}">⌨️ ${formatHours(pr.codingTimeHours)}</span>` : ''}
+                                ${pr.pickupTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.pickupTimeHours, 'pickupTime')}">👀 ${formatHours(pr.pickupTimeHours)}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Filter PR list
+        function filterPRList() {
+            const searchTerm = document.getElementById('prSearchInput').value.toLowerCase();
+            const items = document.querySelectorAll('#prListContainer .pr-item');
+
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+            });
+        }
+
+        // Build PR URL
+        function buildPRUrl(pr, repositories) {
+            // Try to find the repository from the PR data or use the first repo
+            if (repositories && repositories.length > 0) {
+                const repo = repositories[0]; // Default to first repo
+                return `https://github.com/${repo}/pull/${pr.prNumber}`;
+            }
+            return '#';
+        }
+
+        // ==================== CONTRIBUTOR PR POPUP ====================
+
+        // Show developer PRs popup
+        function showDeveloperPRs(developerIndex) {
+            if (!currentMetricsData || !currentMetricsData.developerMetrics) return;
+
+            const dev = currentMetricsData.developerMetrics[developerIndex];
+            if (!dev) return;
+
+            const displayName = getDisplayName(dev.nickname);
+            const avatarUrl = getAvatarUrl(dev.nickname);
+            const prs = dev.prDetails || [];
+
+            // Update header
+            document.getElementById('prPopupAvatar').src = avatarUrl || '';
+            document.getElementById('prPopupAvatar').style.display = avatarUrl ? 'block' : 'none';
+            document.getElementById('prPopupName').textContent = displayName;
+            document.getElementById('prPopupLogin').textContent = `@${dev.nickname}`;
+
+            // Update stats
+            document.getElementById('prPopupStats').innerHTML = `
+                <div class="pr-popup-stat">
+                    <div class="pr-popup-stat-value">${dev.totalPRs}</div>
+                    <div class="pr-popup-stat-label">Total PRs</div>
+                </div>
+                <div class="pr-popup-stat">
+                    <div class="pr-popup-stat-value">${dev.cycleTime.displayValue}</div>
+                    <div class="pr-popup-stat-label">Avg Cycle Time</div>
+                </div>
+                <div class="pr-popup-stat">
+                    <div class="pr-popup-stat-value">${dev.prSize.displayValue}</div>
+                    <div class="pr-popup-stat-label">Avg PR Size</div>
+                </div>
+                <div class="pr-popup-stat">
+                    <div class="pr-popup-stat-value">${dev.mergeFrequency.displayValue}</div>
+                    <div class="pr-popup-stat-label">Merge Freq</div>
+                </div>
+            `;
+
+            // Render PR list
+            const body = document.getElementById('prPopupBody');
+            if (prs.length === 0) {
+                body.innerHTML = '<p style="text-align: center; color: #71717a; padding: 2rem;">No PR details available</p>';
+            } else {
+                const repositories = currentMetricsData.analyzedRepositories;
+                body.innerHTML = prs.map(pr => {
+                    const prUrl = buildPRUrl(pr, repositories);
+                    return `
+                        <div class="pr-item">
+                            <div class="pr-number">#${pr.prNumber}</div>
+                            <div class="pr-info">
+                                <div class="pr-title">
+                                    <a href="${prUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(pr.prTitle)}</a>
+                                </div>
+                                <div class="pr-meta">
+                                    <span class="pr-meta-item">📅 Created: ${formatDate(pr.createdAt)}</span>
+                                    ${pr.mergedAt ? `<span class="pr-meta-item">✅ Merged: ${formatDate(pr.mergedAt)}</span>` : '<span class="pr-meta-item">⏳ Not merged</span>'}
+                                    <span class="pr-meta-item">📏 ${pr.prSize} lines changed</span>
+                                </div>
+                                <div class="pr-metrics">
+                                    ${pr.codingTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.codingTimeHours, 'codingTime')}">⌨️ Coding: ${formatHours(pr.codingTimeHours)}</span>` : ''}
+                                    ${pr.pickupTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.pickupTimeHours, 'pickupTime')}">👀 Pickup: ${formatHours(pr.pickupTimeHours)}</span>` : ''}
+                                    ${pr.reviewTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.reviewTimeHours, 'reviewTime')}">📝 Review: ${formatHours(pr.reviewTimeHours)}</span>` : ''}
+                                    ${pr.cycleTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.cycleTimeHours, 'cycleTime')}">🔄 Cycle: ${formatHours(pr.cycleTimeHours)}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Show popup
+            document.getElementById('prPopupModal').classList.add('show');
+        }
+
+        // Close PR popup
+        function closePRPopup(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('prPopupModal').classList.remove('show');
+        }
+
+        // Close popup on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closePRPopup();
+            }
+        });
+
+        // ==================== HELPER FUNCTIONS ====================
+
+        // Format hours to readable string
+        function formatHours(hours) {
+            if (hours == null) return 'N/A';
+            if (hours < 1) return `${Math.round(hours * 60)}m`;
+            if (hours < 24) return `${hours.toFixed(1)}h`;
+            const days = Math.floor(hours / 24);
+            const remainingHours = Math.round(hours % 24);
+            return `${days}d ${remainingHours}h`;
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // Get rating class based on metric thresholds
+        function getRatingClass(hours, metricType) {
+            const thresholds = {
+                codingTime: { elite: 0.9, good: 4, fair: 23 },
+                pickupTime: { elite: 1, good: 4, fair: 16 },
+                reviewTime: { elite: 4, good: 8, fair: 24 },
+                cycleTime: { elite: 24, good: 72, fair: 168 }
+            };
+
+            const t = thresholds[metricType];
+            if (!t || hours == null) return '';
+
+            if (hours <= t.elite) return 'elite';
+            if (hours <= t.good) return 'good';
+            if (hours <= t.fair) return 'fair';
+            return 'needs-focus';
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
-
