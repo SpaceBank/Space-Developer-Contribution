@@ -577,10 +577,96 @@
             color: #e4e4e7;
             font-size: 1rem;
         }
+
+        /* Custom Modal/Popup */
+        .custom-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-icon { font-size: 3rem; text-align: center; margin-bottom: 1rem; }
+        .modal-title { font-size: 1.25rem; font-weight: 600; color: #e4e4e7; text-align: center; margin-bottom: 0.75rem; }
+        .modal-message { font-size: 0.95rem; color: #a1a1aa; text-align: center; line-height: 1.5; margin-bottom: 1.5rem; }
+        .modal-buttons { display: flex; gap: 0.75rem; justify-content: center; }
+        .modal-button { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .modal-button.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+        .modal-button.primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+
+        /* Floating Navigation */
+        .floating-nav { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 1000; }
+        .nav-toggle { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 12px; color: #fff; font-size: 1.25rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+        .nav-toggle:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5); }
+        .nav-menu { position: absolute; top: 56px; left: 0; background: rgba(30, 30, 46, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.5rem; min-width: 200px; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all 0.3s; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        .nav-menu.show { opacity: 1; visibility: visible; transform: translateY(0); }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #e4e4e7; text-decoration: none; border-radius: 8px; transition: all 0.2s; font-size: 0.9rem; }
+        .nav-item:hover { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+        .nav-item.active { background: rgba(99, 102, 241, 0.3); color: #a5b4fc; }
+        .nav-divider { height: 1px; background: rgba(255, 255, 255, 0.1); margin: 0.5rem 0; }
+
+        /* Loading Panel */
+        .loading-panel { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 1.5rem; margin-top: 1rem; }
+        .loading-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .loading-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 600; color: #e4e4e7; }
+        .loading-progress-bar { height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
+        .loading-progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width 0.3s; }
+        .loading-status { font-size: 0.875rem; color: #a1a1aa; }
+        .pulse-dot { width: 10px; height: 10px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
     </style>
 </head>
 <body>
-    <a href="/" class="back-button">← Back to Home</a>
+    <!-- Custom Modal/Popup -->
+    <div id="customModal" class="custom-modal">
+        <div class="modal-content">
+            <div class="modal-icon" id="modalIcon">⚠️</div>
+            <div class="modal-title" id="modalTitle">Alert</div>
+            <div class="modal-message" id="modalMessage">This is a message</div>
+            <div class="modal-buttons">
+                <button class="modal-button primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Navigation -->
+    <div class="floating-nav">
+        <button class="nav-toggle" onclick="toggleNavMenu()" title="Navigation">☰</button>
+        <div class="nav-menu" id="navMenu">
+            <a href="/" class="nav-item">🏠 Home</a>
+            <div class="nav-divider"></div>
+            <a href="/contribution.html" class="nav-item">📊 Contribution</a>
+            <a href="/engagement.html" class="nav-item">👥 Engagement</a>
+            <a href="/matrix.html" class="nav-item active">📈 Matrix</a>
+        </div>
+    </div>
 
     <div class="container">
         <h1>⚡ Engineering Matrix</h1>
@@ -619,10 +705,9 @@
             </div>
 
             <div id="analyze-error" class="error hidden"></div>
-            <div id="analyze-loading" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Analyzing metrics... This may take a few minutes.</span>
-            </div>
+
+            <!-- Loading Panel -->
+            <div id="loadingPanel" class="hidden"></div>
         </div>
 
         <!-- Step 3: Results -->
@@ -631,7 +716,6 @@
 
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                 <button class="secondary" onclick="goToStep(1)">← Back to Selection</button>
-                <a href="/" class="secondary" style="text-decoration: none;">🏠 Home</a>
             </div>
 
             <!-- Analysis Info -->
@@ -898,6 +982,40 @@
             return data ? JSON.parse(data) : null;
         }
 
+        // Custom Modal Functions
+        function showModal(icon, title, message) {
+            document.getElementById('modalIcon').textContent = icon;
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('customModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.remove('show');
+        }
+
+        // Close modal on background click
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'customModal') {
+                closeModal();
+            }
+        });
+
+        // Navigation menu toggle
+        function toggleNavMenu() {
+            const menu = document.getElementById('navMenu');
+            menu.classList.toggle('show');
+        }
+
+        // Close nav menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const nav = document.querySelector('.floating-nav');
+            const menu = document.getElementById('navMenu');
+            if (nav && menu && !nav.contains(e.target)) {
+                menu.classList.remove('show');
+            }
+        });
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -1013,13 +1131,24 @@
             if (selectedRepos.has(fullName)) {
                 selectedRepos.delete(fullName);
             } else {
+                // Check max 10 limit
+                if (selectedRepos.size >= 10) {
+                    showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
+                    return;
+                }
                 selectedRepos.add(fullName);
             }
             renderRepositoryList(document.getElementById('repoSearch').value);
         }
 
         function selectAllRepos() {
-            repositories.forEach(repo => selectedRepos.add(repo.fullName));
+            // Limit to 10 max
+            const toAdd = repositories.slice(0, 10);
+            toAdd.forEach(repo => selectedRepos.add(repo.fullName));
+
+            if (repositories.length > 10) {
+                showModal('ℹ️', 'Selection Limited', 'Only the first 10 repositories were selected. Maximum limit is 10.');
+            }
             renderRepositoryList(document.getElementById('repoSearch').value);
         }
 
@@ -1028,15 +1157,65 @@
             document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
         }
 
+        // Show loading panel
+        function showLoadingPanel(repos) {
+            const panel = document.getElementById('loadingPanel');
+            if (panel) {
+                panel.classList.remove('hidden');
+                panel.innerHTML = `
+                    <div class="loading-panel">
+                        <div class="loading-header">
+                            <div class="loading-title">
+                                <div class="pulse-dot"></div>
+                                <span>Analyzing ${repos.length} Repositories</span>
+                            </div>
+                            <span style="font-size: 0.875rem; color: #a1a1aa;">Please wait...</span>
+                        </div>
+                        <div class="loading-progress-bar">
+                            <div class="loading-progress-fill" id="matrixProgressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="loading-status" id="matrixLoadingStatus">
+                            Fetching PR data from GitHub API...
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function hideLoadingPanel() {
+            const panel = document.getElementById('loadingPanel');
+            if (panel) {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function updateLoadingProgress(percent, status) {
+            const fill = document.getElementById('matrixProgressFill');
+            const statusEl = document.getElementById('matrixLoadingStatus');
+            if (fill) fill.style.width = percent + '%';
+            if (statusEl) statusEl.textContent = status;
+        }
+
         // Analyze metrics
         async function analyzeMetrics() {
+            // Validate: minimum 1 repo
             if (selectedRepos.size === 0) {
-                showError('analyze-error', 'Please select at least one repository');
+                showModal('📁', 'Repositories Required', 'Please select at least 1 repository to analyze.');
                 return;
             }
 
+            // Validate: maximum 10 repos
+            if (selectedRepos.size > 10) {
+                showModal('⚠️', 'Too Many Repositories', 'You can select a maximum of 10 repositories. Please deselect some repositories.');
+                return;
+            }
+            analyzeBtn.disabled  = true
+
             hideError('analyze-error');
-            showLoading('analyze-loading');
+
+            const repoList = Array.from(selectedRepos);
+            showLoadingPanel(repoList);
+            updateLoadingProgress(10, 'Connecting to GitHub API...');
 
             const sessionData = getSessionData();
             const token = sessionData?.token || '';
@@ -1044,6 +1223,8 @@
             const endDate = document.getElementById('endDate').value || null;
 
             try {
+                updateLoadingProgress(20, 'Fetching PR data...');
+
                 const response = await fetch('/api/metrics/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1051,21 +1232,31 @@
                         token: token,
                         provider: selectedProvider,
                         baseUrl: sessionData?.baseUrl || null,
-                        repositoryFullNames: Array.from(selectedRepos),
+                        repositoryFullNames: repoList,
                         startDate: startDate,
                         endDate: endDate
                     })
                 });
 
+                updateLoadingProgress(60, 'Processing PR metrics...');
+
                 if (!response.ok) throw new Error('Failed to analyze metrics');
 
+                updateLoadingProgress(80, 'Calculating developer metrics...');
                 const data = await response.json();
-                hideLoading('analyze-loading');
-                displayResults(data);
-                goToStep(3);
+
+                updateLoadingProgress(100, 'Complete!');
+
+                setTimeout(() => {
+                    hideLoadingPanel();
+                    displayResults(data);
+                    analyzeBtn.disabled  = false
+                    goToStep(3);
+                }, 500);
             } catch (error) {
-                hideLoading('analyze-loading');
-                showError('analyze-error', error.message);
+                analyzeBtn.disabled  = false
+                hideLoadingPanel();
+                showModal('❌', 'Analysis Failed', error.message);
             }
         }
 

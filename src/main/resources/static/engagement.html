@@ -602,6 +602,17 @@
             display: none;
         }
 
+        /* Floating Navigation */
+        .floating-nav { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 1000; }
+        .nav-toggle { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 12px; color: #fff; font-size: 1.25rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+        .nav-toggle:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5); }
+        .nav-menu { position: absolute; top: 56px; left: 0; background: rgba(30, 30, 46, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.5rem; min-width: 200px; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all 0.3s; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        .nav-menu.show { opacity: 1; visibility: visible; transform: translateY(0); }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #e4e4e7; text-decoration: none; border-radius: 8px; transition: all 0.2s; font-size: 0.9rem; }
+        .nav-item:hover { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+        .nav-item.active { background: rgba(99, 102, 241, 0.3); color: #a5b4fc; }
+        .nav-divider { height: 1px; background: rgba(255, 255, 255, 0.1); margin: 0.5rem 0; }
+
         /* Custom Modal/Popup */
         .custom-modal {
             display: none;
@@ -709,15 +720,23 @@
         </div>
     </div>
 
-    <a href="/" class="back-button">← Back to Home</a>
+    <!-- Floating Navigation -->
+    <div class="floating-nav">
+        <button class="nav-toggle" onclick="toggleNavMenu()" title="Navigation">☰</button>
+        <div class="nav-menu" id="navMenu">
+            <a href="/" class="nav-item">🏠 Home</a>
+            <div class="nav-divider"></div>
+            <a href="/contribution.html" class="nav-item">📊 Contribution</a>
+            <a href="/engagement.html" class="nav-item active">👥 Engagement</a>
+            <a href="/matrix.html" class="nav-item">📈 Matrix</a>
+        </div>
+    </div>
 
     <div class="container">
         <h1>👥 Developer Engagement Dashboard</h1>
 
         <!-- Step 2: Select Contributors & Configure -->
         <div class="panel" id="step2-panel">
-            <h2>👥 Select Contributors & Configure Analysis</h2>
-
             <!-- Organization Info -->
             <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; font-size: 0.9rem;"></div>
 
@@ -1048,6 +1067,21 @@
         document.addEventListener('click', (e) => {
             if (e.target.id === 'customModal') {
                 closeModal();
+            }
+        });
+
+        // Navigation menu toggle
+        function toggleNavMenu() {
+            const menu = document.getElementById('navMenu');
+            menu.classList.toggle('show');
+        }
+
+        // Close nav menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const nav = document.querySelector('.floating-nav');
+            const menu = document.getElementById('navMenu');
+            if (nav && menu && !nav.contains(e.target)) {
+                menu.classList.remove('show');
             }
         });
 
