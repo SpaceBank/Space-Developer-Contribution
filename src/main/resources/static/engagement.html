@@ -1678,6 +1678,9 @@
                 const repos = data.analyzedRepositories || [];
                 const repoCount = repos.length;
 
+                // Store repos globally for toggleRepoDetails function
+                window.analysisRepos = repos;
+
                 document.getElementById('analysisInfo').innerHTML = `
                     <div style="margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
                         <strong>📁 Repositories:</strong>
