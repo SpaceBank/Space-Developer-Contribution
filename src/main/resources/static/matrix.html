@@ -1841,6 +1841,43 @@
                 const avatarUrl = getAvatarUrl(pr.nickname || pr.author);
                 const prUrl = buildPRUrl(pr, repositories);
 
+                // Build timeline info (first line) with icons and colors
+                const timeline = [];
+                if (pr.firstCommitTime) {
+                    timeline.push(`<span style="color: #a78bfa;">📝 First Commit:</span> ${formatDateTime(pr.firstCommitTime)}`);
+                }
+                timeline.push(`<span style="color: #60a5fa;">→ 🚀 PR Created:</span> ${formatDateTime(pr.createdAt)}`);
+                if (pr.firstReviewTime) {
+                    timeline.push(`<span style="color: #fbbf24;">→ 👀 First Review:</span> ${formatDateTime(pr.firstReviewTime)}`);
+                }
+                if (pr.firstApprovalTime) {
+                    timeline.push(`<span style="color: #34d399;">→ ✅ First Approval:</span> ${formatDateTime(pr.firstApprovalTime)}`);
+                }
+                if (pr.mergedAt) {
+                    timeline.push(`<span style="color: #22c55e;">→ 🔀 Merged:</span> ${formatDateTime(pr.mergedAt)}`);
+                }
+
+                // Build code changes (second line)
+                const codeChanges = [
+                    `<span style="color: #86efac;">Lines Added:</span> <span style="color: #22c55e; font-weight: 600;">+${pr.additions || 0}</span>`,
+                    `<span style="color: #fca5a5;">Lines Deleted:</span> <span style="color: #ef4444; font-weight: 600;">-${pr.deletions || 0}</span>`,
+                    `<span style="color: #9ca3af;">Total Changes:</span> <span style="font-weight: 600;">${pr.prSize || 0} lines</span>`
+                ];
+
+                // All 6 metrics always shown
+                const metricsHTML = [
+                    { label: 'Coding Time', val: pr.codingTimeHours, type: 'codingTime' },
+                    { label: 'Pickup Time', val: pr.pickupTimeHours, type: 'pickupTime' },
+                    { label: 'Approve Time', val: pr.approveTimeHours, type: 'approveTime' },
+                    { label: 'Merge Time', val: pr.mergeTimeHours, type: 'mergeTime' },
+                    { label: 'Review Time', val: pr.reviewTimeHours, type: 'reviewTime' },
+                    { label: 'Cycle Time', val: pr.cycleTimeHours, type: 'cycleTime' }
+                ].map(m => {
+                    const rating = getRatingClass(m.val, m.type);
+                    const displayVal = formatHoursShort(m.val);
+                    return `<span class="pr-metric-tag ${rating}">${m.label}: ${displayVal}</span>`;
+                }).join('');
+
                 return `
                     <div class="pr-item">
                         <div class="pr-number">#${pr.prNumber}</div>
@@ -1850,17 +1887,17 @@
                             </div>
                             <div class="pr-meta">
                                 <span class="pr-meta-item">
-                                    ${avatarUrl ? `<img src="${avatarUrl}" style="width: 16px; height: 16px; border-radius: 50%;">` : '👤'}
+                                    ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" style="width: 16px; height: 16px; border-radius: 50%;">` : '👤'}
                                     ${displayName}
                                 </span>
-                                <span class="pr-meta-item">📅 ${formatDate(pr.createdAt)}</span>
-                                ${pr.mergedAt ? `<span class="pr-meta-item">✅ Merged ${formatDate(pr.mergedAt)}</span>` : ''}
-                                <span class="pr-meta-item">📏 ${pr.prSize} lines</span>
                             </div>
+                            <div style="font-size: 0.8rem; color: #9ca3af; margin: 0.5rem 0; line-height: 1.5;">
+                                <div>${timeline.join(' &nbsp;&nbsp;')}</div>
+                                <div style="margin-top: 0.25rem;">${codeChanges.join(' &nbsp;&nbsp;')}</div>
+                            </div>
+                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.5rem 0;"></div>
                             <div class="pr-metrics">
-                                ${pr.cycleTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.cycleTimeHours, 'cycleTime')}">🔄 ${formatHours(pr.cycleTimeHours)}</span>` : ''}
-                                ${pr.codingTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.codingTimeHours, 'codingTime')}">⌨️ ${formatHours(pr.codingTimeHours)}</span>` : ''}
-                                ${pr.pickupTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.pickupTimeHours, 'pickupTime')}">👀 ${formatHours(pr.pickupTimeHours)}</span>` : ''}
+                                ${metricsHTML}
                             </div>
                         </div>
                     </div>
@@ -1936,6 +1973,44 @@
                 const repositories = currentMetricsData.analyzedRepositories;
                 body.innerHTML = prs.map(pr => {
                     const prUrl = buildPRUrl(pr, repositories);
+
+                    // Build timeline info with icons and colors
+                    const timeline = [];
+                    if (pr.firstCommitTime) {
+                        timeline.push(`<span style="color: #a78bfa;">📝 First Commit:</span> ${formatDateTime(pr.firstCommitTime)}`);
+                    }
+                    timeline.push(`<span style="color: #60a5fa;">→ 🚀 PR Created:</span> ${formatDateTime(pr.createdAt)}`);
+                    if (pr.firstReviewTime) {
+                        timeline.push(`<span style="color: #fbbf24;">→ 👀 First Review:</span> ${formatDateTime(pr.firstReviewTime)}`);
+                    }
+                    if (pr.firstApprovalTime) {
+                        timeline.push(`<span style="color: #34d399;">→ ✅ First Approval:</span> ${formatDateTime(pr.firstApprovalTime)}`);
+                    }
+                    if (pr.mergedAt) {
+                        timeline.push(`<span style="color: #22c55e;">→ 🔀 Merged:</span> ${formatDateTime(pr.mergedAt)}`);
+                    }
+
+                    // Build code changes
+                    const codeChanges = [
+                        `<span style="color: #86efac;">Lines Added:</span> <span style="color: #22c55e; font-weight: 600;">+${pr.additions || 0}</span>`,
+                        `<span style="color: #fca5a5;">Lines Deleted:</span> <span style="color: #ef4444; font-weight: 600;">-${pr.deletions || 0}</span>`,
+                        `<span style="color: #9ca3af;">Total Changes:</span> <span style="font-weight: 600;">${pr.prSize || 0} lines</span>`
+                    ];
+
+                    // All 6 metrics
+                    const metricsHTML = [
+                        { label: 'Coding Time', val: pr.codingTimeHours, type: 'codingTime' },
+                        { label: 'Pickup Time', val: pr.pickupTimeHours, type: 'pickupTime' },
+                        { label: 'Approve Time', val: pr.approveTimeHours, type: 'approveTime' },
+                        { label: 'Merge Time', val: pr.mergeTimeHours, type: 'mergeTime' },
+                        { label: 'Review Time', val: pr.reviewTimeHours, type: 'reviewTime' },
+                        { label: 'Cycle Time', val: pr.cycleTimeHours, type: 'cycleTime' }
+                    ].map(m => {
+                        const rating = getRatingClass(m.val, m.type);
+                        const displayVal = formatHoursShort(m.val);
+                        return `<span class="pr-metric-tag ${rating}">${m.label}: ${displayVal}</span>`;
+                    }).join('');
+
                     return `
                         <div class="pr-item">
                             <div class="pr-number">#${pr.prNumber}</div>
@@ -1943,16 +2018,13 @@
                                 <div class="pr-title">
                                     <a href="${prUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(pr.prTitle)}</a>
                                 </div>
-                                <div class="pr-meta">
-                                    <span class="pr-meta-item">📅 Created: ${formatDate(pr.createdAt)}</span>
-                                    ${pr.mergedAt ? `<span class="pr-meta-item">✅ Merged: ${formatDate(pr.mergedAt)}</span>` : '<span class="pr-meta-item">⏳ Not merged</span>'}
-                                    <span class="pr-meta-item">📏 ${pr.prSize} lines changed</span>
+                                <div style="font-size: 0.8rem; color: #9ca3af; margin: 0.5rem 0; line-height: 1.5;">
+                                    <div>${timeline.join(' &nbsp;&nbsp;')}</div>
+                                    <div style="margin-top: 0.25rem;">${codeChanges.join(' &nbsp;&nbsp;')}</div>
                                 </div>
+                                <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.5rem 0;"></div>
                                 <div class="pr-metrics">
-                                    ${pr.codingTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.codingTimeHours, 'codingTime')}">⌨️ Coding: ${formatHours(pr.codingTimeHours)}</span>` : ''}
-                                    ${pr.pickupTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.pickupTimeHours, 'pickupTime')}">👀 Pickup: ${formatHours(pr.pickupTimeHours)}</span>` : ''}
-                                    ${pr.reviewTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.reviewTimeHours, 'reviewTime')}">📝 Review: ${formatHours(pr.reviewTimeHours)}</span>` : ''}
-                                    ${pr.cycleTimeHours != null ? `<span class="pr-metric-tag ${getRatingClass(pr.cycleTimeHours, 'cycleTime')}">🔄 Cycle: ${formatHours(pr.cycleTimeHours)}</span>` : ''}
+                                    ${metricsHTML}
                                 </div>
                             </div>
                         </div>
@@ -1989,11 +2061,36 @@
             return `${days}d ${remainingHours}h`;
         }
 
-        // Format date
+        // Format hours short - always returns a value (for consistent display)
+        function formatHoursShort(hours) {
+            if (hours == null || hours === undefined) return '—';
+            if (hours === 0) return '0m';
+            if (hours < 1) return `${Math.round(hours * 60)}m`;
+            if (hours < 24) return `${hours.toFixed(1)}h`;
+            const days = Math.floor(hours / 24);
+            const remainingHours = Math.round(hours % 24);
+            if (remainingHours === 0) return `${days}d`;
+            return `${days}d ${remainingHours}h`;
+        }
+
+        // Format date (short)
         function formatDate(dateStr) {
             if (!dateStr) return 'N/A';
             const date = new Date(dateStr);
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // Format date and time (full)
+        function formatDateTime(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
 
         // Get rating class based on metric thresholds
@@ -2001,8 +2098,10 @@
             const thresholds = {
                 codingTime: { elite: 0.9, good: 4, fair: 23 },
                 pickupTime: { elite: 1, good: 4, fair: 16 },
-                reviewTime: { elite: 4, good: 8, fair: 24 },
-                cycleTime: { elite: 24, good: 72, fair: 168 }
+                approveTime: { elite: 10, good: 22, fair: 42 },
+                mergeTime: { elite: 1, good: 3, fair: 16 },
+                reviewTime: { elite: 3, good: 14, fair: 24 },
+                cycleTime: { elite: 25, good: 72, fair: 161 }
             };
 
             const t = thresholds[metricType];

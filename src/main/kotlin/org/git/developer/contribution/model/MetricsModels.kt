@@ -31,15 +31,21 @@ data class PRMetrics(
     val prNumber: Int,
     val prTitle: String,
     val author: String,
+    val repositoryFullName: String,    // Repository full name (owner/repo)
     val codingTimeHours: Double?,      // First commit to PR opened
     val pickupTimeHours: Double?,      // PR opened to first review
     val approveTimeHours: Double?,     // First comment to first approval
     val mergeTimeHours: Double?,       // First approval to merge
     val reviewTimeHours: Double?,      // PR opened to merge
     val cycleTimeHours: Double?,       // First commit to merge
-    val prSize: Int,                   // Lines changed
+    val prSize: Int,                   // Lines changed (additions + deletions)
+    val additions: Int,                // Lines added
+    val deletions: Int,                // Lines deleted
     val createdAt: String,
-    val mergedAt: String?
+    val mergedAt: String?,
+    val firstCommitTime: String?,      // First commit timestamp
+    val firstReviewTime: String?,      // First review timestamp
+    val firstApprovalTime: String?     // First approval timestamp
 )
 
 /**

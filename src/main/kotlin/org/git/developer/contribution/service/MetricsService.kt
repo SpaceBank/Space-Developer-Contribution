@@ -500,6 +500,7 @@ class MetricsService(
                     prNumber = pr.prNumber,
                     prTitle = pr.title,
                     author = pr.authorLogin,
+                    repositoryFullName = pr.repositoryFullName,
                     codingTimeHours = calculateCodingTime(pr),
                     pickupTimeHours = calculatePickupTime(pr),
                     approveTimeHours = calculateApproveTime(pr),
@@ -507,8 +508,13 @@ class MetricsService(
                     reviewTimeHours = calculateReviewTime(pr),
                     cycleTimeHours = calculateCycleTime(pr),
                     prSize = pr.prSize,
+                    additions = pr.additions,
+                    deletions = pr.deletions,
                     createdAt = pr.createdAt,
-                    mergedAt = pr.mergedAt
+                    mergedAt = pr.mergedAt,
+                    firstCommitTime = pr.firstCommitTime,
+                    firstReviewTime = pr.firstReviewTime,
+                    firstApprovalTime = pr.firstApprovalTime
                 )
             }
 
