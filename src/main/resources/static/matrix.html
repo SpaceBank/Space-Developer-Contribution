@@ -263,6 +263,57 @@
             font-size: 0.9rem;
         }
 
+        /* Branch list styles */
+        .branch-list {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .branch-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .branch-item:last-child {
+            border-bottom: none;
+        }
+
+        .branch-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .branch-item.selected {
+            background: rgba(34, 197, 94, 0.15);
+        }
+
+        .branch-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #22c55e;
+        }
+
+        .branch-name {
+            font-size: 0.875rem;
+            color: #e4e4e7;
+            font-family: 'Courier New', monospace;
+        }
+
+        .branch-filter-options label {
+            font-size: 0.9rem;
+        }
+
+        .branch-filter-options input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #6366f1;
+        }
+
         /* Metrics Matrix */
         .metrics-grid {
             display: grid;
@@ -1034,6 +1085,37 @@
 
             <div class="repo-list" id="repoList"></div>
 
+            <!-- Branch Selector -->
+            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: #e4e4e7;">🌿 Filter by Branches</h3>
+
+                <div class="branch-filter-options" style="margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="branchFilter" value="all" checked onchange="handleBranchFilterChange()">
+                        <span style="color: #e4e4e7;">All Branches</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 0.5rem;">
+                        <input type="radio" name="branchFilter" value="specific" onchange="handleBranchFilterChange()">
+                        <span style="color: #e4e4e7;">Specific Branches</span>
+                    </label>
+                </div>
+
+                <div id="branchInputContainer" class="hidden" style="margin-top: 1rem;">
+                    <label for="branchInput" style="display: block; font-size: 0.875rem; color: #a1a1aa; margin-bottom: 0.5rem;">
+                        Enter branch names (comma-separated):
+                    </label>
+                    <input
+                        type="text"
+                        id="branchInput"
+                        placeholder="e.g., main, develop, feature/new-api, hotfix/bug-123"
+                        style="width: 100%; padding: 0.75rem 1rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #e4e4e7; font-size: 0.9rem; font-family: 'Courier New', monospace;"
+                    >
+                    <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.5rem;">
+                        💡 Tip: Separate multiple branches with commas. Example: main, develop, staging
+                    </p>
+                </div>
+            </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="startDate">Start Date</label>
@@ -1297,6 +1379,7 @@
         let selectedProvider = 'GITHUB';
         let repositories = [];
         let selectedRepos = new Set();
+        let branchFilterMode = 'all'; // 'all' or 'specific'
         let trendChart = null;
 
         // Display name lookup map (populated from session)
@@ -1510,6 +1593,35 @@
             document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
         }
 
+        // ==================== BRANCH FUNCTIONS ====================
+
+        function handleBranchFilterChange() {
+            const selectedMode = document.querySelector('input[name="branchFilter"]:checked').value;
+            branchFilterMode = selectedMode;
+            const branchInputContainer = document.getElementById('branchInputContainer');
+
+            if (selectedMode === 'specific') {
+                branchInputContainer.classList.remove('hidden');
+            } else {
+                branchInputContainer.classList.add('hidden');
+            }
+        }
+
+        function getBranchesFromInput() {
+            const input = document.getElementById('branchInput');
+            if (!input || !input.value.trim()) {
+                return [];
+            }
+
+            // Split by comma, trim whitespace, and filter empty strings
+            return input.value
+                .split(',')
+                .map(b => b.trim())
+                .filter(b => b.length > 0);
+        }
+
+        // ==================== END BRANCH FUNCTIONS ====================
+
         // Show loading panel
         function showLoadingPanel(repos) {
             const panel = document.getElementById('loadingPanel');
@@ -1578,6 +1690,14 @@
             try {
                 updateLoadingProgress(20, 'Fetching PR data...');
 
+                // Prepare branch filter from text input
+                const branchFilter = branchFilterMode === 'specific'
+                    ? getBranchesFromInput()
+                    : null;
+
+                // Only send branches if there are any
+                const branchesToSend = (branchFilter && branchFilter.length > 0) ? branchFilter : null;
+
                 const response = await fetch('/api/metrics/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1587,7 +1707,8 @@
                         baseUrl: sessionData?.baseUrl || null,
                         repositoryFullNames: repoList,
                         startDate: startDate,
-                        endDate: endDate
+                        endDate: endDate,
+                        branches: branchesToSend
                     })
                 });
 

@@ -91,7 +91,8 @@ data class MetricsAnalyzeRequest(
     val baseUrl: String? = null,
     val repositoryFullNames: List<String>,
     val startDate: String? = null,
-    val endDate: String? = null
+    val endDate: String? = null,
+    val branches: List<String>? = null  // Optional branch filter
 )
 
 /**

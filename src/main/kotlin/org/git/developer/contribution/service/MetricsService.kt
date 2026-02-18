@@ -83,11 +83,19 @@ class MetricsService(
         logger.info("Fetched ${allPRData.size} PRs with detailed data")
 
         // Filter PRs by date range
-        val filteredPRs = allPRData.filter { pr ->
+        var filteredPRs = allPRData.filter { pr ->
             pr.mergedAt != null && pr.mergedAt >= startDate.toString() && pr.mergedAt <= endDate.toString()
         }
 
         logger.info("Filtered to ${filteredPRs.size} merged PRs in date range")
+
+        // Filter by branches if specified
+        if (!request.branches.isNullOrEmpty()) {
+            filteredPRs = filteredPRs.filter { pr ->
+                pr.baseBranch != null && request.branches.contains(pr.baseBranch)
+            }
+            logger.info("Filtered to ${filteredPRs.size} PRs in branches: ${request.branches.joinToString(", ")}")
+        }
 
         // Calculate number of weeks in range
         val weeksInRange = ChronoUnit.WEEKS.between(startDate, endDate).coerceAtLeast(1)
@@ -184,6 +192,7 @@ class MetricsService(
                         number
                         title
                         author { login }
+                        baseRefName
                         createdAt
                         mergedAt
                         additions
@@ -266,6 +275,7 @@ class MetricsService(
 
                         val additions = (pr["additions"] as? Number)?.toInt() ?: 0
                         val deletions = (pr["deletions"] as? Number)?.toInt() ?: 0
+                        val baseBranch = pr["baseRefName"] as? String
 
                         prList.add(PRDetailedInfo(
                             prNumber = (pr["number"] as Number).toInt(),
@@ -279,7 +289,8 @@ class MetricsService(
                             firstApprovalTime = firstApprovalTime,
                             additions = additions,
                             deletions = deletions,
-                            prSize = additions + deletions
+                            prSize = additions + deletions,
+                            baseBranch = baseBranch
                         ))
                     }
                 }
@@ -701,6 +712,7 @@ data class PRDetailedInfo(
     val firstApprovalTime: String?,
     val additions: Int,
     val deletions: Int,
-    val prSize: Int
+    val prSize: Int,
+    val baseBranch: String? = null  // Base branch (e.g., "main", "develop")
 )
 
