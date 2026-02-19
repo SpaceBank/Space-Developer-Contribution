@@ -58,7 +58,10 @@ class MetricsService(
      * Analyze repositories and calculate metrics
      */
     fun analyzeMetrics(request: MetricsAnalyzeRequest): MetricsAnalysisResponse {
-        logger.info("Analyzing metrics for ${request.repositoryFullNames.size} repositories")
+        logger.info("🔬 Analyzing metrics for ${request.repositoryFullNames.size} repositories")
+        logger.info("   Repos: ${request.repositoryFullNames.joinToString(", ")}")
+        logger.info("   Date range: ${request.startDate} to ${request.endDate}")
+        logger.info("   Branches: ${request.branches?.joinToString(", ") ?: "all"}")
 
         val startDate = request.startDate?.let { LocalDate.parse(it) }
             ?: LocalDate.now().minusMonths(3)
@@ -69,7 +72,7 @@ class MetricsService(
         val allPRData = mutableListOf<PRDetailedInfo>()
 
         for (repoFullName in request.repositoryFullNames) {
-            logger.info("Fetching PR data for $repoFullName")
+            logger.info("📡 Fetching PR data for $repoFullName")
             val prData = fetchPRDetailedData(
                 token = request.token,
                 provider = request.provider,
@@ -80,14 +83,25 @@ class MetricsService(
             allPRData.addAll(prData)
         }
 
-        logger.info("Fetched ${allPRData.size} PRs with detailed data")
+        logger.info("📊 Fetched ${allPRData.size} total PRs with detailed data")
 
-        // Filter PRs by date range
+        // Filter PRs by date range using proper date parsing
+        val startDateStr = startDate.toString()    // "2025-11-19"
+        val endDateStr = endDate.plusDays(1).toString()  // exclusive end: "2026-02-20" to include all of end date
+
         var filteredPRs = allPRData.filter { pr ->
-            pr.mergedAt != null && pr.mergedAt >= startDate.toString() && pr.mergedAt <= endDate.toString()
+            if (pr.mergedAt == null) return@filter false
+            // mergedAt is ISO datetime like "2025-12-01T15:30:00Z"
+            // Extract just the date part for comparison
+            val mergedDate = pr.mergedAt.substring(0, 10) // "2025-12-01"
+            mergedDate >= startDateStr && mergedDate < endDateStr
         }
 
-        logger.info("Filtered to ${filteredPRs.size} merged PRs in date range")
+        logger.info("📊 Filtered to ${filteredPRs.size} merged PRs in date range $startDate to $endDate (from ${allPRData.size} total)")
+        if (filteredPRs.size < allPRData.size) {
+            val excluded = allPRData.size - filteredPRs.size
+            logger.info("   └─ Excluded $excluded PRs outside date range")
+        }
 
         // Filter by branches if specified
         if (!request.branches.isNullOrEmpty()) {
@@ -177,13 +191,17 @@ class MetricsService(
         val prList = mutableListOf<PRDetailedInfo>()
         var hasNextPage = true
         var cursor: String? = null
+        var pageCount = 0
+
+        logger.info("📡 Starting GraphQL PR fetch for $repositoryFullName (since=$since)")
 
         while (hasNextPage) {
+            pageCount++
             val afterClause = if (cursor != null) ", after: \"$cursor\"" else ""
             val query = """
                 query {
                   repository(owner: "$owner", name: "$repo") {
-                    pullRequests(states: [MERGED], first: 50, orderBy: {field: UPDATED_AT, direction: DESC}$afterClause) {
+                    pullRequests(states: [MERGED], first: 100, orderBy: {field: CREATED_AT, direction: DESC}$afterClause) {
                       pageInfo {
                         hasNextPage
                         endCursor
@@ -224,6 +242,14 @@ class MetricsService(
                     .bodyToMono<Map<String, Any?>>()
                     .block()
 
+                // Check for GraphQL errors
+                val errors = response?.get("errors") as? List<*>
+                if (errors != null && errors.isNotEmpty()) {
+                    val firstError = (errors[0] as? Map<*, *>)?.get("message") ?: "Unknown GraphQL error"
+                    logger.error("❌ GraphQL error for $repositoryFullName: $firstError")
+                    throw RuntimeException("GraphQL error: $firstError")
+                }
+
                 val data = response?.get("data") as? Map<*, *>
                 val repository = data?.get("repository") as? Map<*, *>
                 val pullRequests = repository?.get("pullRequests") as? Map<*, *>
@@ -233,15 +259,25 @@ class MetricsService(
                 hasNextPage = pageInfo?.get("hasNextPage") as? Boolean ?: false
                 cursor = pageInfo?.get("endCursor") as? String
 
+                var pageInRangeCount = 0
+
                 if (nodes != null) {
+                    logger.debug("   Page $pageCount: ${nodes.size} PRs returned from API")
+
                     for (node in nodes) {
                         val pr = node as? Map<*, *> ?: continue
                         val mergedAt = pr["mergedAt"] as? String ?: continue
+                        val createdAt = pr["createdAt"] as? String ?: ""
 
-                        // Filter by since date
-                        if (since != null && mergedAt < since) {
+                        // Since we order by CREATED_AT DESC, if createdAt is before our
+                        // since date, all subsequent PRs will also be before it.
+                        // We can safely stop pagination.
+                        if (since != null && createdAt < since) {
+                            logger.info("   ⏹ PR #${(pr["number"] as? Number)?.toInt()} created at $createdAt is before $since — stopping pagination")
                             hasNextPage = false
-                            break
+                            // Don't break yet — this PR might still have been merged in range
+                            // (created before range but merged within range). We still add it
+                            // if mergedAt is in range. But we stop fetching more pages.
                         }
 
                         val author = pr["author"] as? Map<*, *>
@@ -282,7 +318,7 @@ class MetricsService(
                             title = pr["title"] as? String ?: "",
                             authorLogin = authorLogin,
                             repositoryFullName = repositoryFullName,
-                            createdAt = pr["createdAt"] as? String ?: "",
+                            createdAt = createdAt,
                             mergedAt = mergedAt,
                             firstCommitTime = firstCommitTime,
                             firstReviewTime = firstReviewTime,
@@ -292,20 +328,28 @@ class MetricsService(
                             prSize = additions + deletions,
                             baseBranch = baseBranch
                         ))
+                        pageInRangeCount++
                     }
                 }
 
-                // Limit to avoid too many requests
-                if (prList.size >= 200) {
+                logger.info("   📄 Page $pageCount: added $pageInRangeCount PRs (total so far: ${prList.size})")
+
+                // Safety: stop after 500 PRs or 10 pages to avoid infinite loops
+                if (prList.size >= 500) {
+                    logger.info("   ⚠️ Reached 500 PR limit, stopping pagination")
+                    hasNextPage = false
+                }
+                if (pageCount >= 10) {
+                    logger.info("   ⚠️ Reached 10 page limit, stopping pagination")
                     hasNextPage = false
                 }
             } catch (e: Exception) {
-                logger.error("GraphQL error for $repositoryFullName: ${e.message}")
+                logger.error("❌ GraphQL error for $repositoryFullName on page $pageCount: ${e.message}")
                 throw e
             }
         }
 
-        logger.info("Fetched ${prList.size} PRs via GraphQL for $repositoryFullName")
+        logger.info("✅ Fetched ${prList.size} merged PRs via GraphQL for $repositoryFullName ($pageCount pages)")
         return prList
     }
 
@@ -335,11 +379,13 @@ class MetricsService(
         var page = 1
         var hasMore = true
 
-        // Limit to 3 pages for performance
-        while (hasMore && page <= 3) {
+        logger.info("📡 Starting REST PR fetch for $repositoryFullName (since=$since)")
+
+        // Fetch up to 10 pages (500 PRs)
+        while (hasMore && page <= 10) {
             try {
                 val response = webClient.get()
-                    .uri("/repos/$repositoryFullName/pulls?state=closed&per_page=50&page=$page&sort=updated&direction=desc")
+                    .uri("/repos/$repositoryFullName/pulls?state=closed&per_page=100&page=$page&sort=created&direction=desc")
                     .retrieve()
                     .bodyToMono<List<Map<String, Any?>>>()
                     .block()
@@ -347,18 +393,21 @@ class MetricsService(
                 if (response.isNullOrEmpty()) {
                     hasMore = false
                 } else {
+                    var stoppedEarly = false
                     for (pr in response) {
                         val mergedAt = pr["merged_at"] as? String ?: continue
+                        val createdAt = pr["created_at"] as? String ?: continue
 
-                        // Filter by since date
-                        if (since != null && mergedAt < since) continue
+                        // Since sorted by created DESC, if created is before since date, stop
+                        if (since != null && createdAt < since) {
+                            stoppedEarly = true
+                            // Still add this PR if it was merged in range
+                        }
 
                         val prNumber = (pr["number"] as Number).toInt()
                         val user = pr["user"] as? Map<*, *>
                         val authorLogin = user?.get("login") as? String ?: "unknown"
-                        val createdAt = pr["created_at"] as? String ?: continue
 
-                        // Basic info without additional API calls for speed
                         prList.add(PRDetailedInfo(
                             prNumber = prNumber,
                             title = pr["title"] as? String ?: "",
@@ -374,15 +423,23 @@ class MetricsService(
                             prSize = 0
                         ))
                     }
-                    page++
-                    if (response.size < 50) hasMore = false
+
+                    logger.info("   📄 REST page $page: ${response.size} PRs, total so far: ${prList.size}")
+
+                    if (stoppedEarly) {
+                        hasMore = false
+                    } else {
+                        page++
+                        if (response.size < 100) hasMore = false
+                    }
                 }
             } catch (e: Exception) {
-                logger.error("Error fetching GitHub PRs for $repositoryFullName: ${e.message}")
+                logger.error("❌ Error fetching GitHub PRs via REST for $repositoryFullName page $page: ${e.message}")
                 hasMore = false
             }
         }
 
+        logger.info("✅ Fetched ${prList.size} PRs via REST for $repositoryFullName ($page pages)")
         return prList
     }
 
