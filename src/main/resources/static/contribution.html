@@ -263,6 +263,18 @@
                 grid-column: span 1;
             }
         }
+
+        /* Results container - hidden by default, shown after analysis */
+        .results-container { display: none; margin-top: 2rem; }
+        .results-container.visible { display: block; animation: fadeIn 0.4s ease-out; }
+
+        /* Loading spinner between config and results */
+        .analysis-loading { display: none; text-align: center; padding: 3rem 1rem; }
+        .analysis-loading.visible { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .error-box { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 12px; padding: 1rem; margin-top: 1rem; color: #f87171; }
+        .error-box.hidden { display: none; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -294,23 +306,10 @@
             <p class="subtitle">Analyze commits, code changes, and contribution patterns across repositories</p>
         </div>
 
-        <!-- Step Indicator -->
-        <div class="step-indicator">
-            <div class="step active" id="step2-indicator">
-                <span class="step-number">1</span>
-                <span>Select Repos</span>
-            </div>
-            <div class="step-connector" id="step-connector"></div>
-            <div class="step" id="step3-indicator">
-                <span class="step-number">2</span>
-                <span>View Report</span>
-            </div>
-        </div>
-
-        <!-- Step 2: Repository Selection -->
-        <div class="panel" id="step2-panel">
+        <!-- Repository Selection -->
+        <div class="config-panel" id="step2-panel">
             <!-- Organization Info -->
-            <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; font-size: 0.9rem;"></div>
+            <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 12px; font-size: 0.9rem;"></div>
 
             <h2>📁 Select Repositories</h2>
 
@@ -329,10 +328,10 @@
             <div class="repo-list" id="repoList"></div>
 
             <!-- Branch Selector -->
-            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: #e4e4e7;">🌿 Filter by Branches</h3>
+            <div class="config-section">
+                <div class="config-section-title">🌿 Filter by Branches</div>
 
-                <div class="branch-filter-options" style="margin-bottom: 1rem;">
+                <div style="margin-bottom: 1rem;">
                     <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                         <input type="radio" name="branchFilter" value="all" checked onchange="handleBranchFilterChange()">
                         <span style="color: #e4e4e7;">All Branches</span>
@@ -343,53 +342,45 @@
                     </label>
                 </div>
 
-                <div id="branchInputContainer" class="hidden" style="margin-top: 1rem;">
-                    <label for="branchInput" style="display: block; font-size: 0.875rem; color: #a1a1aa; margin-bottom: 0.5rem;">
-                        Enter branch names (comma-separated):
-                    </label>
-                    <input
-                        type="text"
-                        id="branchInput"
-                        placeholder="e.g., main, develop, feature/new-api, hotfix/bug-123"
-                        style="width: 100%; padding: 0.75rem 1rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #e4e4e7; font-size: 0.9rem; font-family: 'Courier New', monospace;"
-                    >
-                    <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.5rem;">
-                        💡 Tip: Separate multiple branches with commas. Example: main, develop, staging
-                    </p>
+                <div id="branchInputContainer" class="hidden">
+                    <div class="config-field">
+                        <label for="branchInput">Enter branch names (comma-separated)</label>
+                        <input type="text" id="branchInput" placeholder="e.g., main, develop, feature/new-api" style="font-family: 'Courier New', monospace;">
+                        <div class="field-hint">💡 Separate multiple branches with commas</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-row" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label for="startDate">Start Date</label>
-                    <input type="date" id="startDate">
-                </div>
-                <div class="form-group">
-                    <label for="endDate">End Date</label>
-                    <input type="date" id="endDate">
-                </div>
-                <div class="form-group">
-                    <label for="period">Aggregation Period</label>
-                    <select id="period">
-                        <option value="DAILY">Daily</option>
-                        <option value="WEEKLY" selected>Weekly</option>
-                        <option value="MONTHLY">Monthly</option>
-                    </select>
+            <!-- Date Range & Period -->
+            <div class="config-section">
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label for="startDate">Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="config-field">
+                        <label for="endDate">End Date</label>
+                        <input type="date" id="endDate">
+                    </div>
+                    <div class="config-field">
+                        <label for="period">Aggregation Period</label>
+                        <select id="period">
+                            <option value="DAILY">Daily</option>
+                            <option value="WEEKLY" selected>Weekly</option>
+                            <option value="MONTHLY">Monthly</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div style="margin-top: 1rem; display: flex; align-items: center;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0;">
-                    <input type="checkbox" id="excludeMerges" checked style="width: auto;">
-                    <span>Exclude merge commits</span>
-                </label>
-                <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #a1a1aa;" title="Like GitHub's default behavior">ℹ️</span>
+            <div class="config-checkbox">
+                <input type="checkbox" id="excludeMerges" checked>
+                <label for="excludeMerges">🔀 Exclude merge commits (recommended)</label>
             </div>
 
-            <div class="button-group">
-                <button onclick="analyzeRepositories()" id="analyzeBtn" disabled>
-                    <span>Analyze Selected Repositories</span>
-                    <span>→</span>
+            <div class="config-actions">
+                <button class="btn-action btn-analyze" onclick="analyzeRepositories()" id="analyzeBtn" disabled>
+                    📊 Analyze Selected Repositories
                 </button>
             </div>
 
@@ -411,19 +402,20 @@
                     <span>Current:</span>
                     <span class="current-action" id="loading-current-action">Initializing...</span>
                 </div>
-                <div class="repo-status-list" id="repo-status-list">
-                    <!-- Repo status items will be inserted here -->
-                </div>
+                <div class="repo-status-list" id="repo-status-list"></div>
             </div>
         </div>
 
-        <!-- Step 3: Results -->
-        <div class="panel hidden" id="step3-panel">
-            <h2>📊 Contribution Report</h2>
+        <!-- Loading -->
+        <div class="analysis-loading" id="analysisLoading">
+            <div class="spinner"></div>
+            <span style="color:var(--color-accent-light);font-weight:500" id="loadingText">Analyzing repositories…</span>
+        </div>
+        <div id="errorMsg" class="error-box hidden"></div>
 
-            <div class="button-group" style="margin-bottom: var(--space-xl);">
-                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
-            </div>
+        <!-- Results (appears below config panel on same page) -->
+        <div class="results-container" id="resultsContainer">
+            <h2 style="color:#fff;margin-bottom:1rem;">📊 Contribution Report</h2>
 
             <!-- Analyzed Repositories Section -->
             <div class="analyzed-repos-section" id="analyzedReposSection">
@@ -669,22 +661,24 @@
             }
         });
 
-        // Step navigation
+        // Show/hide results (config panel always stays visible)
+        function showResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.add('visible');
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function hideResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.remove('visible');
+        }
+
+        // Legacy goToStep calls mapped to new pattern
         function goToStep(step) {
-            currentStep = step;
-
-            document.getElementById('step2-panel').classList.toggle('hidden', step !== 1 && step !== 2);
-            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
-
-            // Update step indicators (only 2 steps: Select Repos and View Report)
-            document.getElementById('step2-indicator').classList.toggle('active', step === 1 || step === 2);
-            document.getElementById('step2-indicator').classList.toggle('completed', step > 2);
-            document.getElementById('step3-indicator').classList.toggle('active', step === 3);
-
-            // Update connector
-            const connector = document.getElementById('step-connector');
-            if (connector) {
-                connector.classList.toggle('completed', step === 3);
+            if (step === 3) {
+                showResults();
+            } else {
+                hideResults();
             }
         }
 

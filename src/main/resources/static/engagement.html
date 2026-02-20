@@ -63,6 +63,18 @@
         .loading-progress-fill { height: 100%; background: linear-gradient(90deg, var(--color-primary), var(--color-accent)); border-radius: 4px; transition: width 0.3s; }
         .loading-status { font-size: 0.875rem; color: var(--color-text-secondary); }
         .pulse-dot { width: 10px; height: 10px; background: var(--color-success); border-radius: 50%; animation: pulse 1.5s infinite; }
+
+        /* Results container - hidden by default, shown after analysis */
+        .results-container { display: none; margin-top: 2rem; }
+        .results-container.visible { display: block; animation: fadeIn 0.4s ease-out; }
+
+        /* Loading spinner between config and results */
+        .analysis-loading { display: none; text-align: center; padding: 3rem 1rem; }
+        .analysis-loading.visible { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .error-box { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 12px; padding: 1rem; margin-top: 1rem; color: #f87171; }
+        .error-box.hidden { display: none; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -94,12 +106,12 @@
             <p class="subtitle">Monitor activity including commits, PR reviews, and code changes over time</p>
         </div>
 
-        <!-- Step 2: Select Contributors & Configure -->
-        <div class="panel" id="step2-panel">
+        <!-- Select Contributors & Configure -->
+        <div class="config-panel" id="step2-panel">
             <!-- Organization Info -->
             <div id="orgInfo" class="org-info-bar"></div>
 
-            <h3 style="margin-bottom: var(--space-sm);">👤 Select Contributors</h3>
+            <h2>👤 Select Contributors</h2>
             <div class="search-box">
                 <input type="text" id="contributorSearch" placeholder="Search contributors..." oninput="filterContributors()">
             </div>
@@ -112,8 +124,8 @@
             <div class="contributors-container" id="contributorsList"></div>
 
             <!-- Repository Filter -->
-            <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border-radius: 8px;">
-                <h3 style="margin-bottom: 0.75rem;">📁 Select Repositories (1-10 required)</h3>
+            <div class="config-section">
+                <div class="config-section-title">📁 Select Repositories (1-10 required)</div>
                 <p style="font-size: 0.8rem; color: #71717a; margin-bottom: 0.75rem;">
                     Select between 1 and 10 repositories to analyze.
                 </p>
@@ -132,39 +144,39 @@
                 </div>
             </div>
 
-            <!-- Exclude Merge Commits Option -->
-            <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem;">
-                <input type="checkbox" id="excludeMergeCommits" checked
-                       style="width: 18px; height: 18px; accent-color: #6366f1;">
-                <label for="excludeMergeCommits" style="cursor: pointer;">
-                    🔀 Exclude merge commits (recommended)
-                </label>
+            <!-- Exclude Merge Commits -->
+            <div class="config-checkbox">
+                <input type="checkbox" id="excludeMergeCommits" checked>
+                <label for="excludeMergeCommits">🔀 Exclude merge commits (recommended)</label>
             </div>
 
             <!-- Date Range & Period -->
-            <div class="form-row" style="margin-top: 1.5rem;">
-                <div class="form-group">
-                    <label for="startDate">Start Date</label>
-                    <input type="date" id="startDate">
-                </div>
-                <div class="form-group">
-                    <label for="endDate">End Date</label>
-                    <input type="date" id="endDate">
-                </div>
-                <div class="form-group">
-                    <label for="period">Aggregation Period</label>
-                    <select id="period">
-                        <option value="DAILY">Daily</option>
-                        <option value="WEEKLY" selected>Weekly</option>
-                        <option value="MONTHLY">Monthly</option>
-                    </select>
+            <div class="config-section">
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label for="startDate">Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="config-field">
+                        <label for="endDate">End Date</label>
+                        <input type="date" id="endDate">
+                    </div>
+                    <div class="config-field">
+                        <label for="period">Aggregation Period</label>
+                        <select id="period">
+                            <option value="DAILY">Daily</option>
+                            <option value="WEEKLY" selected>Weekly</option>
+                            <option value="MONTHLY">Monthly</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <button onclick="analyzeEngagement()" id="analyzeBtn" disabled style="margin-top: 1rem;">
-                <span>Analyze Engagement</span>
-                <span>→</span>
-            </button>
+            <div class="config-actions">
+                <button class="btn-action btn-analyze" onclick="analyzeEngagement()" id="analyzeBtn" disabled>
+                    📊 Analyze Engagement
+                </button>
+            </div>
 
             <div id="analyze-error" class="error hidden"></div>
             <div id="analyze-loading" class="loading hidden">
@@ -173,13 +185,16 @@
             </div>
         </div>
 
-        <!-- Step 3: Results -->
-        <div class="panel hidden" id="step3-panel">
-            <h2>📊 Engagement Analysis Results</h2>
+        <!-- Loading -->
+        <div class="analysis-loading" id="analysisLoading">
+            <div class="spinner"></div>
+            <span style="color:var(--color-accent-light);font-weight:500" id="loadingText">Analyzing engagement…</span>
+        </div>
+        <div id="errorMsg" class="error-box hidden"></div>
 
-            <div class="button-group" style="margin-bottom: var(--space-xl);">
-                <button class="secondary" onclick="goToStep(2)">← Back to Selection</button>
-            </div>
+        <!-- Results (appears below config panel on same page) -->
+        <div class="results-container" id="resultsContainer">
+            <h2 style="color:#fff;margin-bottom:1rem;">📊 Engagement Analysis Results</h2>
 
             <!-- Loading Status Panel -->
             <div id="loadingStatusPanel" class="hidden" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px; display: flex; gap: 1.5rem; align-items: center;">
@@ -504,13 +519,25 @@
             document.getElementById('custom-url-group').classList.toggle('hidden', provider !== 'GITLAB');
         }
 
-        // Step navigation (step 2 and 3 only now - no login step)
+        // Show/hide results (config panel always stays visible)
+        function showResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.add('visible');
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function hideResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.remove('visible');
+        }
+
+        // Legacy goToStep calls mapped to new pattern
         function goToStep(step) {
-            // Map step 1 to step 2 since there's no login panel
-            if (step === 1) step = 2;
-            currentStep = step;
-            document.getElementById('step2-panel').classList.toggle('hidden', step !== 2);
-            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
+            if (step === 3) {
+                showResults();
+            } else {
+                hideResults();
+            }
         }
 
         // Repository list rendering

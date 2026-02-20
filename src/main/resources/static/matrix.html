@@ -197,6 +197,18 @@
         .pr-popup-stat-value { font-size: 1.5rem; font-weight: 700; color: #fff; }
         .pr-popup-stat-label { font-size: 0.75rem; color: var(--color-text-muted); }
         .pr-popup-body { padding: 1rem var(--space-xl); max-height: 55vh; overflow-y: auto; }
+
+        /* Results container - hidden by default, shown after analysis */
+        .results-container { display: none; margin-top: 2rem; }
+        .results-container.visible { display: block; animation: fadeIn 0.4s ease-out; }
+
+        /* Loading spinner between config and results */
+        .analysis-loading { display: none; text-align: center; padding: 3rem 1rem; }
+        .analysis-loading.visible { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .error-box { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 12px; padding: 1rem; margin-top: 1rem; color: #f87171; }
+        .error-box.hidden { display: none; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -250,8 +262,8 @@
             <p class="subtitle">Track Cycle Time, PR Size, Review Time, and benchmark against engineering standards</p>
         </div>
 
-        <!-- Step 2: Repository Selection -->
-        <div class="panel" id="step2-panel">
+        <!-- Repository Selection -->
+        <div class="config-panel" id="step2-panel">
             <h2>📁 Select Repositories</h2>
 
             <div class="search-box">
@@ -266,10 +278,10 @@
             <div class="repo-list" id="repoList"></div>
 
             <!-- Branch Selector -->
-            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: #e4e4e7;">🌿 Filter by Branches</h3>
+            <div class="config-section">
+                <div class="config-section-title">🌿 Filter by Branches</div>
 
-                <div class="branch-filter-options" style="margin-bottom: 1rem;">
+                <div style="margin-bottom: 1rem;">
                     <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                         <input type="radio" name="branchFilter" value="all" checked onchange="handleBranchFilterChange()">
                         <span style="color: #e4e4e7;">All Branches</span>
@@ -280,37 +292,31 @@
                     </label>
                 </div>
 
-                <div id="branchInputContainer" class="hidden" style="margin-top: 1rem;">
-                    <label for="branchInput" style="display: block; font-size: 0.875rem; color: #a1a1aa; margin-bottom: 0.5rem;">
-                        Enter branch names (comma-separated):
-                    </label>
-                    <input
-                        type="text"
-                        id="branchInput"
-                        placeholder="e.g., main, develop, feature/new-api, hotfix/bug-123"
-                        style="width: 100%; padding: 0.75rem 1rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #e4e4e7; font-size: 0.9rem; font-family: 'Courier New', monospace;"
-                    >
-                    <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.5rem;">
-                        💡 Tip: Separate multiple branches with commas. Example: main, develop, staging
-                    </p>
+                <div id="branchInputContainer" class="hidden">
+                    <div class="config-field">
+                        <label for="branchInput">Enter branch names (comma-separated)</label>
+                        <input type="text" id="branchInput" placeholder="e.g., main, develop, feature/new-api" style="font-family: 'Courier New', monospace;">
+                        <div class="field-hint">💡 Separate multiple branches with commas</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="startDate">Start Date</label>
-                    <input type="date" id="startDate">
-                </div>
-                <div class="form-group">
-                    <label for="endDate">End Date</label>
-                    <input type="date" id="endDate">
+            <div class="config-section">
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label for="startDate">Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="config-field">
+                        <label for="endDate">End Date</label>
+                        <input type="date" id="endDate">
+                    </div>
                 </div>
             </div>
 
-            <div class="button-group" style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button onclick="analyzeMetrics()" id="analyzeBtn" disabled>
-                    <span>Analyze Metrics</span>
-                    <span>→</span>
+            <div class="config-actions">
+                <button class="btn-action btn-analyze" onclick="analyzeMetrics()" id="analyzeBtn" disabled>
+                    ⚡ Analyze Metrics
                 </button>
             </div>
 
@@ -320,13 +326,16 @@
             <div id="loadingPanel" class="hidden"></div>
         </div>
 
-        <!-- Step 3: Results -->
-        <div class="panel hidden" id="step3-panel">
-            <h2>📊 Engineering Metrics Matrix</h2>
+        <!-- Loading -->
+        <div class="analysis-loading" id="analysisLoading">
+            <div class="spinner"></div>
+            <span style="color:var(--color-accent-light);font-weight:500" id="loadingText">Analyzing metrics…</span>
+        </div>
+        <div id="errorMsg" class="error-box hidden"></div>
 
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <button class="secondary" onclick="goToStep(1)">← Back to Selection</button>
-            </div>
+        <!-- Results (appears below config panel on same page) -->
+        <div class="results-container" id="resultsContainer">
+            <h2 style="color:#fff;margin-bottom:1rem;">📊 Engineering Metrics Matrix</h2>
 
             <!-- Analysis Info -->
             <div id="analysisInfo" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;"></div>
@@ -674,11 +683,25 @@
             }
         });
 
-        // Step navigation
+        // Show/hide results (config panel always stays visible)
+        function showResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.add('visible');
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function hideResults() {
+            const results = document.getElementById('resultsContainer');
+            results.classList.remove('visible');
+        }
+
+        // Legacy goToStep calls mapped to new pattern
         function goToStep(step) {
-            currentStep = step;
-            document.getElementById('step2-panel').classList.toggle('hidden', step !== 1 && step !== 2);
-            document.getElementById('step3-panel').classList.toggle('hidden', step !== 3);
+            if (step === 3) {
+                showResults();
+            } else {
+                hideResults();
+            }
         }
 
         // Fetch repositories
