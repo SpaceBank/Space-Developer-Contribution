@@ -25,6 +25,16 @@ body.in-iframe .page-content{padding-top:1rem}
 .btn-analyze:hover:not(:disabled){box-shadow:0 8px 25px rgba(16,185,129,.4)}
 .workflow-hint{font-size:.75rem;color:#52525b;margin-top:.35rem}
 .workflow-loader{display:none;align-items:center;gap:.5rem;margin-top:.5rem;font-size:.8rem;color:#34d399}
+
+/* Repo search dropdown */
+.repo-search-wrapper{position:relative;max-width:480px}
+.repo-dropdown{display:none;position:absolute;top:100%;left:0;right:0;max-height:280px;overflow-y:auto;background:#1e1e2e;border:1px solid rgba(255,255,255,.15);border-radius:12px;margin-top:4px;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.repo-dropdown.show{display:block}
+.repo-dropdown-item{padding:.65rem 1rem;color:#e4e4e7;font-size:.875rem;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:.5rem;border-bottom:1px solid rgba(255,255,255,.05)}
+.repo-dropdown-item:last-child{border-bottom:none}
+.repo-dropdown-item:hover,.repo-dropdown-item.selected{background:rgba(16,185,129,.15);color:#34d399}
+.repo-dropdown-item .repo-icon{opacity:.5;font-size:.75rem}
+.repo-dropdown-empty{padding:1rem;text-align:center;color:#71717a;font-size:.85rem}
 .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin-bottom:2rem}
 .metric-card{background:rgba(255,255,255,.04);border-radius:18px;padding:1.25rem;border:2px solid rgba(255,255,255,.1);transition:all .3s;position:relative;overflow:hidden}
 .metric-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity .3s}
@@ -142,12 +152,16 @@ body.in-iframe .page-content{padding-top:1rem}
 <div class="config-panel" id="configPanel">
     <div style="margin-bottom:1.25rem">
         <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">📁 Select Repository</label>
-        <select id="repoSelect" onchange="onRepoSelected()" style="width:100%;max-width:480px;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit">
-            <option value="">— choose a repository —</option>
-        </select>
+        <div class="repo-search-wrapper" id="repoSearchWrapper">
+            <input type="text" id="repoSearchInput" placeholder="Search repositories…" autocomplete="off"
+                   style="width:100%;max-width:480px;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit"
+                   oninput="filterRepoDropdown()" onfocus="showRepoDropdown()">
+            <div class="repo-dropdown" id="repoDropdown"></div>
+        </div>
+        <input type="hidden" id="repoSelectValue" value="">
     </div>
     <div class="config-grid">
-        <div class="config-field"><label>Branch</label><input type="text" id="branchInput" placeholder="main" value="main"></div>
+        <div class="config-field"><label>Branch</label><input type="text" id="branchInput" placeholder="master" value="master"></div>
         <div class="config-field">
             <label>Deployment Workflow</label>
             <select id="workflowSelect" disabled><option value="">← select repo first</option></select>
@@ -248,6 +262,7 @@ body.in-iframe .page-content{padding-top:1rem}
 var charts = {};
 var analysisData = null;
 var allCommitsForSearch = [];
+var allRepos = [];
 
 function getSessionData() {
     var d = sessionStorage.getItem('spaceAnalyticsSession');
@@ -262,20 +277,57 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('startDateInput').value = start.toISOString().split('T')[0];
     var s = getSessionData();
     if (s && s.repositories) {
-        var sel = document.getElementById('repoSelect');
-        s.repositories.forEach(function(r) {
-            var o = document.createElement('option');
-            o.value = r.fullName;
-            o.textContent = r.fullName + (r.private ? ' 🔒' : '');
-            sel.appendChild(o);
-        });
+        allRepos = s.repositories.map(function(r) { return { fullName: r.fullName, isPrivate: r.private }; });
+        renderRepoDropdown(allRepos);
     }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        var wrapper = document.getElementById('repoSearchWrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            document.getElementById('repoDropdown').classList.remove('show');
+        }
+    });
 });
+
+function renderRepoDropdown(repos) {
+    var dd = document.getElementById('repoDropdown');
+    if (!repos.length) {
+        dd.innerHTML = '<div class="repo-dropdown-empty">No repositories found</div>';
+        return;
+    }
+    dd.innerHTML = repos.map(function(r) {
+        var icon = r.isPrivate ? '🔒' : '📂';
+        return '<div class="repo-dropdown-item" onclick="selectRepo(\'' + r.fullName.replace(/'/g, "\\'") + '\')">' +
+            '<span class="repo-icon">' + icon + '</span>' + r.fullName + '</div>';
+    }).join('');
+}
+
+function filterRepoDropdown() {
+    var q = document.getElementById('repoSearchInput').value.toLowerCase();
+    var filtered = allRepos.filter(function(r) { return r.fullName.toLowerCase().indexOf(q) >= 0; });
+    renderRepoDropdown(filtered);
+    document.getElementById('repoDropdown').classList.add('show');
+}
+
+function showRepoDropdown() {
+    var q = document.getElementById('repoSearchInput').value.toLowerCase();
+    var filtered = q ? allRepos.filter(function(r) { return r.fullName.toLowerCase().indexOf(q) >= 0; }) : allRepos;
+    renderRepoDropdown(filtered);
+    document.getElementById('repoDropdown').classList.add('show');
+}
+
+function selectRepo(fullName) {
+    document.getElementById('repoSearchInput').value = fullName;
+    document.getElementById('repoSelectValue').value = fullName;
+    document.getElementById('repoDropdown').classList.remove('show');
+    onRepoSelected();
+}
 
 function onRepoSelected() {
     var s = getSessionData();
     if (!s) { showError('Not logged in.'); return; }
-    var v = document.getElementById('repoSelect').value;
+    var v = document.getElementById('repoSelectValue').value;
     if (!v) return;
     var parts = v.split('/');
     if (parts.length !== 2) return;
@@ -308,9 +360,9 @@ function onRepoSelected() {
 function runAnalysis() {
     var s = getSessionData();
     if (!s) { showError('Not logged in.'); return; }
-    var rv = document.getElementById('repoSelect').value;
+    var rv = document.getElementById('repoSelectValue').value;
     var parts = rv.split('/');
-    var branch = document.getElementById('branchInput').value.trim() || 'main';
+    var branch = document.getElementById('branchInput').value.trim() || 'master';
     var wf = document.getElementById('workflowSelect').value;
     var sd = document.getElementById('startDateInput').value;
     var ed = document.getElementById('endDateInput').value;
