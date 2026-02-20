@@ -951,7 +951,9 @@ class EngagementService(
                         val stats = commitDetail?.get("stats") as? Map<*, *>
                         val additions = (stats?.get("additions") as? Number)?.toInt() ?: 0
                         val deletions = (stats?.get("deletions") as? Number)?.toInt() ?: 0
-                        val filesChanged = (stats?.get("total") as? Number)?.toInt() ?: 0
+                        @Suppress("UNCHECKED_CAST")
+                        val files = commitDetail?.get("files") as? List<Map<String, Any?>>
+                        val filesChanged = files?.size ?: 0
 
                         totalAdded += additions
                         totalDeleted += deletions
