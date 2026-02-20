@@ -308,24 +308,24 @@
                 </div>
             </div>
 
-            <!-- PR Merge Velocity -->
-            <h3 style="margin: 1.5rem 0 1rem;">🚀 PR Merge Velocity (Impact)</h3>
+            <!-- PR Author Velocity -->
+            <h3 style="margin: 1.5rem 0 1rem;">🚀 PR Author Velocity (Impact)</h3>
             <p style="color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem;">
-                <strong>What it measures:</strong> The number of Pull Requests created/merged by each contributor.
-                This metric shows "Impact" - how many ideas and features were actually completed and shipped.
+                <strong>What it measures:</strong> The number of Pull Requests created by each contributor.
+                This metric shows "Impact" - how many ideas and features were submitted. Each PR shows its actual status (Open, Merged, Closed).
                 High PR velocity indicates a developer who delivers finished work regularly.
             </p>
             <div class="charts-grid" id="prChartsSection">
                 <div class="chart-panel">
-                    <h3 style="color: #8b5cf6;">📈 PRs Merged Over Time</h3>
-                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation/merge activity over the selected period</p>
+                    <h3 style="color: #8b5cf6;">📈 PRs Authored Over Time</h3>
+                    <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation activity over the selected period</p>
                     <div class="chart-container">
                         <div class="chart-shimmer shimmer" id="prsMergedLineChartShimmer"></div>
                         <canvas id="prsMergedLineChart"></canvas>
                     </div>
                 </div>
                 <div class="chart-panel">
-                    <h3 style="color: #8b5cf6;">📊 Total PRs Merged by Contributor</h3>
+                    <h3 style="color: #8b5cf6;">📊 Total PRs Authored by Contributor</h3>
                     <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total PRs created between contributors</p>
                     <div class="chart-container">
                         <div class="chart-shimmer shimmer" id="prsMergedBarChartShimmer"></div>
@@ -389,7 +389,9 @@
             <!-- Detailed Table -->
             <div class="panel" style="margin-top: 1.5rem;">
                 <h3>📋 Contributor Engagement Summary</h3>
-                <p style="font-size: 0.82rem; color: #71717a; margin: -0.25rem 0 0.75rem;">💡 Click on a contributor row to view their commit history</p>
+                <p style="font-size: 0.82rem; color: #a1a1aa; margin: -0.25rem 0 0.75rem; background: rgba(99,102,241,.06); border: 1px solid rgba(99,102,241,.15); border-radius: 8px; padding: 0.5rem 0.75rem;">
+                    💡 <strong>Click any contributor row</strong> to view their commits, PRs authored, and PRs reviewed
+                </p>
                 <div style="overflow-x: auto;">
                     <table class="data-table">
                         <thead>
@@ -398,7 +400,7 @@
                                 <th>Commits</th>
                                 <th style="color: #22c55e;">Lines Added</th>
                                 <th style="color: #ef4444;">Lines Deleted</th>
-                                <th>PRs Merged</th>
+                                <th>PRs Authored</th>
                                 <th>PRs Reviewed</th>
                                 <th>Active Days</th>
                             </tr>
@@ -429,8 +431,8 @@
                 <button class="popup-tab active" data-tab="commits" onclick="switchPopupTab('commits')">
                     <span>⌨️</span> Commits <span class="popup-tab-badge" id="tabBadgeCommits">0</span>
                 </button>
-                <button class="popup-tab" data-tab="prs-merged" onclick="switchPopupTab('prs-merged')">
-                    <span>🔀</span> PRs Merged <span class="popup-tab-badge" id="tabBadgePRsMerged">0</span>
+                <button class="popup-tab" data-tab="prs-authored" onclick="switchPopupTab('prs-authored')">
+                    <span>🔀</span> PRs Authored <span class="popup-tab-badge" id="tabBadgePRsAuthored">0</span>
                 </button>
                 <button class="popup-tab" data-tab="prs-reviewed" onclick="switchPopupTab('prs-reviewed')">
                     <span>👁️</span> PRs Reviewed <span class="popup-tab-badge" id="tabBadgePRsReviewed">0</span>
@@ -459,7 +461,7 @@
         let commitsLineChart = null;
         let commitsBarChart = null;
 
-        // Charts - PRs Merged (Impact)
+        // Charts - PRs Authored (Impact)
         let prsMergedLineChart = null;
         let prsMergedBarChart = null;
 
@@ -1237,7 +1239,7 @@
                         <div class="summary-card" id="prsMergedCard">
                             <div class="card-icon">🚀</div>
                             <div class="card-value"><span class="mini-spinner"></span></div>
-                            <div class="card-label">PRs Merged</div>
+                            <div class="card-label">PRs Authored</div>
                         </div>
                         <div class="summary-card" id="prsReviewedCard">
                             <div class="card-icon">👀</div>
@@ -1415,15 +1417,15 @@
             if (prSection) {
                 prSection.innerHTML = `
                     <div class="chart-panel">
-                        <h3 style="color: #8b5cf6;">📈 PRs Merged Over Time</h3>
-                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation/merge activity over the selected period</p>
+                        <h3 style="color: #8b5cf6;">📈 PRs Authored Over Time</h3>
+                        <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Shows PR creation activity over the selected period</p>
                         <div class="chart-container">
                             <div class="chart-shimmer shimmer hidden" id="prsMergedLineChartShimmer"></div>
                             <canvas id="prsMergedLineChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-panel">
-                        <h3 style="color: #8b5cf6;">📊 Total PRs Merged by Contributor</h3>
+                        <h3 style="color: #8b5cf6;">📊 Total PRs Authored by Contributor</h3>
                         <p style="color: #71717a; font-size: 0.75rem; margin-bottom: 0.5rem;">Compares total PRs created between contributors</p>
                         <div class="chart-container">
                             <div class="chart-shimmer shimmer hidden" id="prsMergedBarChartShimmer"></div>
@@ -1511,7 +1513,7 @@
             const rows = tbody.querySelectorAll('tr');
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                // Cells: Contributor, Commits, Lines Added, Lines Deleted, PRs Merged, PRs Reviewed, Active Days
+                // Cells: Contributor, Commits, Lines Added, Lines Deleted, PRs Authored, PRs Reviewed, Active Days
                 // Update cells 4, 5, 6 (0-indexed)
                 if (cells.length >= 7) {
                     cells[4].textContent = 'N/A';
@@ -1604,7 +1606,7 @@
             const contributors = data.contributors.filter(c => selectedContributorsForChart.has(c.login));
             const colors = generateColors(contributors.length);
 
-            // PRs Merged Over Time
+            // PRs Authored Over Time
             if (prsMergedLineChart) prsMergedLineChart.destroy();
             prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
                 type: 'line',
@@ -1645,14 +1647,14 @@
                 }
             });
 
-            // PRs Merged Bar Chart
+            // PRs Authored Bar Chart
             if (prsMergedBarChart) prsMergedBarChart.destroy();
             prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
                 type: 'bar',
                 data: {
                     labels: contributors.map(c => getDisplayName(c.login)),
                     datasets: [{
-                        label: 'PRs Merged',
+                        label: 'PRs Authored',
                         data: contributors.map(c => c.prsMerged || 0),
                         backgroundColor: '#8b5cf6'
                     }]
@@ -1887,7 +1889,7 @@
                 </div>
                 <div class="summary-card" style="background: rgba(139, 92, 246, 0.1);">
                     <h3 style="color: #8b5cf6;">${data.summary.totalPRsMerged || 0}</h3>
-                    <p>PRs Merged</p>
+                    <p>PRs Authored</p>
                     <div class="subtitle">Impact metric</div>
                 </div>
                 <div class="summary-card" style="background: rgba(59, 130, 246, 0.1);">
@@ -2002,8 +2004,8 @@
                     options: chartOptions('Commits')
                 });
 
-                // ===== PRs Merged (Impact) =====
-                // PRs Merged Over Time Line Chart
+                // ===== PRs Authored (Impact) =====
+                // PRs Authored Over Time Line Chart
                 if (prsMergedLineChart) prsMergedLineChart.destroy();
                 prsMergedLineChart = new Chart(document.getElementById('prsMergedLineChart'), {
                     type: 'line',
@@ -2018,22 +2020,22 @@
                             tension: 0.3
                         }))
                     },
-                    options: chartOptions('PRs Merged')
+                    options: chartOptions('PRs Authored')
                 });
 
-                // PRs Merged Bar Chart
+                // PRs Authored Bar Chart
                 if (prsMergedBarChart) prsMergedBarChart.destroy();
                 prsMergedBarChart = new Chart(document.getElementById('prsMergedBarChart'), {
                     type: 'bar',
                     data: {
                         labels: filteredContributors.map(c => getDisplayName(c.login)),
                         datasets: [{
-                            label: 'PRs Merged',
+                            label: 'PRs Authored',
                             data: filteredContributors.map(c => c.prsMerged || 0),
                             backgroundColor: '#8b5cf6'
                         }]
                     },
-                    options: chartOptions('PRs Merged')
+                    options: chartOptions('PRs Authored')
                 });
 
                 // ===== PRs Reviewed (Team Player) =====
@@ -2247,7 +2249,7 @@
                 </div>
                 <div class="commit-popup-stat">
                     <div class="commit-popup-stat-value">${c.prsMerged || 0}</div>
-                    <div class="commit-popup-stat-label">PRs Merged</div>
+                    <div class="commit-popup-stat-label">PRs Authored</div>
                 </div>
                 <div class="commit-popup-stat">
                     <div class="commit-popup-stat-value">${c.prsReviewed || 0}</div>
@@ -2266,7 +2268,7 @@
 
             // Update tab badges
             document.getElementById('tabBadgeCommits').textContent = window._popupCommits.length;
-            document.getElementById('tabBadgePRsMerged').textContent = window._popupPRDetails.length;
+            document.getElementById('tabBadgePRsAuthored').textContent = window._popupPRDetails.length;
             document.getElementById('tabBadgePRsReviewed').textContent = window._popupReviewDetails.length;
 
             // Reset to commits tab
@@ -2291,7 +2293,7 @@
             // Update placeholder
             const placeholders = {
                 'commits': 'Search commits by message or hash…',
-                'prs-merged': 'Search PRs by title, number, or repo…',
+                'prs-authored': 'Search PRs by title, number, or repo…',
                 'prs-reviewed': 'Search reviewed PRs by title, number, or repo…'
             };
             document.getElementById('commitSearchInput').placeholder = placeholders[tab] || 'Search…';
@@ -2312,14 +2314,14 @@
                     );
                     renderCommitList(commits);
                     break;
-                case 'prs-merged':
+                case 'prs-authored':
                     let prs = window._popupPRDetails || [];
                     if (q) prs = prs.filter(p =>
                         (p.title || '').toLowerCase().includes(q) ||
                         String(p.number).includes(q) ||
                         (p.repositoryName || '').toLowerCase().includes(q)
                     );
-                    renderPRList(prs, 'merged');
+                    renderPRList(prs, 'authored');
                     break;
                 case 'prs-reviewed':
                     let reviews = window._popupReviewDetails || [];
@@ -2378,7 +2380,7 @@
 
         function renderPRList(prs, type) {
             const body = document.getElementById('commitPopupBody');
-            const emptyLabel = type === 'merged' ? 'No PRs merged data available' : 'No PRs reviewed data available';
+            const emptyLabel = type === 'authored' ? 'No authored PRs data available' : 'No reviewed PRs data available';
 
             if (!prs || prs.length === 0) {
                 body.innerHTML = `<p style="text-align:center;color:#71717a;padding:2rem;">${emptyLabel}</p>`;

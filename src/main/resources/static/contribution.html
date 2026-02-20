@@ -332,7 +332,7 @@
         .commit-popup-search { padding:.75rem 1.5rem; border-bottom:1px solid rgba(255,255,255,.06); }
         .commit-popup-search input { width:100%; padding:.6rem 1rem; border:1px solid rgba(255,255,255,.1); border-radius:10px; background:rgba(255,255,255,.04); color:#fff; font-size:.85rem; font-family:inherit; }
         .commit-popup-search input:focus { outline:none; border-color:#6366f1; }
-        .commit-popup-body { padding:.75rem 1.5rem 1.5rem; max-height:55vh; overflow-y:auto; }
+        .commit-popup-body { padding:.75rem 1.5rem 1.5rem; max-height:48vh; overflow-y:auto; }
         .commit-item { display:flex; gap:1rem; padding:.75rem; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:10px; margin-bottom:.5rem; transition:all .15s; }
         .commit-item:hover { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.2); }
         .commit-hash { font-family:'Courier New',monospace; font-size:.8rem; color:#818cf8; min-width:70px; padding-top:2px; }
@@ -344,6 +344,29 @@
         .commit-message a:hover { color:#818cf8; text-decoration:underline; }
         .commit-meta { display:flex; flex-wrap:wrap; gap:.75rem; font-size:.75rem; color:#71717a; }
         .commit-meta-item { display:flex; align-items:center; gap:.25rem; }
+
+        /* Popup Tabs */
+        .popup-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,.08); padding:0 1.5rem; gap:0; }
+        .popup-tab { padding:.65rem 1.1rem; border:none; background:none; color:#71717a; font-size:.85rem; font-family:inherit; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; display:flex; align-items:center; gap:.4rem; }
+        .popup-tab:hover { color:#a5b4fc; background:rgba(99,102,241,.05); }
+        .popup-tab.active { color:#a5b4fc; border-bottom-color:#6366f1; }
+        .popup-tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:18px; padding:0 5px; border-radius:9px; background:rgba(255,255,255,.08); font-size:.7rem; font-weight:600; color:#71717a; }
+        .popup-tab.active .popup-tab-badge { background:rgba(99,102,241,.2); color:#818cf8; }
+
+        /* PR Item in popup */
+        .pr-item { display:flex; gap:1rem; padding:.75rem; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:10px; margin-bottom:.5rem; transition:all .15s; }
+        .pr-item:hover { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.2); }
+        .pr-number { font-family:'Courier New',monospace; font-size:.8rem; color:#818cf8; min-width:55px; padding-top:2px; }
+        .pr-number a { color:#818cf8; text-decoration:none; }
+        .pr-number a:hover { text-decoration:underline; color:#a5b4fc; }
+        .pr-info { flex:1; min-width:0; }
+        .pr-title { font-size:.875rem; color:#e4e4e7; margin-bottom:.3rem; word-break:break-word; }
+        .pr-title a { color:#e4e4e7; text-decoration:none; }
+        .pr-title a:hover { color:#818cf8; text-decoration:underline; }
+        .pr-state-badge { padding:.1rem .4rem; border-radius:4px; font-size:.7rem; font-weight:600; }
+        .pr-state-badge.merged { background:rgba(139,92,246,.2); color:#a78bfa; }
+        .pr-state-badge.open { background:rgba(34,197,94,.2); color:#4ade80; }
+        .pr-state-badge.closed { background:rgba(239,68,68,.2); color:#f87171; }
 
         /* Clickable developer row */
         .developer-table tbody tr { cursor:pointer; transition:background .15s; }
@@ -514,7 +537,7 @@
                 </div>
 
                 <div class="chart-wrapper">
-                    <h2>🔀 PRs Merged Over Time</h2>
+                    <h2>🔀 PRs Authored Over Time</h2>
                     <div class="chart-container">
                         <canvas id="prsChart"></canvas>
                     </div>
@@ -543,7 +566,9 @@
 
                 <div class="chart-wrapper">
                     <h2>📋 Developer Summary</h2>
-                    <p style="font-size: 0.82rem; color: #71717a; margin: -0.25rem 0 0.75rem;">💡 Click on a developer row to view their commit history</p>
+                    <p style="font-size: 0.82rem; color: #a1a1aa; margin: -0.25rem 0 0.75rem; background: rgba(99,102,241,.06); border: 1px solid rgba(99,102,241,.15); border-radius: 8px; padding: 0.5rem 0.75rem;">
+                        💡 <strong>Click any developer row</strong> to view their commits, PRs authored, and PRs reviewed
+                    </p>
                     <table class="developer-table">
                         <thead>
                             <tr>
@@ -1590,7 +1615,7 @@
                 }
             });
 
-            // 3. PRs Merged Over Time - use data from backend
+            // 3. PRs Authored Over Time - use data from backend
             const prData = fullAnalysisData.prCountByPeriod || labels.map(() => 0);
             const hasPRData = prData.some(v => v > 0);
             const totalPRs = prData.reduce((a, b) => a + b, 0);
@@ -1601,7 +1626,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Merged PRs',
+                        label: 'PRs Authored',
                         data: prData,
                         borderColor: '#22c55e',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
@@ -1618,7 +1643,7 @@
                         legend: { display: false },
                         title: {
                             display: true,
-                            text: `Total Merged PRs: ${totalPRs}`,
+                            text: `Total PRs Authored: ${totalPRs}`,
                             color: '#22c55e',
                             font: { size: 14 }
                         }
@@ -1638,7 +1663,7 @@
                     data: {
                         labels: topPRAuthors.map(a => getDisplayName(a.authorName)),
                         datasets: [{
-                            label: 'PRs Merged',
+                            label: 'PRs Authored',
                             data: topPRAuthors.map(a => a.prCount),
                             backgroundColor: topPRAuthors.map((_, i) => {
                                 const hue = (i * 137.5) % 360;
@@ -1659,7 +1684,7 @@
                             legend: { display: false },
                             title: {
                                 display: true,
-                                text: `${prAuthorStats.length} developers opened PRs`,
+                                text: `${prAuthorStats.length} developers authored PRs`,
                                 color: '#a1a1aa',
                                 font: { size: 12 }
                             },
@@ -1676,7 +1701,7 @@
                                         return getDisplayName(topPRAuthors[context[0].dataIndex].authorName);
                                     },
                                     label: function(context) {
-                                        return `PRs Merged: ${context.parsed.x}`;
+                                        return `PRs Authored: ${context.parsed.x}`;
                                     }
                                 }
                             }
@@ -1965,7 +1990,9 @@
             document.getElementById(id).classList.add('hidden');
         }
 
-        // ==================== DEVELOPER COMMIT POPUP ====================
+        // ==================== DEVELOPER ACTIVITY POPUP (TABBED) ====================
+
+        let _popupActiveTab = 'commits';
 
         function showDeveloperCommits(devIndex) {
             const developers = window._currentDevelopers;
@@ -2007,19 +2034,70 @@
                 </div>
             `;
 
-            // Store commits globally for filtering
-            window._currentPopupCommits = commits;
-            window._currentPopupRepos = repos;
-            renderCommitList(commits, repos);
+            // Store data globally for tab switching / filtering
+            window._popupCommits = commits;
+            window._popupRepos = repos;
 
-            // Clear search
+            // Update tab badges
+            document.getElementById('tabBadgeCommits').textContent = commits.length;
+            // PR data is not available on the contribution page
+            document.getElementById('tabBadgePRsAuthored').textContent = '—';
+            document.getElementById('tabBadgePRsReviewed').textContent = '—';
+
+            // Reset to commits tab
+            _popupActiveTab = 'commits';
+            document.querySelectorAll('.popup-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.popup-tab[data-tab="commits"]').classList.add('active');
             document.getElementById('commitSearchInput').value = '';
+            document.getElementById('commitSearchInput').placeholder = 'Search commits by message or hash…';
 
-            // Show
+            renderPopupTabContent();
+
+            // Show modal
             document.getElementById('commitPopupModal').classList.add('show');
         }
 
-        function renderCommitList(commits, repos) {
+        function switchPopupTab(tab) {
+            _popupActiveTab = tab;
+            document.querySelectorAll('.popup-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.popup-tab[data-tab="${tab}"]`).classList.add('active');
+            document.getElementById('commitSearchInput').value = '';
+
+            const placeholders = {
+                'commits': 'Search commits by message or hash…',
+                'prs-authored': 'Search PRs by title, number, or repo…',
+                'prs-reviewed': 'Search reviewed PRs by title, number, or repo…'
+            };
+            document.getElementById('commitSearchInput').placeholder = placeholders[tab] || 'Search…';
+
+            renderPopupTabContent();
+        }
+
+        function renderPopupTabContent() {
+            const q = (document.getElementById('commitSearchInput').value || '').toLowerCase();
+
+            switch (_popupActiveTab) {
+                case 'commits':
+                    let commits = window._popupCommits || [];
+                    if (q) commits = commits.filter(c =>
+                        (c.message || '').toLowerCase().includes(q) ||
+                        (c.hash || '').toLowerCase().includes(q) ||
+                        (c.repositoryName || '').toLowerCase().includes(q)
+                    );
+                    renderCommitList(commits);
+                    break;
+                case 'prs-authored':
+                case 'prs-reviewed':
+                    renderPRUnavailable();
+                    break;
+            }
+        }
+
+        function filterPopupTab() {
+            renderPopupTabContent();
+        }
+
+        function renderCommitList(commits) {
             const body = document.getElementById('commitPopupBody');
 
             if (!commits || commits.length === 0) {
@@ -2027,7 +2105,6 @@
                 return;
             }
 
-            // Sort by date descending
             const sorted = [...commits].sort((a, b) => new Date(b.date) - new Date(a.date));
 
             body.innerHTML = sorted.map(c => {
@@ -2036,10 +2113,9 @@
                 const date = new Date(c.date);
                 const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                const repoShort = c.repositoryName.split('/').pop();
-                // Escape message for HTML
+                const repoShort = c.repositoryName ? c.repositoryName.split('/').pop() : '';
                 const msgEl = document.createElement('span');
-                msgEl.textContent = c.message;
+                msgEl.textContent = c.message || '';
                 const safeMsg = msgEl.innerHTML;
 
                 return `
@@ -2049,10 +2125,10 @@
                             <div class="commit-message"><a href="${commitUrl}" target="_blank" rel="noopener noreferrer">${safeMsg}</a></div>
                             <div class="commit-meta">
                                 <span class="commit-meta-item">📅 ${dateStr} ${timeStr}</span>
-                                <span class="commit-meta-item">📦 ${repoShort}</span>
-                                <span class="commit-meta-item" style="color:#22c55e">+${c.linesAdded}</span>
-                                <span class="commit-meta-item" style="color:#ef4444">-${c.linesDeleted}</span>
-                                <span class="commit-meta-item">📁 ${c.filesChanged} files</span>
+                                ${repoShort ? `<span class="commit-meta-item">📦 ${repoShort}</span>` : ''}
+                                <span class="commit-meta-item" style="color:#22c55e">+${c.linesAdded || 0}</span>
+                                <span class="commit-meta-item" style="color:#ef4444">-${c.linesDeleted || 0}</span>
+                                <span class="commit-meta-item">📁 ${c.filesChanged || 0} files</span>
                             </div>
                         </div>
                     </div>
@@ -2060,29 +2136,27 @@
             }).join('');
         }
 
+        function renderPRUnavailable() {
+            const body = document.getElementById('commitPopupBody');
+            const label = _popupActiveTab === 'prs-authored' ? 'PRs Authored' : 'PRs Reviewed';
+            body.innerHTML = `
+                <div style="text-align:center; padding:3rem 1.5rem;">
+                    <div style="font-size:2.5rem; margin-bottom:0.75rem; opacity:.5;">🔀</div>
+                    <div style="font-size:1rem; color:#a1a1aa; font-weight:500; margin-bottom:0.5rem;">${label} data is not available here</div>
+                    <div style="font-size:0.82rem; color:#71717a; max-width:340px; margin:0 auto;">
+                        PR details are available on the <strong style="color:#818cf8;">Engagement</strong> page where GitHub API data is used for analysis.
+                    </div>
+                </div>
+            `;
+        }
+
         function buildCommitUrl(hash, repoName) {
-            // repoName is like "owner/repo"
             if (repoName && repoName.includes('/')) {
                 return 'https://github.com/' + repoName + '/commit/' + hash;
             }
             return '#';
         }
 
-        function filterCommitList() {
-            const q = document.getElementById('commitSearchInput').value.toLowerCase();
-            const commits = window._currentPopupCommits || [];
-            const repos = window._currentPopupRepos || [];
-            if (!q) {
-                renderCommitList(commits, repos);
-                return;
-            }
-            const filtered = commits.filter(c =>
-                c.message.toLowerCase().includes(q) ||
-                c.hash.toLowerCase().includes(q) ||
-                c.repositoryName.toLowerCase().includes(q)
-            );
-            renderCommitList(filtered, repos);
-        }
 
         function closeCommitPopup(event) {
             if (event && event.target !== event.currentTarget) return;
