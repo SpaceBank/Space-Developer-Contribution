@@ -381,7 +381,9 @@ class EngagementService(
                         },
                         activeDaysOverTime = periods.map { (label, _, _) ->
                             EngagementDataPoint(label, stats.activeDaysPerPeriod[label] ?: 0)
-                        }
+                        },
+                        prDetails = stats.prDetails,
+                        reviewDetails = stats.reviewDetails
                     )
                 } catch (e: Exception) {
                     logger.error("❌ Error processing $login: ${e.message}")
@@ -1040,7 +1042,9 @@ class EngagementService(
         val activeDays: Int,
         val prsPerPeriod: Map<String, Int>,
         val reviewsPerPeriod: Map<String, Int>,
-        val activeDaysPerPeriod: Map<String, Int>
+        val activeDaysPerPeriod: Map<String, Int>,
+        val prDetails: List<PRDetail> = emptyList(),
+        val reviewDetails: List<PRDetail> = emptyList()
     )
 
     /**
@@ -1074,6 +1078,8 @@ class EngagementService(
 
         var totalPRs = 0
         var totalReviews = 0
+        val collectedPRDetails = mutableListOf<PRDetail>()
+        val collectedReviewDetails = mutableListOf<PRDetail>()
 
         try {
             // Determine search strategy based on number of repos
@@ -1133,6 +1139,24 @@ class EngagementService(
                                     if (period != null) {
                                         prsPerPeriod[period] = (prsPerPeriod[period] ?: 0) + 1
                                     }
+                                    // Collect PR detail
+                                    val prNumber = (item["number"] as? Number)?.toInt() ?: 0
+                                    val prTitle = item["title"] as? String ?: ""
+                                    val prUrl = item["html_url"] as? String ?: ""
+                                    val prState = item["state"] as? String ?: ""
+                                    @Suppress("UNCHECKED_CAST")
+                                    val pullRequest = item["pull_request"] as? Map<String, Any?>
+                                    val mergedAt = pullRequest?.get("merged_at") as? String
+                                    val repoName = prUrl.replace("https://github.com/", "").split("/pull/").firstOrNull() ?: ""
+                                    collectedPRDetails.add(PRDetail(
+                                        number = prNumber,
+                                        title = prTitle,
+                                        url = prUrl,
+                                        repositoryName = repoName,
+                                        createdAt = createdAt,
+                                        state = prState,
+                                        mergedAt = mergedAt
+                                    ))
                                 } catch (e: Exception) { }
                             }
 
@@ -1191,6 +1215,24 @@ class EngagementService(
                                     if (period != null) {
                                         reviewsPerPeriod[period] = (reviewsPerPeriod[period] ?: 0) + 1
                                     }
+                                    // Collect review detail
+                                    val prNumber = (item["number"] as? Number)?.toInt() ?: 0
+                                    val prTitle = item["title"] as? String ?: ""
+                                    val prUrl = item["html_url"] as? String ?: ""
+                                    val prState = item["state"] as? String ?: ""
+                                    @Suppress("UNCHECKED_CAST")
+                                    val pullRequest = item["pull_request"] as? Map<String, Any?>
+                                    val mergedAt = pullRequest?.get("merged_at") as? String
+                                    val repoName = prUrl.replace("https://github.com/", "").split("/pull/").firstOrNull() ?: ""
+                                    collectedReviewDetails.add(PRDetail(
+                                        number = prNumber,
+                                        title = prTitle,
+                                        url = prUrl,
+                                        repositoryName = repoName,
+                                        createdAt = createdAt,
+                                        state = prState,
+                                        mergedAt = mergedAt
+                                    ))
                                 } catch (e: Exception) { }
                             }
 
@@ -1227,7 +1269,9 @@ class EngagementService(
             activeDays = activeDatesSet.size,
             prsPerPeriod = prsPerPeriod,
             reviewsPerPeriod = reviewsPerPeriod,
-            activeDaysPerPeriod = activeDaysPerPeriod
+            activeDaysPerPeriod = activeDaysPerPeriod,
+            prDetails = collectedPRDetails.sortedByDescending { it.createdAt },
+            reviewDetails = collectedReviewDetails.sortedByDescending { it.createdAt }
         )
     }
 

@@ -136,6 +136,19 @@ data class PRReviewResponse(
 )
 
 /**
+ * Individual PR detail for popup display
+ */
+data class PRDetail(
+    val number: Int,
+    val title: String,
+    val url: String,
+    val repositoryName: String,
+    val createdAt: String,
+    val state: String,
+    val mergedAt: String? = null
+)
+
+/**
  * PR data for a single contributor
  */
 data class ContributorPRData(
@@ -145,6 +158,8 @@ data class ContributorPRData(
     val activeDays: Int,
     val prsMergedOverTime: List<EngagementDataPoint>,
     val prsReviewedOverTime: List<EngagementDataPoint>,
-    val activeDaysOverTime: List<EngagementDataPoint>
+    val activeDaysOverTime: List<EngagementDataPoint>,
+    val prDetails: List<PRDetail> = emptyList(),
+    val reviewDetails: List<PRDetail> = emptyList()
 )
 
