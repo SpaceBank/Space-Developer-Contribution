@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trunk-Based Matrix — Space Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;background:#0a0a1a;color:#e4e4e7;overflow-x:hidden;padding:0}
+body.in-iframe .back-home-btn{display:none!important}
+body.in-iframe{padding-top:0}
+body.in-iframe .page-content{padding-top:1rem}
+.page-content{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:2rem}
+.page-title{text-align:center;margin-bottom:2.5rem}
+.page-title h1{font-size:2.25rem;font-weight:700;background:linear-gradient(135deg,#fff 0%,#34d399 50%,#10b981 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem}
+.page-title p{color:#71717a;font-size:1rem}
+.config-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:2rem;margin-bottom:2rem;backdrop-filter:blur(10px)}
+.config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.25rem;margin-bottom:1.5rem}
+.config-field label{display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.4rem}
+.config-field input,.config-field select{width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit;transition:all .25s}
+.config-field input:focus,.config-field select:focus{outline:none;border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+.config-field select option{background:#1e1e2e;color:#e4e4e7}
+.workflow-hint{font-size:.75rem;color:#52525b;margin-top:.35rem}
+.workflow-loader{display:none;align-items:center;gap:.5rem;margin-top:.5rem;font-size:.8rem;color:#34d399}
+.config-actions{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.btn-action{padding:.85rem 2rem;color:#fff;border:none;border-radius:14px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .25s;font-family:inherit}
+.btn-action:hover:not(:disabled){transform:translateY(-2px)}
+.btn-action:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-analyze{background:linear-gradient(135deg,#10b981,#059669)}
+.btn-analyze:hover:not(:disabled){box-shadow:0 8px 25px rgba(16,185,129,.4)}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin-bottom:2rem}
+.metric-card{background:rgba(255,255,255,.04);border-radius:18px;padding:1.25rem;border:2px solid rgba(255,255,255,.1);transition:all .3s;position:relative;overflow:hidden}
+.metric-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity .3s}
+.metric-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.metric-card:hover::after{opacity:1}
+.metric-card.elite{border-color:#22c55e}.metric-card.elite::after{background:#22c55e}
+.metric-card.high{border-color:#3b82f6}.metric-card.high::after{background:#3b82f6}
+.metric-card.medium{border-color:#f59e0b}.metric-card.medium::after{background:#f59e0b}
+.metric-card.low{border-color:#ef4444}.metric-card.low::after{background:#ef4444}
+.metric-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+.metric-name{font-size:.9rem;font-weight:500;color:#9ca3af}
+.metric-badge{padding:.25rem .5rem;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase}
+.metric-badge.elite{background:#22c55e;color:#052e16}
+.metric-badge.high{background:#3b82f6;color:#1e3a5f}
+.metric-badge.medium{background:#f59e0b;color:#451a03}
+.metric-badge.low{background:#ef4444;color:#450a0a}
+.metric-value{font-size:2rem;font-weight:700;margin-bottom:.5rem;color:#fff}
+.metric-description{font-size:.75rem;color:#71717a;line-height:1.4}
+.legend{display:flex;gap:1.5rem;justify-content:center;margin:1.25rem 0;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#9ca3af}
+.legend-color{width:12px;height:12px;border-radius:3px}
+.legend-color.elite{background:#22c55e}.legend-color.high{background:#3b82f6}.legend-color.medium{background:#f59e0b}.legend-color.low{background:#ef4444}
+.overall-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1.25rem;border-radius:20px;font-size:.9rem;font-weight:700}
+.rating-elite{background:rgba(34,197,94,.2);color:#4ade80}
+.rating-high{background:rgba(59,130,246,.2);color:#60a5fa}
+.rating-medium{background:rgba(249,115,22,.2);color:#fb923c}
+.rating-low{background:rgba(239,68,68,.2);color:#f87171}
+.matrix-table-container{overflow-x:auto;margin-top:1rem;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+.matrix-table{width:100%;border-collapse:collapse}
+.matrix-table th{text-align:left;padding:.75rem 1rem;color:#9ca3af;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)}
+.matrix-table td{padding:.75rem 1rem;font-size:.85rem;border-bottom:1px solid rgba(255,255,255,.04);color:#d4d4d8}
+.matrix-table tbody tr{cursor:pointer;transition:all .2s}
+.matrix-table tbody tr:hover{background:rgba(16,185,129,.08)!important}
+.matrix-cell{display:flex;align-items:center;gap:.5rem}
+.matrix-cell .indicator{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.indicator.elite{background:#22c55e}.indicator.high{background:#3b82f6}.indicator.medium{background:#f59e0b}.indicator.low{background:#ef4444}
+.dev-avatar{width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,.15);object-fit:cover}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
+.chart-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:1.5rem}
+.chart-panel h3{color:#fff;font-size:1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.chart-container{position:relative;height:280px}
+.commit-list-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:1.5rem;margin-bottom:2rem}
+.commit-count-badge{background:rgba(16,185,129,.15);color:#34d399;padding:.25rem .75rem;border-radius:20px;font-size:.8rem;font-weight:600}
+.commit-search-box{margin-bottom:1rem}
+.commit-search-box input{width:100%;padding:.75rem 1rem;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit}
+.commit-search-box input:focus{outline:none;border-color:#10b981}
+.commit-list-container{max-height:400px;overflow-y:auto}
+.commit-item{display:flex;align-items:flex-start;gap:1rem;padding:1rem;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;margin-bottom:.75rem;transition:all .2s}
+.commit-item:hover{background:rgba(255,255,255,.05);border-color:rgba(16,185,129,.2)}
+.commit-sha-box{min-width:70px;padding:.35rem .6rem;background:rgba(16,185,129,.1);color:#34d399;border-radius:8px;font-family:monospace;font-size:.82rem;font-weight:600;text-align:center}
+.commit-info{flex:1;min-width:0}
+.commit-title{font-weight:500;color:#fff;margin-bottom:.35rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.commit-meta{display:flex;flex-wrap:wrap;gap:.75rem;font-size:.8rem;color:#71717a}
+.commit-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.commit-tag{padding:.2rem .5rem;border-radius:4px;font-size:.7rem;font-weight:600}
+.commit-tag.elite{background:rgba(34,197,94,.15);color:#4ade80}
+.commit-tag.high{background:rgba(59,130,246,.15);color:#60a5fa}
+.commit-tag.medium{background:rgba(249,115,22,.15);color:#fb923c}
+.commit-tag.low{background:rgba(239,68,68,.15);color:#f87171}
+.status-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:8px;font-size:.75rem;font-weight:600}
+.status-success{background:rgba(34,197,94,.15);color:#4ade80}
+.status-failure{background:rgba(239,68,68,.15);color:#f87171}
+.status-pending{background:rgba(250,204,21,.15);color:#facc15}
+.thresholds-table{width:100%;border-collapse:collapse;font-size:.875rem}
+.thresholds-table th,.thresholds-table td{padding:.75rem 1rem;text-align:center;border-bottom:1px solid rgba(255,255,255,.08)}
+.thresholds-table th{background:rgba(255,255,255,.03);font-weight:600;font-size:.8rem}
+.thresholds-table td:first-child{text-align:left;min-width:220px}
+.thresholds-table .metric-hint{font-size:.7rem;color:#71717a;display:block;margin-top:.25rem}
+.thresholds-table .elite-col{background:rgba(34,197,94,.15);color:#86efac}
+.thresholds-table .high-col{background:rgba(59,130,246,.15);color:#93c5fd}
+.thresholds-table .medium-col{background:rgba(245,158,11,.15);color:#fcd34d}
+.thresholds-table .low-col{background:rgba(239,68,68,.15);color:#fca5a5}
+.thresholds-table th.elite-col{background:rgba(34,197,94,.3);color:#22c55e}
+.thresholds-table th.high-col{background:rgba(59,130,246,.3);color:#3b82f6}
+.thresholds-table th.medium-col{background:rgba(245,158,11,.3);color:#f59e0b}
+.thresholds-table th.low-col{background:rgba(239,68,68,.3);color:#ef4444}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center;backdrop-filter:blur(8px)}
+.modal-overlay.show{display:flex}
+.modal-content{background:#16162a;border:1px solid rgba(255,255,255,.12);border-radius:24px;width:90%;max-width:950px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.5rem 2rem;border-bottom:1px solid rgba(255,255,255,.08)}
+.modal-header h2{color:#fff;font-size:1.2rem;display:flex;align-items:center;gap:.75rem}
+.modal-header h2 img{width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.15)}
+.modal-close{background:rgba(255,255,255,.08);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;transition:all .2s}
+.modal-close:hover{background:rgba(239,68,68,.2);color:#f87171}
+.modal-body{padding:1.5rem 2rem;overflow-y:auto;flex:1}
+.modal-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.modal-metric-card{background:rgba(255,255,255,.04);border-radius:12px;padding:1rem;text-align:center}
+.mmv{font-size:1.3rem;font-weight:700;color:#fff}
+.mml{font-size:.72rem;color:#71717a;margin-top:.2rem}
+.section-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:1.5rem;margin-bottom:2rem}
+.section-panel h3{color:#fff;font-size:1.1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.section-panel p.hint{font-size:.85rem;color:#71717a;margin-bottom:1rem}
+.analysis-loading{display:none;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem}
+.analysis-loading.visible{display:flex}
+.analysis-loading .spinner{width:48px;height:48px;border:4px solid rgba(16,185,129,.2);border-top-color:#10b981;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#fca5a5;padding:1rem;border-radius:14px;text-align:center;margin-bottom:1.5rem}
+.results-container{display:none}
+.results-container.visible{display:block}
+.analysis-info{margin-bottom:1.5rem;padding:1rem;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15);border-radius:12px;font-size:.9rem;color:#d4d4d8}
+@media(max-width:1024px){.metrics-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.modal-metrics{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.metrics-grid{grid-template-columns:1fr}.config-grid{grid-template-columns:1fr}.modal-metrics{grid-template-columns:1fr 1fr}}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="bg-animation page-bg"><div class="grid-lines"></div></div>
+<div class="page-content">
+<div class="page-title">
+    <h1>🌳 Trunk-Based Matrix</h1>
+    <p>DORA metrics for trunk-based development — commit → action → deploy</p>
+</div>
+
+<!-- Config Panel -->
+<div class="config-panel" id="configPanel">
+    <div style="margin-bottom:1.25rem">
+        <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">📁 Select Repository</label>
+        <select id="repoSelect" onchange="onRepoSelected()" style="width:100%;max-width:480px;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit">
+            <option value="">— choose a repository —</option>
+        </select>
+    </div>
+    <div class="config-grid">
+        <div class="config-field"><label>Branch</label><input type="text" id="branchInput" placeholder="main" value="main"></div>
+        <div class="config-field">
+            <label>Deployment Workflow</label>
+            <select id="workflowSelect" disabled><option value="">← select repo first</option></select>
+            <div class="workflow-loader" id="workflowLoader"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span>Loading workflows…</span></div>
+            <div class="workflow-hint">The GitHub Actions workflow that deploys your code</div>
+        </div>
+        <div class="config-field"><label>Start Date</label><input type="date" id="startDateInput"></div>
+        <div class="config-field"><label>End Date</label><input type="date" id="endDateInput"></div>
+    </div>
+    <div class="config-actions">
+        <button class="btn-action btn-analyze" id="analyzeBtn" onclick="runAnalysis()" disabled>📊 Analyze Trunk Metrics</button>
+    </div>
+</div>
+
+<!-- Loading -->
+<div class="analysis-loading" id="analysisLoading">
+    <div class="spinner"></div>
+    <span style="color:#34d399;font-weight:500" id="loadingText">Analyzing trunk-based metrics…</span>
+</div>
+<div id="errorMsg" class="error-box hidden"></div>
+
+<!-- RESULTS -->
+<div class="results-container" id="resultsContainer">
+    <div class="analysis-info" id="analysisInfo"></div>
+    <div style="text-align:center;margin-bottom:1.5rem"><span id="overallBadge" class="overall-badge"></span></div>
+    <div class="legend">
+        <div class="legend-item"><span class="legend-color elite"></span> Elite</div>
+        <div class="legend-item"><span class="legend-color high"></span> High</div>
+        <div class="legend-item"><span class="legend-color medium"></span> Medium</div>
+        <div class="legend-item"><span class="legend-color low"></span> Low</div>
+    </div>
+
+    <h3 style="color:#fff;margin:1.5rem 0 1rem;font-size:1.15rem">🏢 Team Metrics</h3>
+    <div class="metrics-grid" id="teamMetricsGrid"></div>
+
+    <div class="charts-row">
+        <div class="chart-panel"><h3>📈 Weekly Trend</h3><div class="chart-container"><canvas id="weeklyTrendChart"></canvas></div></div>
+        <div class="chart-panel"><h3>🔄 Cycle Time Decomposition</h3><div class="chart-container"><canvas id="cycleTimeChart"></canvas></div></div>
+    </div>
+    <div class="charts-row">
+        <div class="chart-panel"><h3>📊 Daily Commits &amp; Actions</h3><div class="chart-container"><canvas id="dailyChart"></canvas></div></div>
+        <div class="chart-panel"><h3>⏱️ Lead Time Trend</h3><div class="chart-container"><canvas id="leadTimeChart"></canvas></div></div>
+    </div>
+    <div class="charts-row">
+        <div class="chart-panel"><h3>✅ Deploy Success vs Failure</h3><div class="chart-container"><canvas id="successFailChart"></canvas></div></div>
+        <div class="chart-panel"><h3>📦 Commit Batch Size Distribution</h3><div class="chart-container"><canvas id="batchSizeChart"></canvas></div></div>
+    </div>
+
+    <div class="section-panel">
+        <h3>👥 Developer Metrics Matrix</h3>
+        <p class="hint">💡 Click on a developer row to view their commit details</p>
+        <div class="matrix-table-container">
+            <table class="matrix-table" id="devMatrix">
+                <thead><tr><th>Developer</th><th>Commits</th><th>Deploy Freq</th><th>Lead Time</th><th>Cycle Time</th><th>Pipeline</th><th>Batch Size</th><th>Success Rate</th></tr></thead>
+                <tbody id="devMatrixBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="commit-list-panel" id="commitListPanel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:.5rem">📋 Analyzed Commits <span class="commit-count-badge" id="commitCountBadge">0</span></h3>
+        </div>
+        <div class="commit-search-box"><input type="text" id="commitSearchInput" placeholder="Search commits by message, author, or SHA..." oninput="filterCommitList()"></div>
+        <div class="commit-list-container" id="commitListContainer"></div>
+    </div>
+
+    <div class="section-panel">
+        <h3>📋 Metric Thresholds Reference</h3>
+        <div style="overflow-x:auto">
+            <table class="thresholds-table">
+                <thead><tr><th>Metric</th><th class="elite-col">🏆 Elite</th><th class="high-col">✅ High</th><th class="medium-col">⚠️ Medium</th><th class="low-col">🔴 Low</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>🚀 Deployment Frequency</strong><br><span class="metric-hint">Successful deploys per day</span></td><td class="elite-col">≥ 1/day</td><td class="high-col">≥ 1/week</td><td class="medium-col">≥ 1/month</td><td class="low-col">&lt; 1/month</td></tr>
+                    <tr><td><strong>⏱️ Lead Time for Changes</strong><br><span class="metric-hint">Commit → deployment completed</span></td><td class="elite-col">&lt; 1 hour</td><td class="high-col">&lt; 1 day</td><td class="medium-col">&lt; 1 week</td><td class="low-col">&gt; 1 week</td></tr>
+                    <tr><td><strong>🔄 Cycle Time</strong><br><span class="metric-hint">Commit → successfully deployed</span></td><td class="elite-col">&lt; 1 hour</td><td class="high-col">&lt; 1 day</td><td class="medium-col">&lt; 1 week</td><td class="low-col">&gt; 1 week</td></tr>
+                    <tr><td><strong>💥 Change Failure Rate</strong><br><span class="metric-hint">% of deployments that failed</span></td><td class="elite-col">≤ 5%</td><td class="high-col">≤ 15%</td><td class="medium-col">≤ 30%</td><td class="low-col">&gt; 30%</td></tr>
+                    <tr><td><strong>🔧 Mean Time to Recovery</strong><br><span class="metric-hint">Failed → next successful action</span></td><td class="elite-col">&lt; 1 hour</td><td class="high-col">&lt; 1 day</td><td class="medium-col">&lt; 1 week</td><td class="low-col">&gt; 1 week</td></tr>
+                    <tr><td><strong>⌨️ Commit Frequency</strong><br><span class="metric-hint">Commits per day to trunk</span></td><td class="elite-col">≥ 5/day</td><td class="high-col">≥ 2/day</td><td class="medium-col">≥ 0.5/day</td><td class="low-col">&lt; 0.5/day</td></tr>
+                    <tr><td><strong>📏 Batch Size</strong><br><span class="metric-hint">Avg lines changed per commit</span></td><td class="elite-col">&lt; 50</td><td class="high-col">&lt; 150</td><td class="medium-col">&lt; 400</td><td class="low-col">&gt; 400</td></tr>
+                    <tr><td><strong>⚡ Time to Deploy</strong><br><span class="metric-hint">Pipeline run duration</span></td><td class="elite-col">&lt; 5 min</td><td class="high-col">&lt; 15 min</td><td class="medium-col">&lt; 30 min</td><td class="low-col">&gt; 30 min</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Author Modal -->
+<div class="modal-overlay" id="authorModal" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header"><h2 id="modalTitle"></h2><button class="modal-close" onclick="document.getElementById('authorModal').classList.remove('show')">✕</button></div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+var charts = {};
+var analysisData = null;
+var allCommitsForSearch = [];
+
+function getSessionData() {
+    var d = sessionStorage.getItem('spaceAnalyticsSession');
+    return d ? JSON.parse(d) : null;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.self !== window.top) document.body.classList.add('in-iframe');
+    var end = new Date(), start = new Date();
+    start.setMonth(start.getMonth() - 3);
+    document.getElementById('endDateInput').value = end.toISOString().split('T')[0];
+    document.getElementById('startDateInput').value = start.toISOString().split('T')[0];
+    var s = getSessionData();
+    if (s && s.repositories) {
+        var sel = document.getElementById('repoSelect');
+        s.repositories.forEach(function(r) {
+            var o = document.createElement('option');
+            o.value = r.fullName;
+            o.textContent = r.fullName + (r.private ? ' 🔒' : '');
+            sel.appendChild(o);
+        });
+    }
+});
+
+function onRepoSelected() {
+    var s = getSessionData();
+    if (!s) { showError('Not logged in.'); return; }
+    var v = document.getElementById('repoSelect').value;
+    if (!v) return;
+    var parts = v.split('/');
+    if (parts.length !== 2) return;
+    var owner = parts[0], repo = parts[1];
+    var ws = document.getElementById('workflowSelect');
+    var ld = document.getElementById('workflowLoader');
+    ws.innerHTML = '<option value="">Loading…</option>';
+    ws.disabled = true;
+    ld.style.display = 'flex';
+    document.getElementById('analyzeBtn').disabled = true;
+    hideError();
+    fetch('/api/trunk-matrix/workflows?owner=' + encodeURIComponent(owner) + '&repo=' + encodeURIComponent(repo) + '&token=' + encodeURIComponent(s.token))
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(wf) {
+            ws.innerHTML = '<option value="">— select workflow —</option>';
+            wf.forEach(function(w) {
+                var o = document.createElement('option');
+                o.value = w.name;
+                o.textContent = w.name + ' (' + w.state + ')';
+                ws.appendChild(o);
+            });
+            ws.disabled = false;
+            ws.onchange = function() { document.getElementById('analyzeBtn').disabled = !ws.value; };
+            if (!wf.length) { ws.innerHTML = '<option value="">No workflows found</option>'; showError('No GitHub Actions workflows found.'); }
+        })
+        .catch(function(e) { showError('Failed: ' + e.message); ws.innerHTML = '<option value="">Error</option>'; })
+        .finally(function() { ld.style.display = 'none'; });
+}
+
+function runAnalysis() {
+    var s = getSessionData();
+    if (!s) { showError('Not logged in.'); return; }
+    var rv = document.getElementById('repoSelect').value;
+    var parts = rv.split('/');
+    var branch = document.getElementById('branchInput').value.trim() || 'main';
+    var wf = document.getElementById('workflowSelect').value;
+    var sd = document.getElementById('startDateInput').value;
+    var ed = document.getElementById('endDateInput').value;
+    if (!rv || parts.length !== 2 || !wf || !sd || !ed) { showError('Please fill all fields.'); return; }
+    hideError();
+    document.getElementById('resultsContainer').classList.remove('visible');
+    document.getElementById('analysisLoading').classList.add('visible');
+    document.getElementById('analyzeBtn').disabled = true;
+    fetch('/api/trunk-matrix/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: s.token, provider: s.provider || 'GITHUB', owner: parts[0], repo: parts[1], branch: branch, workflowName: wf, startDate: sd, endDate: ed })
+    })
+    .then(function(r) { if (!r.ok) return r.text().then(function(t) { throw new Error(t || 'HTTP ' + r.status); }); return r.json(); })
+    .then(function(data) {
+        analysisData = data;
+        renderResults(data);
+        document.getElementById('resultsContainer').classList.add('visible');
+    })
+    .catch(function(e) { showError('Analysis failed: ' + e.message); })
+    .finally(function() { document.getElementById('analysisLoading').classList.remove('visible'); document.getElementById('analyzeBtn').disabled = false; });
+}
+
+function renderResults(d) {
+    document.getElementById('analysisInfo').innerHTML =
+        '📦 <strong>' + d.owner + '/' + d.repo + '</strong> • Branch: <strong>' + d.branch + '</strong> • Workflow: <strong>' + d.workflowName +
+        '</strong> • ' + d.startDate + ' → ' + d.endDate + ' • ' + d.totalCommits + ' commits • ' + d.totalActionRuns + ' action runs • ' + d.authorStats.length + ' developers';
+    var ob = document.getElementById('overallBadge');
+    ob.className = 'overall-badge rating-' + d.ratings.overall.toLowerCase();
+    ob.innerHTML = '🏆 Overall Rating: <strong>' + d.ratings.overall + '</strong>';
+    renderTeamMetrics(d.teamMetrics);
+    renderWeeklyTrendChart(d.weeklyTrend);
+    renderCycleTimeChart(d);
+    renderDailyChart(d.dailyStats);
+    renderLeadTimeChart(d.dailyStats);
+    renderSuccessFailChart(d.successfulCommits, d.failedCommits);
+    renderBatchSizeChart(d.commits);
+    renderDevMatrix(d.authorStats);
+    renderCommitList(d.commits);
+}
+
+function renderTeamMetrics(tm) {
+    var items = [
+        { icon: '🚀', name: 'Deployment Frequency', v: tm.deploymentFrequency },
+        { icon: '⏱️', name: 'Lead Time', v: tm.leadTime },
+        { icon: '🔄', name: 'Cycle Time', v: tm.cycleTime },
+        { icon: '💥', name: 'Change Failure Rate', v: tm.changeFailureRate },
+        { icon: '🔧', name: 'MTTR', v: tm.mttr },
+        { icon: '⌨️', name: 'Commit Frequency', v: tm.commitFrequency },
+        { icon: '📏', name: 'Batch Size', v: tm.batchSize },
+        { icon: '⚡', name: 'Time to Deploy', v: tm.timeToDeploy }
+    ];
+    document.getElementById('teamMetricsGrid').innerHTML = items.map(function(i) {
+        var r = i.v.rating.toLowerCase();
+        return '<div class="metric-card ' + r + '"><div class="metric-header"><span class="metric-name">' + i.icon + ' ' + i.name + '</span><span class="metric-badge ' + r + '">' + i.v.rating + '</span></div><div class="metric-value">' + i.v.displayValue + '</div><div class="metric-description">' + i.v.unit + '</div></div>';
+    }).join('');
+}
+
+function renderDevMatrix(authors) {
+    document.getElementById('devMatrixBody').innerHTML = authors.map(function(a, i) {
+        var avatar = a.authorAvatarUrl ? '<img class="dev-avatar" src="' + a.authorAvatarUrl + '" alt="">' : '';
+        var lt = a.avgLeadTimeMinutes != null ? fmtDur(a.avgLeadTimeMinutes) : '—';
+        var ct = a.avgCycleTimeMinutes != null ? fmtDur(a.avgCycleTimeMinutes) : '—';
+        var td = a.avgTimeToDeployMinutes != null ? fmtDur(a.avgTimeToDeployMinutes) : '—';
+        var bs = a.avgBatchSize.toFixed(0);
+        var sr = a.commitSuccessRate.toFixed(0) + '%';
+        var df = a.deploymentFrequency.toFixed(2) + '/d';
+        var ltR = rateLeadTime(a.avgLeadTimeMinutes), ctR = rateCycleTime(a.avgCycleTimeMinutes);
+        var bsR = rateBatchSize(a.avgBatchSize), srR = rateSuccessRate(a.commitSuccessRate);
+        var dfR = rateDeployFreq(a.deploymentFrequency), tdR = rateTimeToDeploy(a.avgTimeToDeployMinutes);
+        return '<tr onclick="showAuthorDetail(' + i + ')">' +
+            '<td><div class="matrix-cell">' + avatar + ' <span>' + esc(a.authorName) + '</span></div></td>' +
+            '<td>' + a.totalCommits + '</td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + dfR + '"></span><span>' + df + '</span></div></td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + ltR + '"></span><span>' + lt + '</span></div></td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + ctR + '"></span><span>' + ct + '</span></div></td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + tdR + '"></span><span>' + td + '</span></div></td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + bsR + '"></span><span>' + bs + '</span></div></td>' +
+            '<td><div class="matrix-cell"><span class="indicator ' + srR + '"></span><span>' + sr + '</span></div></td>' +
+            '</tr>';
+    }).join('');
+}
+
+function rateDeployFreq(v) { return v >= 1 ? 'elite' : v >= 0.14 ? 'high' : v >= 0.03 ? 'medium' : 'low'; }
+function rateLeadTime(min) { if (min == null) return 'medium'; var h = min / 60; return h < 1 ? 'elite' : h < 24 ? 'high' : h < 168 ? 'medium' : 'low'; }
+function rateCycleTime(min) { return rateLeadTime(min); }
+function rateBatchSize(l) { return l < 50 ? 'elite' : l < 150 ? 'high' : l < 400 ? 'medium' : 'low'; }
+function rateSuccessRate(pct) { return pct >= 95 ? 'elite' : pct >= 85 ? 'high' : pct >= 70 ? 'medium' : 'low'; }
+function rateTimeToDeploy(min) { if (min == null) return 'medium'; return min < 5 ? 'elite' : min < 15 ? 'high' : min < 30 ? 'medium' : 'low'; }
+
+function showAuthorDetail(idx) {
+    var a = analysisData.authorStats[idx];
+    if (!a) return;
+    var avatar = a.authorAvatarUrl ? '<img src="' + a.authorAvatarUrl + '" alt="">' : '';
+    document.getElementById('modalTitle').innerHTML = avatar + ' ' + esc(a.authorName) + ' <span style="color:#71717a;font-weight:400">@' + esc(a.authorLogin) + '</span>';
+    var lt = a.avgLeadTimeMinutes != null ? fmtDur(a.avgLeadTimeMinutes) : '—';
+    var ct = a.avgCycleTimeMinutes != null ? fmtDur(a.avgCycleTimeMinutes) : '—';
+    var td = a.avgTimeToDeployMinutes != null ? fmtDur(a.avgTimeToDeployMinutes) : '—';
+    var h = '<div class="modal-metrics">' +
+        mc(a.totalCommits, 'Total Commits', '') + mc(a.successfulCommits, 'Successful', 'color:#4ade80') +
+        mc(a.failedCommits, 'Failed', 'color:#f87171') + mc(a.commitSuccessRate.toFixed(1) + '%', 'Success Rate', '') +
+        '</div><div class="modal-metrics">' +
+        mc(lt, 'Avg Lead Time', '') + mc(ct, 'Avg Cycle Time', '') +
+        mc(td, 'Avg Pipeline', '') + mc(a.avgBatchSize.toFixed(0) + ' lines', 'Avg Batch Size', '') +
+        '</div><div class="modal-metrics">' +
+        mc(a.deploymentFrequency.toFixed(2) + '/d', 'Deploy Freq', '') +
+        mc('+' + a.totalLinesAdded, 'Lines Added', 'color:#4ade80') +
+        mc('-' + a.totalLinesDeleted, 'Lines Deleted', 'color:#f87171') +
+        mc(a.pendingCommits, 'Pending', '') +
+        '</div>';
+    h += '<h3 style="color:#fff;font-size:1rem;margin:1.5rem 0 1rem">Commits</h3><div style="overflow-x:auto"><table class="matrix-table"><thead><tr><th>SHA</th><th>Message</th><th>Date</th><th>Lines</th><th>Status</th><th>Lead Time</th><th>Action</th></tr></thead><tbody>';
+    a.commits.forEach(function(c) {
+        var date = new Date(c.committedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        var link = c.firstActionUrl ? '<a href="' + c.firstActionUrl + '" target="_blank" style="color:#34d399;text-decoration:none">View ↗</a>' : '—';
+        h += '<tr><td><span style="font-family:monospace;color:#34d399">' + c.shortSha + '</span></td>' +
+            '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(c.message) + '">' + esc(c.message) + '</td>' +
+            '<td style="white-space:nowrap">' + date + '</td><td>+' + c.linesAdded + '/-' + c.linesDeleted + '</td>' +
+            '<td>' + statusBadge(c.deploymentResult) + '</td>' +
+            '<td>' + (c.leadTimeMinutes != null ? fmtDur(c.leadTimeMinutes) : '—') + '</td><td>' + link + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    document.getElementById('modalBody').innerHTML = h;
+    document.getElementById('authorModal').classList.add('show');
+}
+
+function mc(v, l, style) { return '<div class="modal-metric-card"><div class="mmv"' + (style ? ' style="' + style + '"' : '') + '>' + v + '</div><div class="mml">' + l + '</div></div>'; }
+
+// ══════ CHARTS ══════
+function dc(n) { if (charts[n]) { charts[n].destroy(); charts[n] = null; } }
+function co(yLabel) {
+    return { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+        scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                  y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: yLabel, color: '#9ca3af' } } } };
+}
+
+function renderWeeklyTrendChart(weeks) {
+    dc('weekly');
+    charts.weekly = new Chart(document.getElementById('weeklyTrendChart').getContext('2d'), {
+        type: 'line', data: { labels: weeks.map(function(w) { return w.week + ' (' + w.startDate.substring(5) + ')'; }),
+        datasets: [
+            { label: 'Commits', data: weeks.map(function(w) { return w.commits; }), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4, pointRadius: 3 },
+            { label: 'Successful Deploys', data: weeks.map(function(w) { return w.successfulDeploys; }), borderColor: '#22c55e', tension: .4, pointRadius: 3 },
+            { label: 'Failed Deploys', data: weeks.map(function(w) { return w.failedDeploys; }), borderColor: '#ef4444', tension: .4, pointRadius: 3 }
+        ] }, options: co('Count')
+    });
+}
+
+function renderCycleTimeChart(d) {
+    dc('cycle');
+    var authors = d.authorStats.filter(function(a) { return a.avgCycleTimeMinutes != null; }).slice(0, 10);
+    var pipeline = authors.map(function(a) { return (a.avgTimeToDeployMinutes || 0) / 60; });
+    var wait = authors.map(function(a) { return ((a.avgCycleTimeMinutes || 0) - (a.avgTimeToDeployMinutes || 0)) / 60; });
+    charts.cycle = new Chart(document.getElementById('cycleTimeChart').getContext('2d'), {
+        type: 'bar', data: { labels: authors.map(function(a) { return a.authorName; }),
+        datasets: [
+            { label: 'Wait Time (commit→action start)', data: wait.map(function(v) { return v.toFixed(2); }), backgroundColor: 'rgba(139,92,246,.6)', borderRadius: 4 },
+            { label: 'Pipeline Duration', data: pipeline.map(function(v) { return v.toFixed(2); }), backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 4 }
+        ] }, options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: { x: { stacked: true, ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                      y: { stacked: true, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Hours', color: '#9ca3af' } } } }
+    });
+}
+
+function renderDailyChart(stats) {
+    dc('daily');
+    charts.daily = new Chart(document.getElementById('dailyChart').getContext('2d'), {
+        type: 'bar', data: { labels: stats.map(function(s) { return s.date.substring(5); }),
+        datasets: [
+            { label: 'Commits', data: stats.map(function(s) { return s.commits; }), backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 4 },
+            { label: 'Successful', data: stats.map(function(s) { return s.successfulRuns; }), backgroundColor: 'rgba(34,197,94,.6)', borderRadius: 4 },
+            { label: 'Failed', data: stats.map(function(s) { return s.failedRuns; }), backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 4 }
+        ] }, options: co('Count')
+    });
+}
+
+function renderLeadTimeChart(stats) {
+    dc('lead');
+    var f = stats.filter(function(s) { return s.avgLeadTimeMinutes != null; });
+    charts.lead = new Chart(document.getElementById('leadTimeChart').getContext('2d'), {
+        type: 'line', data: { labels: f.map(function(s) { return s.date.substring(5); }),
+        datasets: [{ label: 'Avg Lead Time', data: f.map(function(s) { return (s.avgLeadTimeMinutes / 60).toFixed(2); }),
+            borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.1)', fill: true, tension: .4, pointRadius: 3
+        }] }, options: co('Hours')
+    });
+}
+
+function renderSuccessFailChart(succ, fail) {
+    dc('sf');
+    charts.sf = new Chart(document.getElementById('successFailChart').getContext('2d'), {
+        type: 'doughnut', data: { labels: ['Success (' + succ + ')', 'Failure (' + fail + ')'],
+        datasets: [{ data: [succ, fail], backgroundColor: ['rgba(34,197,94,.7)', 'rgba(239,68,68,.7)'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9ca3af' } } } }
+    });
+}
+
+function renderBatchSizeChart(commits) {
+    dc('batch');
+    var b = { '1-10': 0, '11-50': 0, '51-100': 0, '101-500': 0, '500+': 0 };
+    commits.forEach(function(c) { var t = c.linesAdded + c.linesDeleted; if (t <= 10) b['1-10']++; else if (t <= 50) b['11-50']++; else if (t <= 100) b['51-100']++; else if (t <= 500) b['101-500']++; else b['500+']++; });
+    charts.batch = new Chart(document.getElementById('batchSizeChart').getContext('2d'), {
+        type: 'bar', data: { labels: Object.keys(b),
+        datasets: [{ label: 'Commits', data: Object.values(b), backgroundColor: ['rgba(34,197,94,.6)', 'rgba(59,130,246,.6)', 'rgba(250,204,21,.6)', 'rgba(249,115,22,.6)', 'rgba(239,68,68,.6)'], borderRadius: 6 }] },
+        options: co('Commits')
+    });
+}
+
+// ══════ COMMIT LIST ══════
+function renderCommitList(commits) {
+    allCommitsForSearch = commits;
+    document.getElementById('commitCountBadge').textContent = commits.length;
+    renderCommitItems(commits);
+}
+
+function renderCommitItems(items) {
+    document.getElementById('commitListContainer').innerHTML = items.slice(0, 200).map(function(c) {
+        var date = new Date(c.committedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        var lt = c.leadTimeMinutes != null ? fmtDur(c.leadTimeMinutes) : '—';
+        var lines = c.linesAdded + c.linesDeleted;
+        var ltR = rateLeadTime(c.leadTimeMinutes);
+        var bsR = rateBatchSize(lines);
+        var link = c.firstActionUrl ? ' • <a href="' + c.firstActionUrl + '" target="_blank" style="color:#34d399;text-decoration:none;font-size:.8rem">View Action ↗</a>' : '';
+        return '<div class="commit-item">' +
+            '<div class="commit-sha-box">' + c.shortSha + '</div>' +
+            '<div class="commit-info">' +
+            '<div class="commit-title" title="' + esc(c.message) + '">' + esc(c.message) + '</div>' +
+            '<div class="commit-meta"><span>👤 ' + esc(c.authorLogin) + '</span><span>📅 ' + date + '</span><span>+' + c.linesAdded + ' / -' + c.linesDeleted + '</span>' + link + '</div>' +
+            '<div class="commit-tags">' +
+            statusBadge(c.deploymentResult) +
+            ' <span class="commit-tag ' + ltR + '">⏱️ ' + lt + '</span>' +
+            ' <span class="commit-tag ' + bsR + '">📏 ' + lines + ' lines</span>' +
+            '</div></div></div>';
+    }).join('');
+}
+
+function filterCommitList() {
+    var q = document.getElementById('commitSearchInput').value.toLowerCase();
+    var f = allCommitsForSearch.filter(function(c) { return c.message.toLowerCase().indexOf(q) >= 0 || c.authorLogin.toLowerCase().indexOf(q) >= 0 || c.shortSha.toLowerCase().indexOf(q) >= 0; });
+    document.getElementById('commitCountBadge').textContent = f.length;
+    renderCommitItems(f);
+}
+
+// ══════ HELPERS ══════
+function statusBadge(s) {
+    if (s === 'SUCCESS') return '<span class="status-badge status-success">✅ Success</span>';
+    if (s === 'FAILURE') return '<span class="status-badge status-failure">❌ Failed</span>';
+    return '<span class="status-badge status-pending">⏳ Pending</span>';
+}
+function fmtDur(min) { if (min < 60) return min.toFixed(0) + 'm'; if (min < 1440) return (min / 60).toFixed(1) + 'h'; return (min / 1440).toFixed(1) + 'd'; }
+function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function showError(m) { var e = document.getElementById('errorMsg'); e.textContent = m; e.classList.remove('hidden'); }
+function hideError() { document.getElementById('errorMsg').classList.add('hidden'); }
+</script>
+</body>
+</html>
+

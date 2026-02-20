@@ -224,6 +224,11 @@
             box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
         }
 
+        .tab-btn[data-tab="trunk"].active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
         /* ==================== GRID POPUP ==================== */
         .grid-popup-overlay {
             position: fixed;
@@ -1013,6 +1018,11 @@
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(249, 115, 22, 0.15);
         }
 
+        .action-card.trunk:hover {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(16, 185, 129, 0.15);
+        }
+
         .action-icon {
             font-size: 3rem;
             margin-bottom: 1rem;
@@ -1199,6 +1209,10 @@
         <button class="tab-btn" data-tab="matrix" onclick="switchTab('matrix')">
             <span class="tab-icon">⚡</span>
             <span>Matrix</span>
+        </button>
+        <button class="tab-btn" data-tab="trunk" onclick="switchTab('trunk')">
+            <span class="tab-icon">🌳</span>
+            <span>Trunk Matrix</span>
         </button>
     </nav>
 
@@ -1406,6 +1420,13 @@
                     <p>Track Cycle Time, PR Size, Review Time, and benchmark against standards.</p>
                     <div class="action-arrow">→</div>
                 </div>
+
+                <div class="action-card trunk" onclick="switchTab('trunk')">
+                    <div class="action-icon">🌳</div>
+                    <h3>Trunk-Based Matrix</h3>
+                    <p>DORA metrics for trunk-based CI/CD — commits, GitHub Actions, and recovery time.</p>
+                    <div class="action-arrow">→</div>
+                </div>
             </div>
         </div>
     </div>
@@ -1430,13 +1451,20 @@
             <iframe id="iframe-matrix" src="" data-src="matrix.html"></iframe>
         </div>
     </div>
+
+    <!-- Trunk Matrix Tab -->
+    <div class="tab-content" id="tab-trunk">
+        <div class="iframe-container">
+            <iframe id="iframe-trunk" src="" data-src="trunk-matrix.html"></iframe>
+        </div>
+    </div>
 </main>
 
 <script>
     // State
     let selectedProvider = 'GITHUB';
     let currentTab = 'home';
-    let iframesLoaded = { contribution: false, engagement: false, matrix: false };
+    let iframesLoaded = { contribution: false, engagement: false, matrix: false, trunk: false };
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
@@ -1759,7 +1787,7 @@
         document.getElementById('token').value = '';
 
         // Reset iframes
-        iframesLoaded = { contribution: false, engagement: false, matrix: false };
+        iframesLoaded = { contribution: false, engagement: false, matrix: false, trunk: false };
         document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
             iframe.src = '';
         });
