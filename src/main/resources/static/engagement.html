@@ -75,6 +75,27 @@
         .error-box.hidden { display: none; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Searchable dropdowns */
+        .repo-search-wrapper, .contributor-search-wrapper { position: relative; }
+        .repo-dropdown, .contributor-dropdown { display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:#1e1e2e; border:1px solid rgba(255,255,255,.15); border-radius:12px; margin-top:4px; z-index:100; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+        .repo-dropdown.show, .contributor-dropdown.show { display:block; }
+        .repo-dropdown-item, .contributor-dropdown-item { padding:.6rem 1rem; color:#e4e4e7; font-size:.875rem; cursor:pointer; transition:background .15s; display:flex; align-items:center; gap:.5rem; border-bottom:1px solid rgba(255,255,255,.05); }
+        .repo-dropdown-item:last-child, .contributor-dropdown-item:last-child { border-bottom:none; }
+        .repo-dropdown-item:hover, .contributor-dropdown-item:hover { background:rgba(99,102,241,.15); }
+        .repo-dropdown-item.selected, .contributor-dropdown-item.selected { background:rgba(99,102,241,.2); color:#818cf8; }
+        .repo-dropdown-item .repo-check, .contributor-dropdown-item .dd-check { width:16px; height:16px; border-radius:4px; border:2px solid rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-size:.7rem; flex-shrink:0; transition:all .15s; }
+        .repo-dropdown-item.selected .repo-check, .contributor-dropdown-item.selected .dd-check { background:#6366f1; border-color:#6366f1; color:#fff; }
+        .repo-dropdown-item .repo-icon, .contributor-dropdown-item .dd-avatar { opacity:.5; font-size:.75rem; }
+        .contributor-dropdown-item .dd-avatar { width:24px; height:24px; border-radius:50%; opacity:1; }
+        .repo-dropdown-empty, .contributor-dropdown-empty { padding:1rem; text-align:center; color:#71717a; font-size:.85rem; }
+
+        /* Selected tags */
+        .repo-tag, .contributor-tag { display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .6rem; background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); border-radius:8px; font-size:.78rem; color:#a5b4fc; cursor:default; }
+        .contributor-tag { background:rgba(139,92,246,.15); border-color:rgba(139,92,246,.3); color:#c4b5fd; }
+        .contributor-tag .tag-avatar { width:16px; height:16px; border-radius:50%; }
+        .repo-tag .tag-remove, .contributor-tag .tag-remove { cursor:pointer; color:#71717a; font-size:.85rem; line-height:1; margin-left:.15rem; transition:color .15s; }
+        .repo-tag .tag-remove:hover, .contributor-tag .tag-remove:hover { color:#ef4444; }
     </style>
 </head>
 <body>
@@ -107,41 +128,28 @@
         </div>
 
         <!-- Select Contributors & Configure -->
-        <div class="config-panel" id="step2-panel">
-            <!-- Organization Info -->
-            <div id="orgInfo" class="org-info-bar"></div>
+        <div class="config-panel" id="configPanel">
 
-            <h2>👤 Select Contributors</h2>
-            <div class="search-box">
-                <input type="text" id="contributorSearch" placeholder="Search contributors..." oninput="filterContributors()">
-            </div>
-
-            <div class="selection-controls">
-                <button class="secondary" onclick="deselectAllContributors()">Deselect All</button>
-                <span style="margin-left: auto; color: #a1a1aa;"><span id="contributorCount">0</span> selected</span>
-            </div>
-
-            <div class="contributors-container" id="contributorsList"></div>
-
-            <!-- Repository Filter -->
-            <div class="config-section">
-                <div class="config-section-title">📁 Select Repositories (1-10 required)</div>
-                <p style="font-size: 0.8rem; color: #71717a; margin-bottom: 0.75rem;">
-                    Select between 1 and 10 repositories to analyze.
-                </p>
-
-                <div id="repo-selection">
-                    <div class="search-box">
-                        <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
-                    </div>
-
-                    <div class="selection-controls">
-                        <button class="secondary" onclick="deselectAllRepos()">Deselect All</button>
-                        <span style="margin-left: auto; color: #a1a1aa;"><span id="repoCount">0</span> selected</span>
-                    </div>
-
-                    <div class="repo-list" id="repoList"></div>
+            <div style="margin-bottom:1.25rem">
+                <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">👤 Select Contributors <span id="contributorCount" style="color:#818cf8;font-weight:600">0</span> selected</label>
+                <div class="contributor-search-wrapper" id="contributorSearchWrapper">
+                    <input type="text" id="contributorSearch" placeholder="Search contributors…" autocomplete="off"
+                           style="width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit"
+                           oninput="filterContributors()" onfocus="showContributorDropdown()">
+                    <div class="contributor-dropdown" id="contributorDropdown"></div>
                 </div>
+                <div class="contributor-selected-tags" id="contributorSelectedTags" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem"></div>
+            </div>
+
+            <div style="margin-bottom:1.25rem">
+                <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">📁 Select Repositories <span id="repoCount" style="color:#818cf8;font-weight:600">0</span> selected (1-10)</label>
+                <div class="repo-search-wrapper" id="repoSearchWrapper">
+                    <input type="text" id="repoSearch" placeholder="Search repositories…" autocomplete="off"
+                           style="width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit"
+                           oninput="filterRepos()" onfocus="showRepoDropdown()">
+                    <div class="repo-dropdown" id="repoDropdown"></div>
+                </div>
+                <div class="repo-selected-tags" id="repoSelectedTags" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem"></div>
             </div>
 
             <!-- Exclude Merge Commits -->
@@ -151,24 +159,22 @@
             </div>
 
             <!-- Date Range & Period -->
-            <div class="config-section">
-                <div class="config-grid">
-                    <div class="config-field">
-                        <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate">
-                    </div>
-                    <div class="config-field">
-                        <label for="endDate">End Date</label>
-                        <input type="date" id="endDate">
-                    </div>
-                    <div class="config-field">
-                        <label for="period">Aggregation Period</label>
-                        <select id="period">
-                            <option value="DAILY">Daily</option>
-                            <option value="WEEKLY" selected>Weekly</option>
-                            <option value="MONTHLY">Monthly</option>
-                        </select>
-                    </div>
+            <div class="config-grid">
+                <div class="config-field">
+                    <label>Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="config-field">
+                    <label>End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="config-field">
+                    <label>Aggregation Period</label>
+                    <select id="period">
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY" selected>Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                    </select>
                 </div>
             </div>
 
@@ -491,18 +497,14 @@
                     if (sessionData.repositories && sessionData.repositories.length > 0) {
                         repositories = sessionData.repositories.map(r => r.fullName);
 
-                        // Render repository list
-                        renderRepoList();
+                        // Render repository dropdown
+                        renderRepoDropdown(repositories);
+                        renderRepoSelectedTags();
                     }
 
-                    renderContributorsList();
+                    renderContributorDropdown(contributors);
+                    renderContributorSelectedTags();
 
-                    // Show org info
-                    document.getElementById('orgInfo').innerHTML = `
-                        🏢 <strong>${organizations.length}</strong> organizations •
-                        👥 <strong>${contributors.length}</strong> contributors •
-                        📦 <strong>${repositories.length}</strong> repositories loaded
-                    `;
                 }
             } else {
                 // Redirect to login if no session
@@ -540,103 +542,135 @@
             }
         }
 
-        // Repository list rendering
-        function renderRepoList(filter = '') {
-            const container = document.getElementById('repoList');
-            const filtered = repositories.filter(r =>
-                r.toLowerCase().includes(filter.toLowerCase())
-            );
-
-            container.innerHTML = filtered.map(repo => {
-                const repoName = repo.split('/').pop();
-                return `
-                    <div class="repo-item ${selectedRepos.has(repo) ? 'selected' : ''}"
-                         onclick="toggleRepo('${repo}')">
-                        <input type="checkbox" ${selectedRepos.has(repo) ? 'checked' : ''}
-                               onclick="event.stopPropagation(); toggleRepo('${repo}')">
-                        <div class="repo-info">
-                            <div class="repo-name">${repoName}</div>
-                            <div class="repo-fullname">${repo}</div>
-                        </div>
-                    </div>
-                `;
+        // ==================== REPO DROPDOWN ====================
+        function renderRepoDropdown(repos) {
+            const dd = document.getElementById('repoDropdown');
+            if (!repos.length) {
+                dd.innerHTML = '<div class="repo-dropdown-empty">No repositories found</div>';
+                return;
+            }
+            dd.innerHTML = repos.map(repo => {
+                const fullName = typeof repo === 'string' ? repo : repo.fullName;
+                const isPrivate = typeof repo === 'object' && repo.isPrivate;
+                const isSelected = selectedRepos.has(fullName);
+                const icon = isPrivate ? '🔒' : '📂';
+                return `<div class="repo-dropdown-item ${isSelected ? 'selected' : ''}" onclick="toggleRepo('${fullName.replace(/'/g, "\\'")}')">
+                    <span class="repo-check">${isSelected ? '✓' : ''}</span>
+                    <span class="repo-icon">${icon}</span>
+                    ${fullName}
+                </div>`;
             }).join('');
-
-            updateRepoCount();
         }
 
         function filterRepos() {
-            renderRepoList(document.getElementById('repoSearch').value);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = repositories.filter(r => {
+                const name = typeof r === 'string' ? r : r.fullName;
+                return name.toLowerCase().includes(q);
+            });
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
         }
 
-        function toggleRepo(repo) {
-            // Check if adding would exceed limit
-            if (!selectedRepos.has(repo) && selectedRepos.size >= 10) {
-                showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
+        function showRepoDropdown() {
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => {
+                const name = typeof r === 'string' ? r : r.fullName;
+                return name.toLowerCase().includes(q);
+            }) : repositories;
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
+        }
+
+        function toggleRepo(fullName) {
+            if (selectedRepos.has(fullName)) {
+                selectedRepos.delete(fullName);
+            } else {
+                if (selectedRepos.size >= 10) {
+                    showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
+                    return;
+                }
+                selectedRepos.add(fullName);
+            }
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => {
+                const name = typeof r === 'string' ? r : r.fullName;
+                return name.toLowerCase().includes(q);
+            }) : repositories;
+            renderRepoDropdown(filtered);
+            renderRepoSelectedTags();
+            updateRepoCount();
+        }
+
+        function removeRepo(fullName) {
+            selectedRepos.delete(fullName);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => {
+                const name = typeof r === 'string' ? r : r.fullName;
+                return name.toLowerCase().includes(q);
+            }) : repositories;
+            renderRepoDropdown(filtered);
+            renderRepoSelectedTags();
+            updateRepoCount();
+        }
+
+        function renderRepoSelectedTags() {
+            const container = document.getElementById('repoSelectedTags');
+            if (selectedRepos.size === 0) {
+                container.innerHTML = '<span style="color:#52525b;font-size:.8rem">No repositories selected</span>';
                 return;
             }
-
-            if (selectedRepos.has(repo)) {
-                selectedRepos.delete(repo);
-            } else {
-                selectedRepos.add(repo);
-            }
-            renderRepoList(document.getElementById('repoSearch').value);
-        }
-
-        function deselectAllRepos() {
-            selectedRepos.clear();
-            renderRepoList(document.getElementById('repoSearch').value);
+            container.innerHTML = Array.from(selectedRepos).map(name => {
+                const short = name.split('/').pop();
+                return `<span class="repo-tag">${short}<span class="tag-remove" onclick="removeRepo('${name.replace(/'/g, "\\'")}')">&times;</span></span>`;
+            }).join('');
         }
 
         function updateRepoCount() {
-            const repoCountEl = document.getElementById('repoCount');
-            if (repoCountEl) {
-                repoCountEl.textContent = selectedRepos.size;
-            }
+            const el = document.getElementById('repoCount');
+            if (el) el.textContent = selectedRepos.size;
         }
 
-
-        // Render contributors list
-        function renderContributorsList(filter = '') {
-            const container = document.getElementById('contributorsList');
-
-            // Filter by login, name, or display name
-            const filtered = contributors.filter(c => {
+        // ==================== CONTRIBUTOR DROPDOWN ====================
+        function renderContributorDropdown(contribs) {
+            const dd = document.getElementById('contributorDropdown');
+            if (!contribs.length) {
+                dd.innerHTML = '<div class="contributor-dropdown-empty">No contributors found</div>';
+                return;
+            }
+            dd.innerHTML = contribs.map(c => {
+                const isSelected = selectedContributors.has(c.login);
                 const displayName = getDisplayName(c.login);
-                const searchText = filter.toLowerCase();
-
-                return c.login.toLowerCase().includes(searchText) ||
-                       (c.name && c.name.toLowerCase().includes(searchText)) ||
-                       (displayName && displayName.toLowerCase().includes(searchText));
-            });
-
-            container.innerHTML = filtered.map(c => {
-                const displayName = getDisplayName(c.login);
-                const reposInfo = c.publicRepos ? `📁 ${c.publicRepos} repos` : '';
-                const contributionsInfo = c.contributions ? `${c.contributions} contributions` : '';
-                const infoText = [contributionsInfo, reposInfo].filter(x => x).join(' • ');
-
-                return `
-                    <div class="contributor-item ${selectedContributors.has(c.login) ? 'selected' : ''}"
-                         onclick="toggleContributor('${c.login}')">
-                        <input type="checkbox" ${selectedContributors.has(c.login) ? 'checked' : ''}
-                               onclick="event.stopPropagation(); toggleContributor('${c.login}')">
-                        <img class="contributor-avatar" src="${c.avatarUrl || ''}"
-                             onerror="this.style.display='none'" alt="">
-                        <div class="contributor-info">
-                            <div class="contributor-login">${displayName}</div>
-                            <div class="contributor-contributions">@${c.login}${infoText ? ' • ' + infoText : ''}</div>
-                        </div>
-                    </div>
-                `;
+                return `<div class="contributor-dropdown-item ${isSelected ? 'selected' : ''}" onclick="toggleContributor('${c.login.replace(/'/g, "\\'")}')">
+                    <span class="dd-check">${isSelected ? '✓' : ''}</span>
+                    ${c.avatarUrl ? `<img class="dd-avatar" src="${c.avatarUrl}" alt="">` : ''}
+                    <span>${displayName} <span style="color:#71717a;font-size:.75rem">@${c.login}</span></span>
+                </div>`;
             }).join('');
-
-            updateContributorCount();
         }
 
         function filterContributors() {
-            renderContributorsList(document.getElementById('contributorSearch').value);
+            const q = document.getElementById('contributorSearch').value.toLowerCase();
+            const filtered = contributors.filter(c => {
+                const displayName = getDisplayName(c.login);
+                return c.login.toLowerCase().includes(q) ||
+                       (c.name && c.name.toLowerCase().includes(q)) ||
+                       (displayName && displayName.toLowerCase().includes(q));
+            });
+            renderContributorDropdown(filtered);
+            document.getElementById('contributorDropdown').classList.add('show');
+        }
+
+        function showContributorDropdown() {
+            const q = document.getElementById('contributorSearch').value.toLowerCase();
+            const filtered = q ? contributors.filter(c => {
+                const displayName = getDisplayName(c.login);
+                return c.login.toLowerCase().includes(q) ||
+                       (c.name && c.name.toLowerCase().includes(q)) ||
+                       (displayName && displayName.toLowerCase().includes(q));
+            }) : contributors;
+            renderContributorDropdown(filtered);
+            document.getElementById('contributorDropdown').classList.add('show');
         }
 
         function toggleContributor(login) {
@@ -645,18 +679,62 @@
             } else {
                 selectedContributors.add(login);
             }
-            renderContributorsList(document.getElementById('contributorSearch').value);
+            const q = document.getElementById('contributorSearch').value.toLowerCase();
+            const filtered = q ? contributors.filter(c => {
+                const displayName = getDisplayName(c.login);
+                return c.login.toLowerCase().includes(q) ||
+                       (c.name && c.name.toLowerCase().includes(q)) ||
+                       (displayName && displayName.toLowerCase().includes(q));
+            }) : contributors;
+            renderContributorDropdown(filtered);
+            renderContributorSelectedTags();
+            updateContributorCount();
         }
 
-        function deselectAllContributors() {
-            selectedContributors.clear();
-            renderContributorsList(document.getElementById('contributorSearch').value);
+        function removeContributor(login) {
+            selectedContributors.delete(login);
+            const q = document.getElementById('contributorSearch').value.toLowerCase();
+            const filtered = q ? contributors.filter(c => {
+                const displayName = getDisplayName(c.login);
+                return c.login.toLowerCase().includes(q) ||
+                       (c.name && c.name.toLowerCase().includes(q)) ||
+                       (displayName && displayName.toLowerCase().includes(q));
+            }) : contributors;
+            renderContributorDropdown(filtered);
+            renderContributorSelectedTags();
+            updateContributorCount();
+        }
+
+        function renderContributorSelectedTags() {
+            const container = document.getElementById('contributorSelectedTags');
+            if (selectedContributors.size === 0) {
+                container.innerHTML = '<span style="color:#52525b;font-size:.8rem">No contributors selected</span>';
+                return;
+            }
+            container.innerHTML = Array.from(selectedContributors).map(login => {
+                const displayName = getDisplayName(login);
+                const avatarUrl = getAvatarUrl(login);
+                const avatarImg = avatarUrl ? `<img class="tag-avatar" src="${avatarUrl}" alt="">` : '';
+                return `<span class="contributor-tag">${avatarImg}${displayName}<span class="tag-remove" onclick="removeContributor('${login.replace(/'/g, "\\'")}')">&times;</span></span>`;
+            }).join('');
         }
 
         function updateContributorCount() {
             document.getElementById('contributorCount').textContent = selectedContributors.size;
             document.getElementById('analyzeBtn').disabled = selectedContributors.size === 0;
         }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            const repoWrapper = document.getElementById('repoSearchWrapper');
+            if (repoWrapper && !repoWrapper.contains(e.target)) {
+                document.getElementById('repoDropdown').classList.remove('show');
+            }
+            const contribWrapper = document.getElementById('contributorSearchWrapper');
+            if (contribWrapper && !contribWrapper.contains(e.target)) {
+                document.getElementById('contributorDropdown').classList.remove('show');
+            }
+        });
 
 
         // Analyze engagement - PARALLEL loading for speed

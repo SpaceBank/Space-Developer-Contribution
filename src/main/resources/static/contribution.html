@@ -275,6 +275,24 @@
         .error-box.hidden { display: none; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Repo search dropdown */
+        .repo-search-wrapper { position: relative; }
+        .repo-dropdown { display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:#1e1e2e; border:1px solid rgba(255,255,255,.15); border-radius:12px; margin-top:4px; z-index:100; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+        .repo-dropdown.show { display:block; }
+        .repo-dropdown-item { padding:.6rem 1rem; color:#e4e4e7; font-size:.875rem; cursor:pointer; transition:background .15s; display:flex; align-items:center; gap:.5rem; border-bottom:1px solid rgba(255,255,255,.05); }
+        .repo-dropdown-item:last-child { border-bottom:none; }
+        .repo-dropdown-item:hover { background:rgba(99,102,241,.15); }
+        .repo-dropdown-item.selected { background:rgba(99,102,241,.2); color:#818cf8; }
+        .repo-dropdown-item .repo-check { width:16px; height:16px; border-radius:4px; border:2px solid rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-size:.7rem; flex-shrink:0; transition:all .15s; }
+        .repo-dropdown-item.selected .repo-check { background:#6366f1; border-color:#6366f1; color:#fff; }
+        .repo-dropdown-item .repo-icon { opacity:.5; font-size:.75rem; }
+        .repo-dropdown-empty { padding:1rem; text-align:center; color:#71717a; font-size:.85rem; }
+
+        /* Selected tags */
+        .repo-tag { display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .6rem; background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); border-radius:8px; font-size:.78rem; color:#a5b4fc; cursor:default; }
+        .repo-tag .tag-remove { cursor:pointer; color:#71717a; font-size:.85rem; line-height:1; margin-left:.15rem; transition:color .15s; }
+        .repo-tag .tag-remove:hover { color:#ef4444; }
     </style>
 </head>
 <body>
@@ -307,69 +325,39 @@
         </div>
 
         <!-- Repository Selection -->
-        <div class="config-panel" id="step2-panel">
-            <!-- Organization Info -->
-            <div id="orgInfo" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 12px; font-size: 0.9rem;"></div>
-
-            <h2>📁 Select Repositories</h2>
-
-            <div class="search-box">
-                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
+        <div class="config-panel" id="configPanel">
+            <div style="margin-bottom:1.25rem">
+                <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">📁 Select Repositories <span id="selectedCount" style="color:#818cf8;font-weight:600">0</span> selected (1-10)</label>
+                <div class="repo-search-wrapper" id="repoSearchWrapper">
+                    <input type="text" id="repoSearch" placeholder="Search repositories…" autocomplete="off"
+                           style="width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit"
+                           oninput="filterRepos()" onfocus="showRepoDropdown()">
+                    <div class="repo-dropdown" id="repoDropdown"></div>
+                </div>
+                <div class="repo-selected-tags" id="repoSelectedTags" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem"></div>
             </div>
 
-            <div class="selection-info">
-                <span><strong id="selectedCount">0</strong> repositories selected</span>
-                <div>
-                    <button class="secondary" onclick="selectAll()">Select All</button>
-                    <button class="secondary" onclick="deselectAll()">Deselect All</button>
+            <div class="config-grid">
+                <div class="config-field">
+                    <label>🌿 Branch</label>
+                    <input type="text" id="branchInput" placeholder="all branches (leave empty)" value="">
+                    <div class="field-hint">Leave empty for all branches, or enter comma-separated names</div>
                 </div>
-            </div>
-
-            <div class="repo-list" id="repoList"></div>
-
-            <!-- Branch Selector -->
-            <div class="config-section">
-                <div class="config-section-title">🌿 Filter by Branches</div>
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="branchFilter" value="all" checked onchange="handleBranchFilterChange()">
-                        <span style="color: #e4e4e7;">All Branches</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 0.5rem;">
-                        <input type="radio" name="branchFilter" value="specific" onchange="handleBranchFilterChange()">
-                        <span style="color: #e4e4e7;">Specific Branches</span>
-                    </label>
+                <div class="config-field">
+                    <label>Start Date</label>
+                    <input type="date" id="startDate">
                 </div>
-
-                <div id="branchInputContainer" class="hidden">
-                    <div class="config-field">
-                        <label for="branchInput">Enter branch names (comma-separated)</label>
-                        <input type="text" id="branchInput" placeholder="e.g., main, develop, feature/new-api" style="font-family: 'Courier New', monospace;">
-                        <div class="field-hint">💡 Separate multiple branches with commas</div>
-                    </div>
+                <div class="config-field">
+                    <label>End Date</label>
+                    <input type="date" id="endDate">
                 </div>
-            </div>
-
-            <!-- Date Range & Period -->
-            <div class="config-section">
-                <div class="config-grid">
-                    <div class="config-field">
-                        <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate">
-                    </div>
-                    <div class="config-field">
-                        <label for="endDate">End Date</label>
-                        <input type="date" id="endDate">
-                    </div>
-                    <div class="config-field">
-                        <label for="period">Aggregation Period</label>
-                        <select id="period">
-                            <option value="DAILY">Daily</option>
-                            <option value="WEEKLY" selected>Weekly</option>
-                            <option value="MONTHLY">Monthly</option>
-                        </select>
-                    </div>
+                <div class="config-field">
+                    <label>Aggregation Period</label>
+                    <select id="period">
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY" selected>Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                    </select>
                 </div>
             </div>
 
@@ -520,7 +508,6 @@
         let organizations = [];
 
         let selectedRepos = new Set();
-        let branchFilterMode = 'all'; // 'all' or 'specific'
         let commitsChart = null;
         let linesChart = null;
         let pieChart = null;
@@ -646,15 +633,10 @@
                         name: r.name || r.fullName.split('/').pop(),
                         isPrivate: r.private || false
                     }));
-                    renderRepositoryList();
+                    renderRepoDropdown(repositories);
+                    renderSelectedTags();
                     currentStep = 1;
                 }
-
-                document.getElementById('orgInfo').innerHTML = `
-                        🏢 <strong>${organizations.length}</strong> organizations •
-                        👥 <strong>${contributors.length}</strong> contributors •
-                        📦 <strong>${repositories.length}</strong> repositories loaded
-                    `;
             } else {
                 // Redirect to login if no session
                 window.location.href = '/';
@@ -712,9 +694,9 @@
                 repositories = data.repositories;
                 selectedRepos.clear();
 
-                renderRepositoryList();
+                renderRepoDropdown(repositories);
+                renderSelectedTags();
                 hideLoading('auth-loading');
-                goToStep(2);
 
             } catch (error) {
                 hideLoading('auth-loading');
@@ -723,99 +705,90 @@
         }
 
         // Render repository list
-        function renderRepositoryList(filter = '') {
-            const container = document.getElementById('repoList');
-            const filtered = repositories.filter(repo =>
-                repo.fullName.toLowerCase().includes(filter.toLowerCase()) ||
-                repo.name.toLowerCase().includes(filter.toLowerCase())
-            );
-
-            container.innerHTML = filtered.map(repo => `
-                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
-                     onclick="toggleRepo('${repo.fullName}')">
-                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
-                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
-                    <div class="repo-info">
-                        <div class="repo-name">
-                            ${repo.name}
-                            ${repo.isPrivate ? '<span class="repo-badge private">Private</span>' : ''}
-                        </div>
-                        <div class="repo-fullname">${repo.fullName}</div>
-                    </div>
-                </div>
-            `).join('');
-
-            updateSelectionCount();
+        // Render repo dropdown with checkboxes
+        function renderRepoDropdown(repos) {
+            const dd = document.getElementById('repoDropdown');
+            if (!repos.length) {
+                dd.innerHTML = '<div class="repo-dropdown-empty">No repositories found</div>';
+                return;
+            }
+            dd.innerHTML = repos.map(repo => {
+                const isSelected = selectedRepos.has(repo.fullName);
+                const icon = repo.isPrivate ? '🔒' : '📂';
+                return `<div class="repo-dropdown-item ${isSelected ? 'selected' : ''}" onclick="toggleRepo('${repo.fullName.replace(/'/g, "\\'")}')">
+                    <span class="repo-check">${isSelected ? '✓' : ''}</span>
+                    <span class="repo-icon">${icon}</span>
+                    ${repo.fullName}
+                </div>`;
+            }).join('');
         }
 
         function filterRepos() {
-            const filter = document.getElementById('repoSearch').value;
-            renderRepositoryList(filter);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = repositories.filter(r => r.fullName.toLowerCase().includes(q));
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
+        }
+
+        function showRepoDropdown() {
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => r.fullName.toLowerCase().includes(q)) : repositories;
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
         }
 
         function toggleRepo(fullName) {
             if (selectedRepos.has(fullName)) {
                 selectedRepos.delete(fullName);
             } else {
-                // Check max 10 limit
                 if (selectedRepos.size >= 10) {
                     showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
                     return;
                 }
                 selectedRepos.add(fullName);
             }
-            renderRepositoryList(document.getElementById('repoSearch').value);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => r.fullName.toLowerCase().includes(q)) : repositories;
+            renderRepoDropdown(filtered);
+            renderSelectedTags();
+            updateSelectionCount();
         }
 
-        function selectAll() {
-            const filter = document.getElementById('repoSearch').value.toLowerCase();
-            const filtered = repositories.filter(repo =>
-                repo.fullName.toLowerCase().includes(filter) || repo.name.toLowerCase().includes(filter)
-            );
+        function removeRepo(fullName) {
+            selectedRepos.delete(fullName);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => r.fullName.toLowerCase().includes(q)) : repositories;
+            renderRepoDropdown(filtered);
+            renderSelectedTags();
+            updateSelectionCount();
+        }
 
-            // Limit to 10 max
-            const toAdd = filtered.slice(0, 10);
-            toAdd.forEach(repo => selectedRepos.add(repo.fullName));
-
-            if (filtered.length > 10) {
-                showModal('ℹ️', 'Selection Limited', `Only the first 10 repositories were selected. Maximum limit is 10.`);
+        function renderSelectedTags() {
+            const container = document.getElementById('repoSelectedTags');
+            if (selectedRepos.size === 0) {
+                container.innerHTML = '<span style="color:#52525b;font-size:.8rem">No repositories selected</span>';
+                return;
             }
-            renderRepositoryList(document.getElementById('repoSearch').value);
+            container.innerHTML = Array.from(selectedRepos).map(name => {
+                const short = name.split('/').pop();
+                return `<span class="repo-tag">${short}<span class="tag-remove" onclick="removeRepo('${name.replace(/'/g, "\\'")}')">&times;</span></span>`;
+            }).join('');
         }
 
-        function deselectAll() {
-            selectedRepos.clear();
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
-
-        // ==================== BRANCH FUNCTIONS ====================
-
-        function handleBranchFilterChange() {
-            const selectedMode = document.querySelector('input[name="branchFilter"]:checked').value;
-            branchFilterMode = selectedMode;
-            const branchInputContainer = document.getElementById('branchInputContainer');
-
-            if (selectedMode === 'specific') {
-                branchInputContainer.classList.remove('hidden');
-            } else {
-                branchInputContainer.classList.add('hidden');
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('repoSearchWrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('repoDropdown').classList.remove('show');
             }
-        }
+        });
 
+        // Branch helper — reads comma-separated input
         function getBranchesFromInput() {
             const input = document.getElementById('branchInput');
-            if (!input || !input.value.trim()) {
-                return [];
-            }
-
-            // Split by comma, trim whitespace, and filter empty strings
-            return input.value
-                .split(',')
-                .map(b => b.trim())
-                .filter(b => b.length > 0);
+            if (!input || !input.value.trim()) return [];
+            return input.value.split(',').map(b => b.trim()).filter(b => b.length > 0);
         }
-
-        // ==================== END BRANCH FUNCTIONS ====================
 
         function updateSelectionCount() {
             document.getElementById('selectedCount').textContent = selectedRepos.size;
@@ -1220,11 +1193,9 @@
             const endDate = document.getElementById('endDate').value || null;
             const period = document.getElementById('period').value;
 
-            // Get branch filter from new input
-            const branchFilter = branchFilterMode === 'specific'
-                ? getBranchesFromInput()
-                : null;
-            const branch = (branchFilter && branchFilter.length > 0) ? branchFilter[0] : null; // Use first branch for now
+            // Get branch filter from input
+            const branches = getBranchesFromInput();
+            const branch = branches.length > 0 ? branches[0] : null;
 
             const excludeMerges = document.getElementById('excludeMerges').checked;
 
@@ -1236,7 +1207,7 @@
             log('info', `Provider: ${selectedProvider}`);
             log('info', `Date Range: ${startDate || 'default'} to ${endDate || 'default'}`);
             log('info', `Period: ${period}`);
-            log('info', `Branch: ${branchFilter && branchFilter.length > 0 ? branchFilter.join(', ') : 'all branches'}`);
+            log('info', `Branch: ${branches && branches.length > 0 ? branches.join(', ') : 'all branches'}`);
             log('info', `Exclude merges: ${excludeMerges}`);
             log('info', `Total repositories: ${repoList.length}`);
 

@@ -166,13 +166,29 @@ class ContributionAggregatorService(
                 )
             }
 
+            // Build commit details list (sorted by date descending, latest first)
+            val commitDetails = developerCommits
+                .sortedByDescending { it.date }
+                .map { commit ->
+                    CommitDetail(
+                        hash = commit.hash,
+                        message = commit.message,
+                        date = commit.date,
+                        linesAdded = commit.linesAdded,
+                        linesDeleted = commit.linesDeleted,
+                        filesChanged = commit.filesChanged,
+                        repositoryName = commit.repositoryName
+                    )
+                }
+
             DeveloperTimeline(
                 authorName = displayName,
                 authorEmail = primaryEmail,
                 nickname = nickname,
                 emails = allEmails,
                 dataPoints = dataPoints,
-                repositories = repositories
+                repositories = repositories,
+                commits = commitDetails
             )
         }.sortedByDescending { timeline -> timeline.dataPoints.sumOf { it.commits } }
     }

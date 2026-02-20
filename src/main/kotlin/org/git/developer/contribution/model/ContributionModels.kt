@@ -50,6 +50,19 @@ data class ContributionDataPoint(
 )
 
 /**
+ * Lightweight commit detail for frontend display
+ */
+data class CommitDetail(
+    val hash: String,
+    val message: String,
+    val date: LocalDateTime,
+    val linesAdded: Int,
+    val linesDeleted: Int,
+    val filesChanged: Int,
+    val repositoryName: String
+)
+
+/**
  * Contribution timeline for a specific developer
  */
 data class DeveloperTimeline(
@@ -58,7 +71,8 @@ data class DeveloperTimeline(
     val nickname: String,
     val emails: Set<String>,
     val dataPoints: List<ContributionDataPoint>,
-    val repositories: Set<String>
+    val repositories: Set<String>,
+    val commits: List<CommitDetail> = emptyList()
 )
 
 /**

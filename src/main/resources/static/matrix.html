@@ -209,6 +209,26 @@
         .error-box.hidden { display: none; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Repo search dropdown */
+        .repo-search-wrapper { position: relative; }
+        .repo-dropdown { display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:#1e1e2e; border:1px solid rgba(255,255,255,.15); border-radius:12px; margin-top:4px; z-index:100; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+        .repo-dropdown.show { display:block; }
+        .repo-dropdown-item { padding:.6rem 1rem; color:#e4e4e7; font-size:.875rem; cursor:pointer; transition:background .15s; display:flex; align-items:center; gap:.5rem; border-bottom:1px solid rgba(255,255,255,.05); }
+        .repo-dropdown-item:last-child { border-bottom:none; }
+        .repo-dropdown-item:hover,.repo-dropdown-item.selected { background:rgba(16,185,129,.15); color:#34d399; }
+        .repo-dropdown-item .repo-icon { opacity:.5; font-size:.75rem; }
+        .repo-dropdown-empty { padding:1rem; text-align:center; color:#71717a; font-size:.85rem; }
+
+        /* Analysis info banner */
+        .analysis-info { margin-bottom:1.5rem; padding:1rem; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.15); border-radius:12px; font-size:.9rem; color:#d4d4d8; }
+
+        /* Overall rating badge */
+        .overall-badge { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem 1.25rem; border-radius:20px; font-size:.9rem; font-weight:700; }
+        .rating-elite { background:rgba(34,197,94,.2); color:#4ade80; }
+        .rating-good { background:rgba(59,130,246,.2); color:#60a5fa; }
+        .rating-fair { background:rgba(249,115,22,.2); color:#fb923c; }
+        .rating-needs-focus,.rating-needs_focus { background:rgba(239,68,68,.2); color:#f87171; }
     </style>
 </head>
 <body>
@@ -263,66 +283,38 @@
         </div>
 
         <!-- Repository Selection -->
-        <div class="config-panel" id="step2-panel">
-            <h2>📁 Select Repositories</h2>
-
-            <div class="search-box">
-                <input type="text" id="repoSearch" placeholder="Search repositories..." oninput="filterRepos()">
-            </div>
-
-            <div class="selection-info">
-                <span id="selectionCount">0</span> repositories selected
-                <button class="secondary" style="float: right; padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="selectAllRepos()">Select All</button>
-            </div>
-
-            <div class="repo-list" id="repoList"></div>
-
-            <!-- Branch Selector -->
-            <div class="config-section">
-                <div class="config-section-title">🌿 Filter by Branches</div>
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="branchFilter" value="all" checked onchange="handleBranchFilterChange()">
-                        <span style="color: #e4e4e7;">All Branches</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 0.5rem;">
-                        <input type="radio" name="branchFilter" value="specific" onchange="handleBranchFilterChange()">
-                        <span style="color: #e4e4e7;">Specific Branches</span>
-                    </label>
+        <div class="config-panel" id="configPanel">
+            <div style="margin-bottom:1.25rem">
+                <label style="display:block;color:#9ca3af;font-size:.82rem;font-weight:500;margin-bottom:.5rem">📁 Select Repository</label>
+                <div class="repo-search-wrapper" id="repoSearchWrapper">
+                    <input type="text" id="repoSearch" placeholder="Search repositories…" autocomplete="off"
+                           style="width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font-size:.9rem;font-family:inherit"
+                           oninput="filterRepos()" onfocus="showRepoDropdown()">
+                    <div class="repo-dropdown" id="repoDropdown"></div>
                 </div>
-
-                <div id="branchInputContainer" class="hidden">
-                    <div class="config-field">
-                        <label for="branchInput">Enter branch names (comma-separated)</label>
-                        <input type="text" id="branchInput" placeholder="e.g., main, develop, feature/new-api" style="font-family: 'Courier New', monospace;">
-                        <div class="field-hint">💡 Separate multiple branches with commas</div>
-                    </div>
+                <input type="hidden" id="repoSelectValue" value="">
+            </div>
+            <div class="config-grid">
+                <div class="config-field">
+                    <label>🌿 Branch</label>
+                    <input type="text" id="branchInput" placeholder="all branches (leave empty)" value="">
+                    <div class="field-hint">Leave empty for all branches, or enter comma-separated names</div>
+                </div>
+                <div class="config-field">
+                    <label>Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="config-field">
+                    <label>End Date</label>
+                    <input type="date" id="endDate">
                 </div>
             </div>
-
-            <div class="config-section">
-                <div class="config-grid">
-                    <div class="config-field">
-                        <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate">
-                    </div>
-                    <div class="config-field">
-                        <label for="endDate">End Date</label>
-                        <input type="date" id="endDate">
-                    </div>
-                </div>
-            </div>
-
             <div class="config-actions">
                 <button class="btn-action btn-analyze" onclick="analyzeMetrics()" id="analyzeBtn" disabled>
                     ⚡ Analyze Metrics
                 </button>
             </div>
-
             <div id="analyze-error" class="error hidden"></div>
-
-            <!-- Loading Panel -->
             <div id="loadingPanel" class="hidden"></div>
         </div>
 
@@ -335,10 +327,11 @@
 
         <!-- Results (appears below config panel on same page) -->
         <div class="results-container" id="resultsContainer">
-            <h2 style="color:#fff;margin-bottom:1rem;">📊 Engineering Metrics Matrix</h2>
+            <!-- Analysis Info Banner -->
+            <div class="analysis-info" id="analysisInfo"></div>
 
-            <!-- Analysis Info -->
-            <div id="analysisInfo" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;"></div>
+            <!-- Overall Rating Badge -->
+            <div style="text-align:center;margin-bottom:1.5rem"><span id="overallBadge" class="overall-badge"></span></div>
 
             <!-- Legend -->
             <div class="legend">
@@ -568,7 +561,6 @@
         let selectedProvider = 'GITHUB';
         let repositories = [];
         let selectedRepos = new Set();
-        let branchFilterMode = 'all'; // 'all' or 'specific'
         let trendChart = null;
 
         // Display name lookup map (populated from session)
@@ -674,8 +666,7 @@
                         name: r.name || r.fullName.split('/').pop(),
                         isPrivate: r.private || false
                     }));
-                    renderRepositoryList();
-                    currentStep = 1;
+                    renderRepoDropdown(repositories);
                 }
             } else {
                 // Redirect to login if no session
@@ -731,7 +722,7 @@
                 const data = await response.json();
                 repositories = data.repositories;
                 selectedRepos.clear();
-                renderRepositoryList();
+                renderRepoDropdown(repositories);
                 hideLoading('auth-loading');
                 goToStep(2);
             } catch (error) {
@@ -740,90 +731,58 @@
             }
         }
 
-        // Render repository list
-        function renderRepositoryList(filter = '') {
-            const container = document.getElementById('repoList');
-            const filtered = repositories.filter(repo =>
-                repo.fullName.toLowerCase().includes(filter.toLowerCase())
-            );
 
-            container.innerHTML = filtered.map(repo => `
-                <div class="repo-item ${selectedRepos.has(repo.fullName) ? 'selected' : ''}"
-                     onclick="toggleRepo('${repo.fullName}')">
-                    <input type="checkbox" ${selectedRepos.has(repo.fullName) ? 'checked' : ''}
-                           onclick="event.stopPropagation(); toggleRepo('${repo.fullName}')">
-                    <div class="repo-info">
-                        <div class="repo-name">${repo.name}</div>
-                        <div class="repo-fullname">${repo.fullName}</div>
-                    </div>
-                </div>
-            `).join('');
-
-            updateSelectionCount();
+        // Render repo dropdown (single select)
+        function renderRepoDropdown(repos) {
+            const dd = document.getElementById('repoDropdown');
+            if (!repos.length) {
+                dd.innerHTML = '<div class="repo-dropdown-empty">No repositories found</div>';
+                return;
+            }
+            dd.innerHTML = repos.map(repo => {
+                const icon = repo.isPrivate ? '🔒' : '📂';
+                return `<div class="repo-dropdown-item" onclick="selectRepo('${repo.fullName.replace(/'/g, "\\'")}')">
+                    <span class="repo-icon">${icon}</span>
+                    ${repo.fullName}
+                </div>`;
+            }).join('');
         }
 
         function filterRepos() {
-            renderRepositoryList(document.getElementById('repoSearch').value);
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = repositories.filter(r => r.fullName.toLowerCase().includes(q));
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
         }
 
-        function toggleRepo(fullName) {
-            if (selectedRepos.has(fullName)) {
-                selectedRepos.delete(fullName);
-            } else {
-                // Check max 10 limit
-                if (selectedRepos.size >= 10) {
-                    showModal('⚠️', 'Maximum Limit Reached', 'You can select a maximum of 10 repositories.');
-                    return;
-                }
-                selectedRepos.add(fullName);
+        function showRepoDropdown() {
+            const q = document.getElementById('repoSearch').value.toLowerCase();
+            const filtered = q ? repositories.filter(r => r.fullName.toLowerCase().includes(q)) : repositories;
+            renderRepoDropdown(filtered);
+            document.getElementById('repoDropdown').classList.add('show');
+        }
+
+        function selectRepo(fullName) {
+            document.getElementById('repoSearch').value = fullName;
+            document.getElementById('repoSelectValue').value = fullName;
+            document.getElementById('repoDropdown').classList.remove('show');
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('repoSearchWrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('repoDropdown').classList.remove('show');
             }
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
+        });
 
-        function selectAllRepos() {
-            // Limit to 10 max
-            const toAdd = repositories.slice(0, 10);
-            toAdd.forEach(repo => selectedRepos.add(repo.fullName));
-
-            if (repositories.length > 10) {
-                showModal('ℹ️', 'Selection Limited', 'Only the first 10 repositories were selected. Maximum limit is 10.');
-            }
-            renderRepositoryList(document.getElementById('repoSearch').value);
-        }
-
-        function updateSelectionCount() {
-            document.getElementById('selectionCount').textContent = selectedRepos.size;
-            document.getElementById('analyzeBtn').disabled = selectedRepos.size === 0;
-        }
-
-        // ==================== BRANCH FUNCTIONS ====================
-
-        function handleBranchFilterChange() {
-            const selectedMode = document.querySelector('input[name="branchFilter"]:checked').value;
-            branchFilterMode = selectedMode;
-            const branchInputContainer = document.getElementById('branchInputContainer');
-
-            if (selectedMode === 'specific') {
-                branchInputContainer.classList.remove('hidden');
-            } else {
-                branchInputContainer.classList.add('hidden');
-            }
-        }
-
+        // Branch helper — reads comma-separated input
         function getBranchesFromInput() {
             const input = document.getElementById('branchInput');
-            if (!input || !input.value.trim()) {
-                return [];
-            }
-
-            // Split by comma, trim whitespace, and filter empty strings
-            return input.value
-                .split(',')
-                .map(b => b.trim())
-                .filter(b => b.length > 0);
+            if (!input || !input.value.trim()) return [];
+            return input.value.split(',').map(b => b.trim()).filter(b => b.length > 0);
         }
-
-        // ==================== END BRANCH FUNCTIONS ====================
 
         // Show loading panel
         function showLoadingPanel(repos) {
@@ -866,22 +825,16 @@
 
         // Analyze metrics
         async function analyzeMetrics() {
-            // Validate: minimum 1 repo
-            if (selectedRepos.size === 0) {
-                showModal('📁', 'Repositories Required', 'Please select at least 1 repository to analyze.');
+            const selectedRepo = document.getElementById('repoSelectValue').value;
+            if (!selectedRepo) {
+                showModal('📁', 'Repository Required', 'Please select a repository to analyze.');
                 return;
             }
-
-            // Validate: maximum 10 repos
-            if (selectedRepos.size > 10) {
-                showModal('⚠️', 'Too Many Repositories', 'You can select a maximum of 10 repositories. Please deselect some repositories.');
-                return;
-            }
-            analyzeBtn.disabled  = true
+            analyzeBtn.disabled = true;
 
             hideError('analyze-error');
 
-            const repoList = Array.from(selectedRepos);
+            const repoList = [selectedRepo];
             showLoadingPanel(repoList);
             updateLoadingProgress(10, 'Connecting to GitHub API...');
 
@@ -894,12 +847,8 @@
                 updateLoadingProgress(20, 'Fetching PR data...');
 
                 // Prepare branch filter from text input
-                const branchFilter = branchFilterMode === 'specific'
-                    ? getBranchesFromInput()
-                    : null;
-
-                // Only send branches if there are any
-                const branchesToSend = (branchFilter && branchFilter.length > 0) ? branchFilter : null;
+                const branches = getBranchesFromInput();
+                const branchesToSend = branches.length > 0 ? branches : null;
 
                 const response = await fetch('/api/metrics/analyze', {
                     method: 'POST',
@@ -927,11 +876,11 @@
                 setTimeout(() => {
                     hideLoadingPanel();
                     displayResults(data);
-                    analyzeBtn.disabled  = false
+                    analyzeBtn.disabled = false;
                     goToStep(3);
                 }, 500);
             } catch (error) {
-                analyzeBtn.disabled  = false
+                analyzeBtn.disabled = false;
                 hideLoadingPanel();
                 showModal('❌', 'Analysis Failed', error.message);
             }
@@ -960,13 +909,19 @@
                 }
             });
 
-            // Analysis Info
-            document.getElementById('analysisInfo').innerHTML = `
-                <strong>📁 Repositories:</strong> ${data.analyzedRepositories.join(', ')}<br>
-                <strong>📅 Date Range:</strong> ${data.dateRange.startDate} to ${data.dateRange.endDate}<br>
-                <strong>👥 Developers:</strong> ${data.teamMetrics.totalDevelopers} |
-                <strong>🔀 Total PRs:</strong> ${data.teamMetrics.totalPRs}
-            `;
+            // Analysis Info Banner (trunk-matrix style)
+            const repos = data.analyzedRepositories || [];
+            document.getElementById('analysisInfo').innerHTML =
+                '📦 <strong>' + repos.join(', ') + '</strong> • ' +
+                data.dateRange.startDate + ' → ' + data.dateRange.endDate +
+                ' • ' + data.teamMetrics.totalPRs + ' PRs • ' +
+                data.teamMetrics.totalDevelopers + ' developers';
+
+            // Overall Rating Badge
+            const overallRating = computeOverallRating(data.teamMetrics);
+            const ob = document.getElementById('overallBadge');
+            ob.className = 'overall-badge rating-' + overallRating.toLowerCase().replace('_', '-').replace(' ', '-');
+            ob.innerHTML = '🏆 Overall Rating: <strong>' + overallRating + '</strong>';
 
             // Team Metrics Grid
             renderTeamMetrics(data.teamMetrics);
@@ -979,6 +934,29 @@
 
             // PR List
             renderPRList(allPRsList, data.analyzedRepositories);
+        }
+
+        // Compute overall rating from team metrics
+        function computeOverallRating(teamMetrics) {
+            const ratingOrder = ['ELITE', 'GOOD', 'FAIR', 'NEEDS_FOCUS'];
+            const ratingScore = { 'ELITE': 4, 'GOOD': 3, 'FAIR': 2, 'NEEDS_FOCUS': 1 };
+            const metrics = ['cycleTime', 'codingTime', 'pickupTime', 'reviewTime', 'mergeFrequency', 'prSize'];
+            let totalScore = 0;
+            let count = 0;
+            metrics.forEach(key => {
+                const m = teamMetrics[key];
+                if (m && m.rating) {
+                    const r = m.rating.toUpperCase().replace(' ', '_');
+                    totalScore += (ratingScore[r] || 2);
+                    count++;
+                }
+            });
+            if (count === 0) return 'Fair';
+            const avg = totalScore / count;
+            if (avg >= 3.5) return 'Elite';
+            if (avg >= 2.5) return 'Good';
+            if (avg >= 1.5) return 'Fair';
+            return 'Needs Focus';
         }
 
         function renderTeamMetrics(metrics) {
