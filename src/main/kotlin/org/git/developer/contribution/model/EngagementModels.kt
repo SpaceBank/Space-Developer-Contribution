@@ -93,6 +93,7 @@ data class ContributorEngagement(
     val linesAddedOverTime: List<EngagementDataPoint> = emptyList(),
     val linesDeletedOverTime: List<EngagementDataPoint> = emptyList(),
     val totalPRsReviewed: Int = 0,
+    val commits: List<CommitDetail> = emptyList(),
     val reviewsOverTime: List<EngagementDataPoint> = emptyList()
 )
 

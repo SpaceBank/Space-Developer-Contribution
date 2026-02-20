@@ -63,7 +63,8 @@ class GitDataExtractorService(
         since: String? = null,
         until: String? = null,
         branch: String? = null,
-        excludeMerges: Boolean = true
+        excludeMerges: Boolean = true,
+        repositoryFullName: String? = null
     ): List<CommitInfo> {
         val repoDir = File(repositoryPath)
 
@@ -86,7 +87,7 @@ class GitDataExtractorService(
         logger.info("Detected ${if (isBareRepo) "bare" else "regular"} repository at $repositoryPath")
         logger.info("Options - branch: ${branch ?: "all"}, excludeMerges: $excludeMerges")
 
-        val repoName = repoDir.name
+        val repoName = repositoryFullName ?: repoDir.name
 
         return try {
             val commits = fetchCommitData(repoDir, since, until, branch, excludeMerges)
@@ -275,11 +276,13 @@ class GitDataExtractorService(
         since: String? = null,
         until: String? = null,
         branch: String? = null,
-        excludeMerges: Boolean = true
+        excludeMerges: Boolean = true,
+        repositoryFullNames: List<String>? = null
     ): List<CommitInfo> {
-        return repositoryPaths.flatMap { path ->
+        return repositoryPaths.flatMapIndexed { index, path ->
             logger.info("Extracting commits from: $path")
-            extractCommits(path, since, until, branch, excludeMerges)
+            val fullName = repositoryFullNames?.getOrNull(index)
+            extractCommits(path, since, until, branch, excludeMerges, fullName)
         }
     }
 }

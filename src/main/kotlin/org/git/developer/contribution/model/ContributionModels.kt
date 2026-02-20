@@ -93,7 +93,8 @@ data class AnalyzeRequest(
     val endDate: LocalDate? = null,
     val period: AggregationPeriod = AggregationPeriod.WEEKLY,
     val branch: String? = null,  // null means all branches
-    val excludeMerges: Boolean = true  // Exclude merge commits by default
+    val excludeMerges: Boolean = true,  // Exclude merge commits by default
+    val repositoryFullNames: List<String>? = null  // Full names like "owner/repo" for commit URLs
 )
 
 /**

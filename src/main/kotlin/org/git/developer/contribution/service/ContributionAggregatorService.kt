@@ -34,7 +34,8 @@ class ContributionAggregatorService(
             since = since,
             until = until,
             branch = request.branch,
-            excludeMerges = request.excludeMerges
+            excludeMerges = request.excludeMerges,
+            repositoryFullNames = request.repositoryFullNames
         )
 
         logger.info("Found ${allCommits.size} total commits")

@@ -444,7 +444,8 @@ class EngagementService(
             },
             linesDeletedOverTime = periods.map { (label, _, _) ->
                 EngagementDataPoint(label, stats.linesDeletedPerPeriod[label] ?: 0)
-            }
+            },
+            commits = stats.commitDetails
         )
     }
 
@@ -855,6 +856,9 @@ class EngagementService(
         val processedShas = mutableSetOf<String>()
         var totalCommitCount = 0
         val commitsToFetchStats = mutableListOf<Pair<String, String>>() // (repoFullName, sha)
+        val commitDetailsList = mutableListOf<CommitDetail>()
+        // Store commit metadata (message, date) keyed by sha for enrichment later
+        val commitMetadata = mutableMapOf<String, Triple<String, java.time.LocalDateTime, String>>() // sha -> (message, date, repoFullName)
 
         try {
             // For each repo, fetch ALL pages of commits (with pagination)
@@ -897,6 +901,15 @@ class EngagementService(
 
                                 totalCommitCount++
 
+                                // Save commit metadata for detail enrichment
+                                val message = commitData?.get("message") as? String ?: ""
+                                val commitDateTime = try {
+                                    java.time.LocalDateTime.parse(dateStr.substring(0, 19))
+                                } catch (e: Exception) {
+                                    commitDate.atStartOfDay()
+                                }
+                                commitMetadata[sha] = Triple(message, commitDateTime, repoFullName)
+
                                 // Count commits per period
                                 val period = findPeriod(commitDate, periods)
                                 if (period != null) {
@@ -924,6 +937,7 @@ class EngagementService(
             logger.info("Found $totalCommitCount commits for $login across ${reposToCheck.size} repos (with pagination)")
 
             // Fetch line stats for up to 500 commits (to keep it reasonably fast)
+            val fetchedShas = mutableSetOf<String>()
             if (commitsToFetchStats.isNotEmpty()) {
                 logger.info("Fetching line stats for ${commitsToFetchStats.size} commits for $login (total commits: $totalCommitCount)")
                 for ((repoFullName, sha) in commitsToFetchStats) {
@@ -937,9 +951,25 @@ class EngagementService(
                         val stats = commitDetail?.get("stats") as? Map<*, *>
                         val additions = (stats?.get("additions") as? Number)?.toInt() ?: 0
                         val deletions = (stats?.get("deletions") as? Number)?.toInt() ?: 0
+                        val filesChanged = (stats?.get("total") as? Number)?.toInt() ?: 0
 
                         totalAdded += additions
                         totalDeleted += deletions
+                        fetchedShas.add(sha)
+
+                        // Build CommitDetail from metadata + stats
+                        val meta = commitMetadata[sha]
+                        if (meta != null) {
+                            commitDetailsList.add(CommitDetail(
+                                hash = sha,
+                                message = meta.first.lineSequence().firstOrNull() ?: "",
+                                date = meta.second,
+                                linesAdded = additions,
+                                linesDeleted = deletions,
+                                filesChanged = filesChanged,
+                                repositoryName = meta.third
+                            ))
+                        }
 
                         // Get commit date for period assignment
                         val commitData = commitDetail?.get("commit") as? Map<*, *>
@@ -962,6 +992,21 @@ class EngagementService(
                 logger.info("Line stats for $login: +$totalAdded / -$totalDeleted")
             }
 
+            // Add remaining commits that weren't fetched for line stats (without line info)
+            commitMetadata.forEach { (sha, meta) ->
+                if (!fetchedShas.contains(sha)) {
+                    commitDetailsList.add(CommitDetail(
+                        hash = sha,
+                        message = meta.first.lineSequence().firstOrNull() ?: "",
+                        date = meta.second,
+                        linesAdded = 0,
+                        linesDeleted = 0,
+                        filesChanged = 0,
+                        repositoryName = meta.third
+                    ))
+                }
+            }
+
         } catch (e: Exception) {
             logger.warn("Error fetching commits for $login: ${e.message}")
         }
@@ -971,7 +1016,8 @@ class EngagementService(
             totalLinesDeleted = totalDeleted,
             linesAddedPerPeriod = addedPerPeriod,
             linesDeletedPerPeriod = deletedPerPeriod,
-            commitsPerPeriod = commitsPerPeriod
+            commitsPerPeriod = commitsPerPeriod,
+            commitDetails = commitDetailsList.sortedByDescending { it.date }
         )
     }
 
@@ -981,7 +1027,8 @@ class EngagementService(
         val totalLinesDeleted: Int,
         val linesAddedPerPeriod: Map<String, Int>,
         val linesDeletedPerPeriod: Map<String, Int>,
-        val commitsPerPeriod: Map<String, Int>
+        val commitsPerPeriod: Map<String, Int>,
+        val commitDetails: List<CommitDetail> = emptyList()
     )
 
     // Data class to hold PR and review stats

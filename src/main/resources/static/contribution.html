@@ -293,6 +293,41 @@
         .repo-tag { display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .6rem; background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); border-radius:8px; font-size:.78rem; color:#a5b4fc; cursor:default; }
         .repo-tag .tag-remove { cursor:pointer; color:#71717a; font-size:.85rem; line-height:1; margin-left:.15rem; transition:color .15s; }
         .repo-tag .tag-remove:hover { color:#ef4444; }
+
+        /* Commit Popup Modal */
+        .commit-popup-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.75); backdrop-filter:blur(8px); z-index:10001; align-items:center; justify-content:center; }
+        .commit-popup-modal.show { display:flex; }
+        .commit-popup-content { background:linear-gradient(135deg,#1e1e2e,#16213e); border:1px solid rgba(255,255,255,.1); border-radius:16px; max-width:900px; width:95%; max-height:85vh; overflow:hidden; box-shadow:0 25px 50px rgba(0,0,0,.5); animation:fadeIn .3s ease-out; }
+        .commit-popup-header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid rgba(255,255,255,.08); }
+        .commit-popup-user-info { display:flex; align-items:center; gap:1rem; }
+        .commit-popup-avatar { width:48px; height:48px; border-radius:50%; border:2px solid #6366f1; }
+        .commit-popup-name { font-size:1.15rem; font-weight:600; color:#fff; }
+        .commit-popup-login { font-size:.85rem; color:#818cf8; }
+        .commit-popup-close { width:40px; height:40px; border:none; background:rgba(255,255,255,.05); color:#9ca3af; border-radius:10px; font-size:1.5rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+        .commit-popup-close:hover { background:rgba(239,68,68,.15); color:#ef4444; }
+        .commit-popup-stats { display:flex; gap:1.5rem; padding:1rem 1.5rem; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; }
+        .commit-popup-stat { text-align:center; }
+        .commit-popup-stat-value { font-size:1.3rem; font-weight:700; color:#fff; }
+        .commit-popup-stat-label { font-size:.72rem; color:#71717a; }
+        .commit-popup-search { padding:.75rem 1.5rem; border-bottom:1px solid rgba(255,255,255,.06); }
+        .commit-popup-search input { width:100%; padding:.6rem 1rem; border:1px solid rgba(255,255,255,.1); border-radius:10px; background:rgba(255,255,255,.04); color:#fff; font-size:.85rem; font-family:inherit; }
+        .commit-popup-search input:focus { outline:none; border-color:#6366f1; }
+        .commit-popup-body { padding:.75rem 1.5rem 1.5rem; max-height:55vh; overflow-y:auto; }
+        .commit-item { display:flex; gap:1rem; padding:.75rem; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:10px; margin-bottom:.5rem; transition:all .15s; }
+        .commit-item:hover { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.2); }
+        .commit-hash { font-family:'Courier New',monospace; font-size:.8rem; color:#818cf8; min-width:70px; padding-top:2px; }
+        .commit-hash a { color:#818cf8; text-decoration:none; }
+        .commit-hash a:hover { text-decoration:underline; color:#a5b4fc; }
+        .commit-info { flex:1; min-width:0; }
+        .commit-message { font-size:.875rem; color:#e4e4e7; margin-bottom:.3rem; word-break:break-word; }
+        .commit-message a { color:#e4e4e7; text-decoration:none; }
+        .commit-message a:hover { color:#818cf8; text-decoration:underline; }
+        .commit-meta { display:flex; flex-wrap:wrap; gap:.75rem; font-size:.75rem; color:#71717a; }
+        .commit-meta-item { display:flex; align-items:center; gap:.25rem; }
+
+        /* Clickable developer row */
+        .developer-table tbody tr { cursor:pointer; transition:background .15s; }
+        .developer-table tbody tr:hover { background:rgba(99,102,241,.1) !important; }
     </style>
 </head>
 <body>
@@ -480,6 +515,7 @@
 
                 <div class="chart-wrapper">
                     <h2>📋 Developer Summary</h2>
+                    <p style="font-size: 0.82rem; color: #71717a; margin: -0.25rem 0 0.75rem;">💡 Click on a developer row to view their commit history</p>
                     <table class="developer-table">
                         <thead>
                             <tr>
@@ -495,6 +531,27 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Developer Commit Popup Modal -->
+    <div id="commitPopupModal" class="commit-popup-modal" onclick="closeCommitPopup(event)">
+        <div class="commit-popup-content" onclick="event.stopPropagation()">
+            <div class="commit-popup-header">
+                <div class="commit-popup-user-info">
+                    <img id="commitPopupAvatar" class="commit-popup-avatar" src="" alt="">
+                    <div>
+                        <div class="commit-popup-name" id="commitPopupName">Developer Name</div>
+                        <div class="commit-popup-login" id="commitPopupLogin">@username</div>
+                    </div>
+                </div>
+                <button class="commit-popup-close" onclick="closeCommitPopup()">×</button>
+            </div>
+            <div class="commit-popup-stats" id="commitPopupStats"></div>
+            <div class="commit-popup-search">
+                <input type="text" id="commitSearchInput" placeholder="Search commits by message or hash…" oninput="filterCommitList()">
+            </div>
+            <div class="commit-popup-body" id="commitPopupBody"></div>
         </div>
     </div>
     </div>
@@ -1106,13 +1163,15 @@
                             ...existing,
                             dataPoints: mergedDataPoints,
                             emails: new Set([...existing.emails, ...dev.emails]),
-                            repositories: new Set([...existing.repositories, ...dev.repositories])
+                            repositories: new Set([...existing.repositories, ...dev.repositories]),
+                            commits: [...(existing.commits || []), ...(dev.commits || [])]
                         });
                     } else {
                         developerMap.set(key, {
                             ...dev,
                             emails: new Set(dev.emails),
-                            repositories: new Set(dev.repositories)
+                            repositories: new Set(dev.repositories),
+                            commits: dev.commits || []
                         });
                     }
                 });
@@ -1768,7 +1827,9 @@
             });
 
             // Developer table
-            document.getElementById('developerTableBody').innerHTML = developers.map(dev => {
+            // Store developers globally for popup access
+            window._currentDevelopers = developers;
+            document.getElementById('developerTableBody').innerHTML = developers.map((dev, index) => {
                 const commits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
                 const added = dev.dataPoints.reduce((sum, dp) => sum + dp.linesAdded, 0);
                 const deleted = dev.dataPoints.reduce((sum, dp) => sum + dp.linesDeleted, 0);
@@ -1776,7 +1837,7 @@
                 const avatarUrl = getAvatarUrl(dev.nickname);
 
                 return `
-                    <tr>
+                    <tr onclick="showDeveloperCommits(${index})" title="Click to view ${displayName}'s commits">
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 ${avatarUrl
@@ -1859,6 +1920,135 @@
         function hideLoading(id) {
             document.getElementById(id).classList.add('hidden');
         }
+
+        // ==================== DEVELOPER COMMIT POPUP ====================
+
+        function showDeveloperCommits(devIndex) {
+            const developers = window._currentDevelopers;
+            if (!developers || !developers[devIndex]) return;
+
+            const dev = developers[devIndex];
+            const displayName = getDisplayName(dev.nickname);
+            const avatarUrl = getAvatarUrl(dev.nickname);
+            const commits = dev.commits || [];
+            const totalCommits = dev.dataPoints.reduce((sum, dp) => sum + dp.commits, 0);
+            const totalAdded = dev.dataPoints.reduce((sum, dp) => sum + dp.linesAdded, 0);
+            const totalDeleted = dev.dataPoints.reduce((sum, dp) => sum + dp.linesDeleted, 0);
+            const repos = Array.from(dev.repositories);
+
+            // Header
+            const avatarEl = document.getElementById('commitPopupAvatar');
+            avatarEl.src = avatarUrl || '';
+            avatarEl.style.display = avatarUrl ? 'block' : 'none';
+            document.getElementById('commitPopupName').textContent = displayName;
+            document.getElementById('commitPopupLogin').textContent = '@' + dev.nickname;
+
+            // Stats
+            document.getElementById('commitPopupStats').innerHTML = `
+                <div class="commit-popup-stat">
+                    <div class="commit-popup-stat-value">${totalCommits}</div>
+                    <div class="commit-popup-stat-label">Total Commits</div>
+                </div>
+                <div class="commit-popup-stat">
+                    <div class="commit-popup-stat-value" style="color:#22c55e">+${totalAdded.toLocaleString()}</div>
+                    <div class="commit-popup-stat-label">Lines Added</div>
+                </div>
+                <div class="commit-popup-stat">
+                    <div class="commit-popup-stat-value" style="color:#ef4444">-${totalDeleted.toLocaleString()}</div>
+                    <div class="commit-popup-stat-label">Lines Deleted</div>
+                </div>
+                <div class="commit-popup-stat">
+                    <div class="commit-popup-stat-value">${repos.length}</div>
+                    <div class="commit-popup-stat-label">Repositories</div>
+                </div>
+            `;
+
+            // Store commits globally for filtering
+            window._currentPopupCommits = commits;
+            window._currentPopupRepos = repos;
+            renderCommitList(commits, repos);
+
+            // Clear search
+            document.getElementById('commitSearchInput').value = '';
+
+            // Show
+            document.getElementById('commitPopupModal').classList.add('show');
+        }
+
+        function renderCommitList(commits, repos) {
+            const body = document.getElementById('commitPopupBody');
+
+            if (!commits || commits.length === 0) {
+                body.innerHTML = '<p style="text-align:center;color:#71717a;padding:2rem;">No commit details available</p>';
+                return;
+            }
+
+            // Sort by date descending
+            const sorted = [...commits].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            body.innerHTML = sorted.map(c => {
+                const shortHash = c.hash.substring(0, 7);
+                const commitUrl = buildCommitUrl(c.hash, c.repositoryName);
+                const date = new Date(c.date);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const repoShort = c.repositoryName.split('/').pop();
+                // Escape message for HTML
+                const msgEl = document.createElement('span');
+                msgEl.textContent = c.message;
+                const safeMsg = msgEl.innerHTML;
+
+                return `
+                    <div class="commit-item">
+                        <div class="commit-hash"><a href="${commitUrl}" target="_blank" rel="noopener noreferrer">${shortHash}</a></div>
+                        <div class="commit-info">
+                            <div class="commit-message"><a href="${commitUrl}" target="_blank" rel="noopener noreferrer">${safeMsg}</a></div>
+                            <div class="commit-meta">
+                                <span class="commit-meta-item">📅 ${dateStr} ${timeStr}</span>
+                                <span class="commit-meta-item">📦 ${repoShort}</span>
+                                <span class="commit-meta-item" style="color:#22c55e">+${c.linesAdded}</span>
+                                <span class="commit-meta-item" style="color:#ef4444">-${c.linesDeleted}</span>
+                                <span class="commit-meta-item">📁 ${c.filesChanged} files</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function buildCommitUrl(hash, repoName) {
+            // repoName is like "owner/repo"
+            if (repoName && repoName.includes('/')) {
+                return 'https://github.com/' + repoName + '/commit/' + hash;
+            }
+            return '#';
+        }
+
+        function filterCommitList() {
+            const q = document.getElementById('commitSearchInput').value.toLowerCase();
+            const commits = window._currentPopupCommits || [];
+            const repos = window._currentPopupRepos || [];
+            if (!q) {
+                renderCommitList(commits, repos);
+                return;
+            }
+            const filtered = commits.filter(c =>
+                c.message.toLowerCase().includes(q) ||
+                c.hash.toLowerCase().includes(q) ||
+                c.repositoryName.toLowerCase().includes(q)
+            );
+            renderCommitList(filtered, repos);
+        }
+
+        function closeCommitPopup(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('commitPopupModal').classList.remove('show');
+        }
+
+        // Close popup on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeCommitPopup();
+        });
     </script>
 </body>
 </html>

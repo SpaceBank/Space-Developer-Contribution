@@ -83,7 +83,8 @@ class RemoteRepositoryAnalyzerService(
                 endDate = request.endDate?.let { LocalDate.parse(it) },
                 period = request.period,
                 branch = request.branch,
-                excludeMerges = request.excludeMerges
+                excludeMerges = request.excludeMerges,
+                repositoryFullNames = listOf(request.repositoryFullName)
             )
 
             val result = contributionAggregator.analyzeRepositories(analyzeRequest)
