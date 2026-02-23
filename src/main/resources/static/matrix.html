@@ -376,6 +376,51 @@
                 </div>
             </div>
 
+            <!-- PR Quality & Size Analytics -->
+            <h3 style="margin: 2rem 0 1rem;">📊 PR Quality & Size Analytics</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Quality Check Rate -->
+                <div class="panel">
+                    <h3>✅ PR Quality Check Rate</h3>
+                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">Success vs Failure of CI/CD quality checks across all PRs</p>
+                    <div style="max-width: 280px; margin: 0 auto;">
+                        <canvas id="qualityRateChart"></canvas>
+                    </div>
+                    <div id="qualityRateStats" style="text-align:center; margin-top: 0.75rem; font-size: 0.82rem; color: #a1a1aa;"></div>
+                </div>
+
+                <!-- PR Size Distribution -->
+                <div class="panel">
+                    <h3>📏 PR Size Distribution</h3>
+                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">How many PRs fall into each size category (lines changed)</p>
+                    <div style="max-width: 280px; margin: 0 auto;">
+                        <canvas id="prSizeDistChart"></canvas>
+                    </div>
+                    <div id="prSizeDistStats" style="text-align:center; margin-top: 0.75rem; font-size: 0.82rem; color: #a1a1aa;"></div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Daily PR & Quality Checks -->
+                <div class="panel">
+                    <h3>📅 Daily PR Activity & Quality</h3>
+                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">PRs merged per day with pass/fail check overlay</p>
+                    <div class="chart-container">
+                        <canvas id="dailyPRChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Production Readiness -->
+                <div class="panel">
+                    <h3>🚀 Production Readiness</h3>
+                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">Percentage of PRs that passed all checks and were production-ready</p>
+                    <div style="max-width: 280px; margin: 0 auto;">
+                        <canvas id="productionReadyChart"></canvas>
+                    </div>
+                    <div id="productionReadyStats" style="text-align:center; margin-top: 0.75rem; font-size: 0.82rem; color: #a1a1aa;"></div>
+                </div>
+            </div>
+
             <!-- Analyzed PRs List -->
             <div class="pr-list-panel" id="prListPanel" style="display: none;">
                 <div class="pr-list-header">
@@ -562,6 +607,10 @@
         let repositories = [];
         let selectedRepos = new Set();
         let trendChart = null;
+        let qualityRateChart = null;
+        let prSizeDistChart = null;
+        let dailyPRChart = null;
+        let productionReadyChart = null;
 
         // Display name lookup map (populated from session)
         window.displayNameMap = {};
@@ -932,6 +981,12 @@
             // Developer Matrix
             renderDeveloperMatrix(data.developerMetrics);
 
+            // PR Quality & Size Analytics
+            renderQualityRateChart(allPRsList);
+            renderPRSizeDistribution(allPRsList);
+            renderDailyPRChart(allPRsList);
+            renderProductionReadiness(allPRsList);
+
             // PR List
             renderPRList(allPRsList, data.analyzedRepositories);
         }
@@ -1052,6 +1107,201 @@
                     }
                 }
             });
+        }
+
+        // ==================== PR QUALITY & SIZE ANALYTICS ====================
+
+        function renderQualityRateChart(prs) {
+            const success = prs.filter(p => p.checkStatus === 'SUCCESS').length;
+            const failure = prs.filter(p => p.checkStatus === 'FAILURE' || p.checkStatus === 'ERROR').length;
+            const pending = prs.filter(p => p.checkStatus === 'PENDING' || p.checkStatus === 'EXPECTED').length;
+            const noChecks = prs.filter(p => !p.checkStatus).length;
+            const total = prs.length;
+
+            if (qualityRateChart) qualityRateChart.destroy();
+            qualityRateChart = new Chart(document.getElementById('qualityRateChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['✅ Passed', '❌ Failed', '⏳ Pending', '⚪ No Checks'],
+                    datasets: [{
+                        data: [success, failure, pending, noChecks],
+                        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b', 'rgba(255,255,255,0.08)'],
+                        borderColor: ['#16a34a', '#dc2626', '#d97706', 'rgba(255,255,255,0.15)'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '60%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#a1a1aa', padding: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.label}: ${ctx.parsed} PRs (${total > 0 ? Math.round(ctx.parsed / total * 100) : 0}%)`
+                            }
+                        }
+                    }
+                }
+            });
+
+            const successRate = total > 0 ? Math.round(success / total * 100) : 0;
+            document.getElementById('qualityRateStats').innerHTML =
+                `<strong style="color:${successRate >= 80 ? '#22c55e' : successRate >= 50 ? '#f59e0b' : '#ef4444'}">${successRate}%</strong> check pass rate across <strong>${total}</strong> PRs`;
+        }
+
+        function renderPRSizeDistribution(prs) {
+            const elite = prs.filter(p => p.prSize < 100).length;
+            const good = prs.filter(p => p.prSize >= 100 && p.prSize <= 155).length;
+            const fair = prs.filter(p => p.prSize > 155 && p.prSize <= 228).length;
+            const needsFocus = prs.filter(p => p.prSize > 228).length;
+            const total = prs.length;
+
+            if (prSizeDistChart) prSizeDistChart.destroy();
+            prSizeDistChart = new Chart(document.getElementById('prSizeDistChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['🏆 Elite (<100)', '✅ Good (100-155)', '⚠️ Fair (156-228)', '🔴 Needs Focus (>228)'],
+                    datasets: [{
+                        data: [elite, good, fair, needsFocus],
+                        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444'],
+                        borderColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '60%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#a1a1aa', padding: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.label}: ${ctx.parsed} PRs (${total > 0 ? Math.round(ctx.parsed / total * 100) : 0}%)`
+                            }
+                        }
+                    }
+                }
+            });
+
+            const smallPct = total > 0 ? Math.round((elite + good) / total * 100) : 0;
+            document.getElementById('prSizeDistStats').innerHTML =
+                `<strong style="color:${smallPct >= 70 ? '#22c55e' : smallPct >= 40 ? '#f59e0b' : '#ef4444'}">${smallPct}%</strong> of PRs are well-sized (≤155 lines)`;
+        }
+
+        function renderDailyPRChart(prs) {
+            // Group PRs by merge date
+            const dayMap = {};
+            prs.forEach(pr => {
+                if (!pr.mergedAt) return;
+                const day = pr.mergedAt.substring(0, 10);
+                if (!dayMap[day]) dayMap[day] = { passed: 0, failed: 0, noChecks: 0 };
+                if (pr.checkStatus === 'SUCCESS') dayMap[day].passed++;
+                else if (pr.checkStatus === 'FAILURE' || pr.checkStatus === 'ERROR') dayMap[day].failed++;
+                else dayMap[day].noChecks++;
+            });
+
+            const sortedDays = Object.keys(dayMap).sort();
+            const passed = sortedDays.map(d => dayMap[d].passed);
+            const failed = sortedDays.map(d => dayMap[d].failed);
+            const noChecks = sortedDays.map(d => dayMap[d].noChecks);
+
+            // Format day labels
+            const labels = sortedDays.map(d => {
+                const dt = new Date(d + 'T00:00:00');
+                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+
+            if (dailyPRChart) dailyPRChart.destroy();
+            dailyPRChart = new Chart(document.getElementById('dailyPRChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '✅ Passed', data: passed, backgroundColor: '#22c55e', borderRadius: 3 },
+                        { label: '❌ Failed', data: failed, backgroundColor: '#ef4444', borderRadius: 3 },
+                        { label: '⚪ No Checks', data: noChecks, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#71717a', font: { size: 10 }, maxRotation: 45 } },
+                        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#71717a', stepSize: 1 }, title: { display: true, text: 'PRs', color: '#71717a' } }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#a1a1aa', padding: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                title: ctx => sortedDays[ctx[0].dataIndex] || '',
+                                afterBody: ctx => {
+                                    const idx = ctx[0].dataIndex;
+                                    const total = (passed[idx] || 0) + (failed[idx] || 0) + (noChecks[idx] || 0);
+                                    return `Total: ${total} PRs`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderProductionReadiness(prs) {
+            const withChecks = prs.filter(p => p.checkStatus);
+            const passed = withChecks.filter(p => p.checkStatus === 'SUCCESS').length;
+            const failed = withChecks.length - passed;
+            const total = withChecks.length;
+            const noChecksCount = prs.length - withChecks.length;
+
+            if (productionReadyChart) productionReadyChart.destroy();
+            productionReadyChart = new Chart(document.getElementById('productionReadyChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['🚀 Production Ready', '⛔ Not Ready'],
+                    datasets: [{
+                        data: [passed, failed],
+                        backgroundColor: ['#22c55e', '#ef4444'],
+                        borderColor: ['#16a34a', '#dc2626'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#a1a1aa', padding: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.label}: ${ctx.parsed} PRs (${total > 0 ? Math.round(ctx.parsed / total * 100) : 0}%)`
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'centerText',
+                    afterDraw: function(chart) {
+                        const { ctx, chartArea } = chart;
+                        const pct = total > 0 ? Math.round(passed / total * 100) : 0;
+                        const cx = (chartArea.left + chartArea.right) / 2;
+                        const cy = (chartArea.top + chartArea.bottom) / 2;
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.font = 'bold 1.8rem Inter, sans-serif';
+                        ctx.fillStyle = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                        ctx.fillText(pct + '%', cx, cy - 8);
+                        ctx.font = '0.7rem Inter, sans-serif';
+                        ctx.fillStyle = '#71717a';
+                        ctx.fillText('Ready', cx, cy + 14);
+                        ctx.restore();
+                    }
+                }]
+            });
+
+            let statsText = `<strong>${passed}</strong> of <strong>${total}</strong> PRs with checks passed`;
+            if (noChecksCount > 0) {
+                statsText += ` · <span style="color:#71717a">${noChecksCount} PRs had no checks</span>`;
+            }
+            document.getElementById('productionReadyStats').innerHTML = statsText;
         }
 
         function renderDeveloperMatrix(developers) {

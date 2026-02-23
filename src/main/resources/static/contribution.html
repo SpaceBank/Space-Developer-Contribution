@@ -587,7 +587,7 @@
         </div>
     </div>
 
-    <!-- Developer Commit Popup Modal -->
+    <!-- Developer Activity Popup Modal -->
     <div id="commitPopupModal" class="commit-popup-modal" onclick="closeCommitPopup(event)">
         <div class="commit-popup-content" onclick="event.stopPropagation()">
             <div class="commit-popup-header">
@@ -601,8 +601,20 @@
                 <button class="commit-popup-close" onclick="closeCommitPopup()">×</button>
             </div>
             <div class="commit-popup-stats" id="commitPopupStats"></div>
+            <!-- Tabs -->
+            <div class="popup-tabs">
+                <button class="popup-tab active" data-tab="commits" onclick="switchPopupTab('commits')">
+                    <span>⌨️</span> Commits <span class="popup-tab-badge" id="tabBadgeCommits">0</span>
+                </button>
+                <button class="popup-tab" data-tab="prs-authored" onclick="switchPopupTab('prs-authored')">
+                    <span>🔀</span> PRs Authored <span class="popup-tab-badge" id="tabBadgePRsAuthored">—</span>
+                </button>
+                <button class="popup-tab" data-tab="prs-reviewed" onclick="switchPopupTab('prs-reviewed')">
+                    <span>👁️</span> PRs Reviewed <span class="popup-tab-badge" id="tabBadgePRsReviewed">—</span>
+                </button>
+            </div>
             <div class="commit-popup-search">
-                <input type="text" id="commitSearchInput" placeholder="Search commits by message or hash…" oninput="filterCommitList()">
+                <input type="text" id="commitSearchInput" placeholder="Search commits by message or hash…" oninput="filterPopupTab()">
             </div>
             <div class="commit-popup-body" id="commitPopupBody"></div>
         </div>

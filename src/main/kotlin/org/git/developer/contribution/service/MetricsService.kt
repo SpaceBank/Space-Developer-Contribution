@@ -219,6 +219,9 @@ class MetricsService(
                           nodes {
                             commit {
                               committedDate
+                              statusCheckRollup {
+                                state
+                              }
                             }
                           }
                         }
@@ -288,6 +291,10 @@ class MetricsService(
                         val commit = firstCommit?.get("commit") as? Map<*, *>
                         val firstCommitTime = commit?.get("committedDate") as? String
 
+                        // Parse check status from statusCheckRollup
+                        val statusCheckRollup = commit?.get("statusCheckRollup") as? Map<*, *>
+                        val checkState = statusCheckRollup?.get("state") as? String  // SUCCESS, FAILURE, PENDING, ERROR, EXPECTED
+
                         val reviews = pr["reviews"] as? Map<*, *>
                         val reviewNodes = reviews?.get("nodes") as? List<*>
                         var firstReviewTime: String? = null
@@ -326,7 +333,8 @@ class MetricsService(
                             additions = additions,
                             deletions = deletions,
                             prSize = additions + deletions,
-                            baseBranch = baseBranch
+                            baseBranch = baseBranch,
+                            checkStatus = checkState
                         ))
                         pageInRangeCount++
                     }
@@ -582,7 +590,8 @@ class MetricsService(
                     mergedAt = pr.mergedAt,
                     firstCommitTime = pr.firstCommitTime,
                     firstReviewTime = pr.firstReviewTime,
-                    firstApprovalTime = pr.firstApprovalTime
+                    firstApprovalTime = pr.firstApprovalTime,
+                    checkStatus = pr.checkStatus
                 )
             }
 
@@ -770,6 +779,7 @@ data class PRDetailedInfo(
     val additions: Int,
     val deletions: Int,
     val prSize: Int,
-    val baseBranch: String? = null  // Base branch (e.g., "main", "develop")
+    val baseBranch: String? = null,
+    val checkStatus: String? = null   // SUCCESS, FAILURE, PENDING, or null
 )
 

@@ -45,7 +45,8 @@ data class PRMetrics(
     val mergedAt: String?,
     val firstCommitTime: String?,      // First commit timestamp
     val firstReviewTime: String?,      // First review timestamp
-    val firstApprovalTime: String?     // First approval timestamp
+    val firstApprovalTime: String?,    // First approval timestamp
+    val checkStatus: String? = null    // CI check status: SUCCESS, FAILURE, PENDING, null
 )
 
 /**
