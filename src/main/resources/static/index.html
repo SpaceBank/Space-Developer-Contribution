@@ -1518,16 +1518,16 @@
 
     // Session management
     function getSessionData() {
-        const data = sessionStorage.getItem('spaceAnalyticsSession');
+        const data = localStorage.getItem('spaceAnalyticsSession');
         return data ? JSON.parse(data) : null;
     }
 
     function saveSessionData(data) {
-        sessionStorage.setItem('spaceAnalyticsSession', JSON.stringify(data));
+        localStorage.setItem('spaceAnalyticsSession', JSON.stringify(data));
     }
 
     function clearSessionData() {
-        sessionStorage.removeItem('spaceAnalyticsSession');
+        localStorage.removeItem('spaceAnalyticsSession');
     }
 
     // Connect with token

@@ -520,9 +520,9 @@
             return contributor?.avatarUrl || contributor?.avatar_url || null;
         }
 
-        // Get session data from sessionStorage
+        // Get session data from localStorage
         function getSessionData() {
-            const data = sessionStorage.getItem('spaceAnalyticsSession');
+            const data = localStorage.getItem('spaceAnalyticsSession');
             return data ? JSON.parse(data) : null;
         }
 
