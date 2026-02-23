@@ -114,6 +114,9 @@ class RemoteRepositoryAnalyzerService(
             val prAuthorStats = calculatePRAuthorStats(prs)
             logger.info("   └─ ${prAuthorStats.size} unique PR authors")
 
+            // Attach PR details to developer timelines
+            val developersWithPRs = attachPRsToDevelopers(result.developers, prs)
+
             val totalTime = System.currentTimeMillis() - startTime
             logger.info("═══════════════════════════════════════════════════════════")
             logger.info("✅ [${request.repositoryFullName}] Analysis complete in ${totalTime}ms")
@@ -124,6 +127,7 @@ class RemoteRepositoryAnalyzerService(
                 analyzedRepositories = listOf(request.repositoryFullName),
                 prCountByPeriod = prCountByPeriod,
                 prAuthorStats = prAuthorStats,
+                developers = developersWithPRs,
                 summary = result.summary.copy(totalPRs = prs.size)
             )
 
@@ -241,11 +245,15 @@ class RemoteRepositoryAnalyzerService(
             // Calculate PR author stats
             val prAuthorStats = calculatePRAuthorStats(allPRs)
 
+            // Attach PR details to developer timelines
+            val developersWithPRs = attachPRsToDevelopers(result.developers, allPRs)
+
             // Return with original repo names and PR data
             return result.copy(
                 analyzedRepositories = request.repositoryFullNames,
                 prCountByPeriod = prCountByPeriod,
                 prAuthorStats = prAuthorStats,
+                developers = developersWithPRs,
                 summary = result.summary.copy(totalPRs = allPRs.size)
             )
 
@@ -287,6 +295,34 @@ class RemoteRepositoryAnalyzerService(
         return prs.groupBy { it.authorName }
             .map { (author, authorPrs) -> PRAuthorStats(author, authorPrs.size) }
             .sortedByDescending { it.prCount }
+    }
+
+    /**
+     * Attach individual PR details to developer timelines by matching PR author to developer nickname.
+     */
+    private fun attachPRsToDevelopers(
+        developers: List<DeveloperTimeline>,
+        prs: List<PullRequestInfo>
+    ): List<DeveloperTimeline> {
+        if (prs.isEmpty()) return developers
+        val prsByAuthor = prs.groupBy { it.authorName.lowercase() }
+        return developers.map { dev ->
+            val devPRs = prsByAuthor[dev.nickname.lowercase()] ?: emptyList()
+            if (devPRs.isEmpty()) dev
+            else dev.copy(
+                prDetails = devPRs.map { pr ->
+                    ContributionPRDetail(
+                        number = pr.number,
+                        title = pr.title,
+                        state = pr.state,
+                        createdAt = pr.createdAt,
+                        mergedAt = pr.mergedAt,
+                        repositoryFullName = pr.repositoryFullName,
+                        url = "https://github.com/${pr.repositoryFullName}/pull/${pr.number}"
+                    )
+                }.sortedByDescending { it.createdAt }
+            )
+        }
     }
 
     /**

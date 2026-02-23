@@ -63,6 +63,19 @@ data class CommitDetail(
 )
 
 /**
+ * Lightweight PR detail for frontend display on contribution page popup
+ */
+data class ContributionPRDetail(
+    val number: Int,
+    val title: String,
+    val state: String,
+    val createdAt: String,
+    val mergedAt: String?,
+    val repositoryFullName: String,
+    val url: String
+)
+
+/**
  * Contribution timeline for a specific developer
  */
 data class DeveloperTimeline(
@@ -72,7 +85,8 @@ data class DeveloperTimeline(
     val emails: Set<String>,
     val dataPoints: List<ContributionDataPoint>,
     val repositories: Set<String>,
-    val commits: List<CommitDetail> = emptyList()
+    val commits: List<CommitDetail> = emptyList(),
+    val prDetails: List<ContributionPRDetail> = emptyList()
 )
 
 /**

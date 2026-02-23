@@ -215,10 +215,16 @@ class MetricsService(
                         mergedAt
                         additions
                         deletions
-                        commits(first: 1) {
+                        firstCommits: commits(first: 1) {
                           nodes {
                             commit {
                               committedDate
+                            }
+                          }
+                        }
+                        lastCommits: commits(last: 1) {
+                          nodes {
+                            commit {
                               statusCheckRollup {
                                 state
                               }
@@ -285,15 +291,25 @@ class MetricsService(
 
                         val author = pr["author"] as? Map<*, *>
                         val authorLogin = author?.get("login") as? String ?: "unknown"
-                        val commits = pr["commits"] as? Map<*, *>
-                        val commitNodes = commits?.get("nodes") as? List<*>
-                        val firstCommit = commitNodes?.firstOrNull() as? Map<*, *>
-                        val commit = firstCommit?.get("commit") as? Map<*, *>
-                        val firstCommitTime = commit?.get("committedDate") as? String
 
-                        // Parse check status from statusCheckRollup
-                        val statusCheckRollup = commit?.get("statusCheckRollup") as? Map<*, *>
+                        // First commit — for firstCommitTime (coding time calculation)
+                        val firstCommitsNode = pr["firstCommits"] as? Map<*, *>
+                        val firstCommitNodes = firstCommitsNode?.get("nodes") as? List<*>
+                        val firstCommitEntry = firstCommitNodes?.firstOrNull() as? Map<*, *>
+                        val firstCommitObj = firstCommitEntry?.get("commit") as? Map<*, *>
+                        val firstCommitTime = firstCommitObj?.get("committedDate") as? String
+
+                        // Last commit — for check status (CI/CD runs on the latest commit)
+                        val lastCommitsNode = pr["lastCommits"] as? Map<*, *>
+                        val lastCommitNodes = lastCommitsNode?.get("nodes") as? List<*>
+                        val lastCommitEntry = lastCommitNodes?.lastOrNull() as? Map<*, *>
+                        val lastCommitObj = lastCommitEntry?.get("commit") as? Map<*, *>
+                        val statusCheckRollup = lastCommitObj?.get("statusCheckRollup") as? Map<*, *>
                         val checkState = statusCheckRollup?.get("state") as? String  // SUCCESS, FAILURE, PENDING, ERROR, EXPECTED
+
+                        if (checkState == null) {
+                            logger.debug("   ⚠️ PR #${(pr["number"] as? Number)?.toInt()} has null checkStatus (no statusCheckRollup on last commit)")
+                        }
 
                         val reviews = pr["reviews"] as? Map<*, *>
                         val reviewNodes = reviews?.get("nodes") as? List<*>

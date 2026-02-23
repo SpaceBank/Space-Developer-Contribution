@@ -2049,11 +2049,11 @@
             // Store data globally for tab switching / filtering
             window._popupCommits = commits;
             window._popupRepos = repos;
+            window._popupPRsAuthored = dev.prDetails || [];
 
             // Update tab badges
             document.getElementById('tabBadgeCommits').textContent = commits.length;
-            // PR data is not available on the contribution page
-            document.getElementById('tabBadgePRsAuthored').textContent = '—';
+            document.getElementById('tabBadgePRsAuthored').textContent = window._popupPRsAuthored.length || '—';
             document.getElementById('tabBadgePRsReviewed').textContent = '—';
 
             // Reset to commits tab
@@ -2099,8 +2099,16 @@
                     renderCommitList(commits);
                     break;
                 case 'prs-authored':
+                    let prs = window._popupPRsAuthored || [];
+                    if (q) prs = prs.filter(p =>
+                        (p.title || '').toLowerCase().includes(q) ||
+                        String(p.number).includes(q) ||
+                        (p.repositoryFullName || '').toLowerCase().includes(q)
+                    );
+                    renderPRAuthoredList(prs);
+                    break;
                 case 'prs-reviewed':
-                    renderPRUnavailable();
+                    renderPRUnavailable('PRs Reviewed');
                     break;
             }
         }
@@ -2148,15 +2156,46 @@
             }).join('');
         }
 
-        function renderPRUnavailable() {
+        function renderPRAuthoredList(prs) {
             const body = document.getElementById('commitPopupBody');
-            const label = _popupActiveTab === 'prs-authored' ? 'PRs Authored' : 'PRs Reviewed';
+            if (!prs || prs.length === 0) {
+                body.innerHTML = '<div style="text-align:center;color:#71717a;padding:2rem;">No authored PRs found for this developer</div>';
+                return;
+            }
+            body.innerHTML = prs.map(pr => {
+                const stateClass = (pr.state || '').toLowerCase() === 'merged' ? 'merged' : (pr.state || '').toLowerCase() === 'open' ? 'open' : 'closed';
+                const stateLabel = stateClass.charAt(0).toUpperCase() + stateClass.slice(1);
+                const repoShort = pr.repositoryFullName ? pr.repositoryFullName.split('/').pop() : '';
+                const date = pr.mergedAt || pr.createdAt;
+                const dateStr = date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                const titleEl = document.createElement('span');
+                titleEl.textContent = pr.title || '';
+                const safeTitle = titleEl.innerHTML;
+                const prUrl = pr.url || '#';
+                return `
+                    <div class="pr-item">
+                        <div class="pr-number"><a href="${prUrl}" target="_blank" rel="noopener noreferrer">#${pr.number}</a></div>
+                        <div class="pr-info">
+                            <div class="pr-title"><a href="${prUrl}" target="_blank" rel="noopener noreferrer">${safeTitle}</a></div>
+                            <div class="commit-meta">
+                                <span class="pr-state-badge ${stateClass}">${stateLabel}</span>
+                                ${dateStr ? `<span class="commit-meta-item">📅 ${dateStr}</span>` : ''}
+                                ${repoShort ? `<span class="commit-meta-item">📦 ${repoShort}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPRUnavailable(label) {
+            const body = document.getElementById('commitPopupBody');
             body.innerHTML = `
                 <div style="text-align:center; padding:3rem 1.5rem;">
-                    <div style="font-size:2.5rem; margin-bottom:0.75rem; opacity:.5;">🔀</div>
+                    <div style="font-size:2.5rem; margin-bottom:0.75rem; opacity:.5;">👁️</div>
                     <div style="font-size:1rem; color:#a1a1aa; font-weight:500; margin-bottom:0.5rem;">${label} data is not available here</div>
                     <div style="font-size:0.82rem; color:#71717a; max-width:340px; margin:0 auto;">
-                        PR details are available on the <strong style="color:#818cf8;">Engagement</strong> page where GitHub API data is used for analysis.
+                        Review data is available on the <strong style="color:#818cf8;">Engagement</strong> page where GitHub API data is used.
                     </div>
                 </div>
             `;
