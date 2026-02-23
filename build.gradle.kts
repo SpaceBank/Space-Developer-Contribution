@@ -22,13 +22,16 @@ repositories {
 extra["springModulithVersion"] = "2.0.1"
 
 val osArch = System.getProperty("os.arch")
+val osName = System.getProperty("os.name").lowercase()
 val macOsClassifier = if (osArch == "aarch64") "osx-aarch_64" else "osx-x86_64"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-webclient")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
-    runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.118.Final:$macOsClassifier")
+    if (osName.contains("mac")) {
+        runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.118.Final:$macOsClassifier")
+    }
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
