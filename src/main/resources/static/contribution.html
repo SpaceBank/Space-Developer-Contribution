@@ -2050,11 +2050,12 @@
             window._popupCommits = commits;
             window._popupRepos = repos;
             window._popupPRsAuthored = dev.prDetails || [];
+            window._popupPRsReviewed = dev.reviewDetails || [];
 
             // Update tab badges
             document.getElementById('tabBadgeCommits').textContent = commits.length;
             document.getElementById('tabBadgePRsAuthored').textContent = window._popupPRsAuthored.length || '—';
-            document.getElementById('tabBadgePRsReviewed').textContent = '—';
+            document.getElementById('tabBadgePRsReviewed').textContent = window._popupPRsReviewed.length || '—';
 
             // Reset to commits tab
             _popupActiveTab = 'commits';
@@ -2108,7 +2109,13 @@
                     renderPRAuthoredList(prs);
                     break;
                 case 'prs-reviewed':
-                    renderPRUnavailable('PRs Reviewed');
+                    let reviews = window._popupPRsReviewed || [];
+                    if (q) reviews = reviews.filter(p =>
+                        (p.title || '').toLowerCase().includes(q) ||
+                        String(p.number).includes(q) ||
+                        (p.repositoryFullName || '').toLowerCase().includes(q)
+                    );
+                    renderPRAuthoredList(reviews);
                     break;
             }
         }

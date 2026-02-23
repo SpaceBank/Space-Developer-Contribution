@@ -3,6 +3,9 @@ package org.git.developer.contribution.service
 import org.git.developer.contribution.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.ExchangeStrategies
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
 import java.io.File
 import java.nio.file.Files
 import java.time.DayOfWeek
@@ -114,8 +117,14 @@ class RemoteRepositoryAnalyzerService(
             val prAuthorStats = calculatePRAuthorStats(prs)
             logger.info("   └─ ${prAuthorStats.size} unique PR authors")
 
-            // Attach PR details to developer timelines
-            val developersWithPRs = attachPRsToDevelopers(result.developers, prs)
+            // Attach PR details (authored + reviewed) to developer timelines via Search API
+            val developersWithPRs = fetchAndAttachAllPRsToDevelopers(
+                result.developers,
+                request.token,
+                listOf(request.repositoryFullName),
+                request.startDate,
+                request.endDate
+            )
 
             val totalTime = System.currentTimeMillis() - startTime
             logger.info("═══════════════════════════════════════════════════════════")
@@ -245,8 +254,14 @@ class RemoteRepositoryAnalyzerService(
             // Calculate PR author stats
             val prAuthorStats = calculatePRAuthorStats(allPRs)
 
-            // Attach PR details to developer timelines
-            val developersWithPRs = attachPRsToDevelopers(result.developers, allPRs)
+            // Attach PR details (authored + reviewed) to developer timelines via Search API
+            val developersWithPRs = fetchAndAttachAllPRsToDevelopers(
+                result.developers,
+                request.token,
+                request.repositoryFullNames,
+                request.startDate,
+                request.endDate
+            )
 
             // Return with original repo names and PR data
             return result.copy(
@@ -299,6 +314,7 @@ class RemoteRepositoryAnalyzerService(
 
     /**
      * Attach individual PR details to developer timelines by matching PR author to developer nickname.
+     * This uses the merged PRs already fetched (fallback for non-GitHub or when Search API fails).
      */
     private fun attachPRsToDevelopers(
         developers: List<DeveloperTimeline>,
@@ -321,6 +337,173 @@ class RemoteRepositoryAnalyzerService(
                         url = "https://github.com/${pr.repositoryFullName}/pull/${pr.number}"
                     )
                 }.sortedByDescending { it.createdAt }
+            )
+        }
+    }
+
+    /**
+     * Fetch authored PRs (all states: open, merged, closed) and reviewed PRs
+     * via GitHub Search API, then attach to developer timelines.
+     */
+    private fun fetchAndAttachAllPRsToDevelopers(
+        developers: List<DeveloperTimeline>,
+        token: String,
+        repositories: List<String>,
+        since: String?,
+        until: String?
+    ): List<DeveloperTimeline> {
+        if (developers.isEmpty() || repositories.isEmpty()) return developers
+
+        val webClient = WebClient.builder()
+            .baseUrl("https://api.github.com")
+            .defaultHeader("Authorization", "Bearer $token")
+            .exchangeStrategies(ExchangeStrategies.builder()
+                .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
+                .build())
+            .build()
+
+        val startDate = since ?: LocalDate.now().minusMonths(6).toString()
+        val endDate = until ?: LocalDate.now().toString()
+
+        // Determine search scope
+        val orgName = repositories.firstOrNull()?.split("/")?.firstOrNull() ?: ""
+        val repoQueries = if (repositories.size > 5 && orgName.isNotEmpty()) {
+            listOf("org:$orgName")
+        } else {
+            repositories.map { "repo:$it" }
+        }
+
+        return developers.map { dev ->
+            val login = dev.nickname
+            val authoredPRs = mutableListOf<ContributionPRDetail>()
+            val reviewedPRs = mutableListOf<ContributionPRDetail>()
+
+            try {
+                // Fetch authored PRs (all states)
+                for (repoQuery in repoQueries) {
+                    var page = 1
+                    var hasMore = true
+                    while (hasMore && page <= 5) {
+                        try {
+                            val searchQuery = "$repoQuery+type:pr+author:$login+created:$startDate..$endDate"
+                            val response = webClient.get()
+                                .uri("/search/issues?q=$searchQuery&per_page=100&page=$page&sort=created&order=desc")
+                                .retrieve()
+                                .bodyToMono<Map<String, Any?>>()
+                                .block()
+
+                            @Suppress("UNCHECKED_CAST")
+                            val items = response?.get("items") as? List<Map<String, Any?>> ?: emptyList()
+                            val totalCount = (response?.get("total_count") as? Number)?.toInt() ?: 0
+
+                            if (items.isEmpty()) {
+                                hasMore = false
+                            } else {
+                                for (item in items) {
+                                    val prNumber = (item["number"] as? Number)?.toInt() ?: continue
+                                    val prTitle = item["title"] as? String ?: ""
+                                    val prUrl = item["html_url"] as? String ?: ""
+                                    val createdAt = item["created_at"] as? String ?: ""
+                                    val prState = item["state"] as? String ?: ""
+
+                                    @Suppress("UNCHECKED_CAST")
+                                    val pullRequest = item["pull_request"] as? Map<String, Any?>
+                                    val mergedAt = pullRequest?.get("merged_at") as? String
+
+                                    val repoName = prUrl.replace("https://github.com/", "").split("/pull/").firstOrNull() ?: ""
+
+                                    val state = when {
+                                        mergedAt != null -> "merged"
+                                        prState == "open" -> "open"
+                                        else -> "closed"
+                                    }
+
+                                    authoredPRs.add(ContributionPRDetail(
+                                        number = prNumber,
+                                        title = prTitle,
+                                        state = state,
+                                        createdAt = createdAt,
+                                        mergedAt = mergedAt,
+                                        repositoryFullName = repoName,
+                                        url = prUrl
+                                    ))
+                                }
+                                if (items.size < 100 || (page * 100) >= totalCount) hasMore = false else page++
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("⚠️ Search authored PRs error for $login in $repoQuery: ${e.message}")
+                            hasMore = false
+                        }
+                    }
+                }
+
+                // Fetch reviewed PRs
+                for (repoQuery in repoQueries) {
+                    var page = 1
+                    var hasMore = true
+                    while (hasMore && page <= 5) {
+                        try {
+                            val searchQuery = "$repoQuery+type:pr+reviewed-by:$login+created:$startDate..$endDate"
+                            val response = webClient.get()
+                                .uri("/search/issues?q=$searchQuery&per_page=100&page=$page&sort=created&order=desc")
+                                .retrieve()
+                                .bodyToMono<Map<String, Any?>>()
+                                .block()
+
+                            @Suppress("UNCHECKED_CAST")
+                            val items = response?.get("items") as? List<Map<String, Any?>> ?: emptyList()
+                            val totalCount = (response?.get("total_count") as? Number)?.toInt() ?: 0
+
+                            if (items.isEmpty()) {
+                                hasMore = false
+                            } else {
+                                for (item in items) {
+                                    val prNumber = (item["number"] as? Number)?.toInt() ?: continue
+                                    val prTitle = item["title"] as? String ?: ""
+                                    val prUrl = item["html_url"] as? String ?: ""
+                                    val createdAt = item["created_at"] as? String ?: ""
+                                    val prState = item["state"] as? String ?: ""
+
+                                    @Suppress("UNCHECKED_CAST")
+                                    val pullRequest = item["pull_request"] as? Map<String, Any?>
+                                    val mergedAt = pullRequest?.get("merged_at") as? String
+
+                                    val repoName = prUrl.replace("https://github.com/", "").split("/pull/").firstOrNull() ?: ""
+
+                                    val state = when {
+                                        mergedAt != null -> "merged"
+                                        prState == "open" -> "open"
+                                        else -> "closed"
+                                    }
+
+                                    reviewedPRs.add(ContributionPRDetail(
+                                        number = prNumber,
+                                        title = prTitle,
+                                        state = state,
+                                        createdAt = createdAt,
+                                        mergedAt = mergedAt,
+                                        repositoryFullName = repoName,
+                                        url = prUrl
+                                    ))
+                                }
+                                if (items.size < 100 || (page * 100) >= totalCount) hasMore = false else page++
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("⚠️ Search reviewed PRs error for $login in $repoQuery: ${e.message}")
+                            hasMore = false
+                        }
+                    }
+                }
+
+                logger.info("📋 [$login] Authored: ${authoredPRs.size} PRs (all states), Reviewed: ${reviewedPRs.size} PRs")
+
+            } catch (e: Exception) {
+                logger.warn("⚠️ Failed to fetch PR details for $login: ${e.message}")
+            }
+
+            dev.copy(
+                prDetails = authoredPRs.sortedByDescending { it.createdAt },
+                reviewDetails = reviewedPRs.sortedByDescending { it.createdAt }
             )
         }
     }

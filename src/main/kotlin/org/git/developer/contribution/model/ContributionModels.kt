@@ -86,7 +86,8 @@ data class DeveloperTimeline(
     val dataPoints: List<ContributionDataPoint>,
     val repositories: Set<String>,
     val commits: List<CommitDetail> = emptyList(),
-    val prDetails: List<ContributionPRDetail> = emptyList()
+    val prDetails: List<ContributionPRDetail> = emptyList(),
+    val reviewDetails: List<ContributionPRDetail> = emptyList()
 )
 
 /**
