@@ -1,10 +1,9 @@
 package org.git.developer.contribution.service
 
+import org.git.developer.contribution.config.GitApiClient
 import org.git.developer.contribution.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.ExchangeStrategies
-import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.io.File
 import java.nio.file.Files
@@ -21,7 +20,8 @@ import java.util.Locale
 class RemoteRepositoryAnalyzerService(
     private val gitProviderService: GitProviderService,
     private val gitDataExtractor: GitDataExtractorService,
-    private val contributionAggregator: ContributionAggregatorService
+    private val contributionAggregator: ContributionAggregatorService,
+    private val api: GitApiClient
 ) {
     private val logger = LoggerFactory.getLogger(RemoteRepositoryAnalyzerService::class.java)
 
@@ -121,6 +121,7 @@ class RemoteRepositoryAnalyzerService(
             val developersWithPRs = fetchAndAttachAllPRsToDevelopers(
                 result.developers,
                 request.token,
+                request.provider,
                 listOf(request.repositoryFullName),
                 request.startDate,
                 request.endDate
@@ -258,6 +259,7 @@ class RemoteRepositoryAnalyzerService(
             val developersWithPRs = fetchAndAttachAllPRsToDevelopers(
                 result.developers,
                 request.token,
+                request.provider,
                 request.repositoryFullNames,
                 request.startDate,
                 request.endDate
@@ -348,19 +350,14 @@ class RemoteRepositoryAnalyzerService(
     private fun fetchAndAttachAllPRsToDevelopers(
         developers: List<DeveloperTimeline>,
         token: String,
+        provider: GitProvider,
         repositories: List<String>,
         since: String?,
         until: String?
     ): List<DeveloperTimeline> {
         if (developers.isEmpty() || repositories.isEmpty()) return developers
 
-        val webClient = WebClient.builder()
-            .baseUrl("https://api.github.com")
-            .defaultHeader("Authorization", "Bearer $token")
-            .exchangeStrategies(ExchangeStrategies.builder()
-                .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-                .build())
-            .build()
+        val webClient = api.forProvider(token, provider)
 
         val startDate = since ?: LocalDate.now().minusMonths(6).toString()
         val endDate = until ?: LocalDate.now().toString()

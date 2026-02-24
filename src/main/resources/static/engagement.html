@@ -963,7 +963,7 @@
                     });
 
                     // Check for token expiry / rate limit BEFORE consuming body
-                    if (r.status === 401 || r.status === 429 || (r.status === 403)) {
+                    if (!r.ok) {
                         const isAuthError = await handleApiError(r, 'engagement');
                         if (isAuthError) throw new Error('Session expired');
                     }

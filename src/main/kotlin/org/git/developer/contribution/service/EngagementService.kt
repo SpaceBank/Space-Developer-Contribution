@@ -1,10 +1,10 @@
 package org.git.developer.contribution.service
 
+import org.git.developer.contribution.config.GitApiClient
 import org.git.developer.contribution.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.ExchangeStrategies
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -18,7 +18,8 @@ import java.util.*
  */
 @Service
 class EngagementService(
-    private val contributorCacheService: ContributorCacheService
+    private val contributorCacheService: ContributorCacheService,
+    private val api: GitApiClient
 ) {
     private val logger = LoggerFactory.getLogger(EngagementService::class.java)
 
@@ -116,6 +117,8 @@ class EngagementService(
 
         } catch (e: Exception) {
             logger.error("Error fetching GitHub org members: ${e.message}", e)
+            // Let GitApiClient-typed exceptions (TokenExpired, RateLimit, etc.) propagate
+            throw e
         }
 
         val sortedMembers = allMembers.values.sortedByDescending { it.contributions }
@@ -296,6 +299,8 @@ class EngagementService(
                 logger.info("Processing contributor ${index + 1}/${request.contributorLogins.size}: $login")
                 analyzeCommitsOnlyForContributor(
                     token = request.token,
+                    provider = request.provider,
+                    baseUrl = request.baseUrl,
                     login = login,
                     startDate = startDate,
                     endDate = endDate,
@@ -366,7 +371,7 @@ class EngagementService(
             val contributorPRData = request.contributorLogins.mapIndexed { index, login ->
                 logger.info("🔄 Processing contributor ${index + 1}/${request.contributorLogins.size}: $login")
                 try {
-                    val stats = fetchPRAndReviewStats(request.token, login, repositories, startDate, endDate, periods)
+                    val stats = fetchPRAndReviewStats(request.token, request.provider, request.baseUrl, login, repositories, startDate, endDate, periods)
                     logger.info("✓ $login: ${stats.totalPRs} PRs, ${stats.totalReviews} reviews, ${stats.activeDays} active days")
                     ContributorPRData(
                         login = login,
@@ -386,8 +391,9 @@ class EngagementService(
                         reviewDetails = stats.reviewDetails
                     )
                 } catch (e: Exception) {
+                    // Let token/rate-limit exceptions propagate (GlobalExceptionHandler will catch)
+                    if (e is org.git.developer.contribution.config.GitApiException) throw e
                     logger.error("❌ Error processing $login: ${e.message}")
-                    // Return empty data for this contributor instead of failing completely
                     ContributorPRData(
                         login = login,
                         prsMerged = 0,
@@ -415,6 +421,8 @@ class EngagementService(
      */
     private fun analyzeCommitsOnlyForContributor(
         token: String,
+        provider: GitProvider,
+        baseUrl: String?,
         login: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -422,7 +430,7 @@ class EngagementService(
         repositories: List<String>,
         excludeMergeCommits: Boolean
     ): ContributorEngagement {
-        val stats = fetchCommitAndLineStatsForContributor(token, login, repositories, startDate, endDate, periods, excludeMergeCommits)
+        val stats = fetchCommitAndLineStatsForContributor(token, provider, baseUrl, login, repositories, startDate, endDate, periods, excludeMergeCommits)
 
         // Get display name from cache
         val displayName = contributorCacheService.getDisplayNameByUsername(login)
@@ -478,6 +486,8 @@ class EngagementService(
                     logger.info("Processing contributor ${index + 1}/${request.contributorLogins.size}: $login via GraphQL")
                     analyzeContributorViaGraphQL(
                         token = request.token,
+                        provider = request.provider,
+                        baseUrl = request.baseUrl,
                         login = login,
                         startDate = startDate,
                         endDate = endDate,
@@ -535,6 +545,8 @@ class EngagementService(
      */
     private fun analyzeContributorViaGraphQL(
         token: String,
+        provider: GitProvider,
+        baseUrl: String?,
         login: String,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -542,16 +554,7 @@ class EngagementService(
         repositories: List<String>,
         excludeMergeCommits: Boolean
     ): ContributorEngagement {
-        val exchangeStrategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        val webClient = WebClient.builder()
-            .baseUrl(GITHUB_GRAPHQL_URL)
-            .exchangeStrategies(exchangeStrategies)
-            .defaultHeader("Authorization", "Bearer $token")
-            .defaultHeader("Content-Type", "application/json")
-            .build()
+        val webClient = api.githubGraphQL(token)
 
         val commitsPerPeriod = mutableMapOf<String, Int>()
         val linesAddedPerPeriod = mutableMapOf<String, Int>()
@@ -737,7 +740,7 @@ class EngagementService(
             }
 
             // Now fetch commit counts using REST API (more accurate for selected repos)
-            val stats = fetchCommitAndLineStatsForContributor(token, login, repositories, startDate, endDate, periods, excludeMergeCommits)
+            val stats = fetchCommitAndLineStatsForContributor(token, provider, baseUrl, login, repositories, startDate, endDate, periods, excludeMergeCommits)
 
             // Use REST API commit count (accurate for selected repos)
             val actualCommitCount = stats.commitsPerPeriod.values.sum()
@@ -756,7 +759,7 @@ class EngagementService(
             }
 
             // Fetch PRs and Reviews using REST API (more accurate for date ranges > 1 year)
-            val prStats = fetchPRAndReviewStats(token, login, repositories, startDate, endDate, periods)
+            val prStats = fetchPRAndReviewStats(token, provider, baseUrl, login, repositories, startDate, endDate, periods)
             prsMerged = prStats.totalPRs
             prsReviewed = prStats.totalReviews
             activeDays = prStats.activeDays
@@ -829,6 +832,8 @@ class EngagementService(
      */
     private fun fetchCommitAndLineStatsForContributor(
         token: String,
+        provider: GitProvider,
+        baseUrl: String?,
         login: String,
         repositories: List<String>,
         startDate: LocalDate,
@@ -836,11 +841,7 @@ class EngagementService(
         periods: List<Triple<String, LocalDate, LocalDate>>,
         excludeMergeCommits: Boolean
     ): CommitLineStats {
-        val webClient = WebClient.builder()
-            .baseUrl(GITHUB_API_URL)
-            .defaultHeader("Authorization", "Bearer $token")
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
+        val webClient = api.forProvider(token, provider, baseUrl)
 
         var totalAdded = 0
         var totalDeleted = 0
@@ -1053,17 +1054,15 @@ class EngagementService(
      */
     private fun fetchPRAndReviewStats(
         token: String,
+        provider: GitProvider,
+        baseUrl: String?,
         login: String,
         repositories: List<String>,
         startDate: LocalDate,
         endDate: LocalDate,
         periods: List<Triple<String, LocalDate, LocalDate>>
     ): PRReviewStats {
-        val webClient = WebClient.builder()
-            .baseUrl(GITHUB_API_URL)
-            .defaultHeader("Authorization", "Bearer $token")
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
+        val webClient = api.forProvider(token, provider, baseUrl)
 
         val prsPerPeriod = mutableMapOf<String, Int>()
         val reviewsPerPeriod = mutableMapOf<String, Int>()
@@ -1309,7 +1308,7 @@ class EngagementService(
         when (provider) {
             GitProvider.GITHUB -> {
                 // Use parallel fetching for GitHub REST
-                val stats = fetchCommitAndLineStatsForContributor(token, login, repositories, startDate, endDate, periods, excludeMergeCommits)
+                val stats = fetchCommitAndLineStatsForContributor(token, provider, baseUrl, login, repositories, startDate, endDate, periods, excludeMergeCommits)
                 stats.linesAddedPerPeriod.forEach { (period, added) ->
                     linesAddedPerPeriod[period] = added
                 }
@@ -1534,21 +1533,7 @@ class EngagementService(
     }
 
     private fun createWebClient(baseUrl: String, token: String, provider: GitProvider): WebClient {
-        val exchangeStrategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        val builder = WebClient.builder()
-            .baseUrl(baseUrl)
-            .exchangeStrategies(exchangeStrategies)
-
-        when (provider) {
-            GitProvider.GITHUB -> builder.defaultHeader("Authorization", "Bearer $token")
-                .defaultHeader("Accept", "application/vnd.github.v3+json")
-            GitProvider.GITLAB -> builder.defaultHeader("PRIVATE-TOKEN", token)
-        }
-
-        return builder.build()
+        return api.forProvider(token, provider, baseUrl)
     }
 }
 

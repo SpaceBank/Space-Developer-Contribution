@@ -1,9 +1,9 @@
 package org.git.developer.contribution.service
 
+import org.git.developer.contribution.config.GitApiClient
 import org.git.developer.contribution.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.ExchangeStrategies
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.time.Instant
@@ -22,7 +22,9 @@ import java.time.temporal.ChronoUnit
  *     • If no matching run     → commit is PENDING
  */
 @Service
-class TrunkMetricsService {
+class TrunkMetricsService(
+    private val api: GitApiClient
+) {
 
     private val logger = LoggerFactory.getLogger(TrunkMetricsService::class.java)
 
@@ -42,7 +44,7 @@ class TrunkMetricsService {
         val endInstant   = endDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()
         val daysInRange  = ChronoUnit.DAYS.between(startDate, endDate).toDouble().coerceAtLeast(1.0)
 
-        val client = buildClient(request.token)
+        val client = buildClient(request.token, request.provider)
 
         // 1 — Fetch commits
         logger.info("📡 Fetching commits …")
@@ -114,8 +116,8 @@ class TrunkMetricsService {
     /**
      * List available workflows for a repository so the user can pick one.
      */
-    fun listWorkflows(token: String, owner: String, repo: String): List<Map<String, String>> {
-        val client = buildClient(token)
+    fun listWorkflows(token: String, owner: String, repo: String, provider: String = "GITHUB"): List<Map<String, String>> {
+        val client = buildClient(token, provider)
         return try {
             val response = client.get()
                 .uri("/repos/$owner/$repo/actions/workflows?per_page=100")
@@ -133,7 +135,7 @@ class TrunkMetricsService {
             }
         } catch (e: Exception) {
             logger.error("❌ Failed to list workflows for $owner/$repo: ${e.message}")
-            emptyList()
+            throw e  // Let GlobalExceptionHandler classify it
         }
     }
 
@@ -141,18 +143,13 @@ class TrunkMetricsService {
     //  GITHUB API HELPERS
     // ════════════════════════════════════════════════════════════
 
-    private fun buildClient(token: String): WebClient {
-        val strategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        return WebClient.builder()
-            .baseUrl("https://api.github.com")
-            .exchangeStrategies(strategies)
-            .defaultHeader("Authorization", "Bearer $token")
-            .defaultHeader("Accept", "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build()
+    private fun buildClient(token: String, provider: String = "GITHUB"): WebClient {
+        val gitProvider = try {
+            GitProvider.valueOf(provider.uppercase())
+        } catch (_: Exception) {
+            GitProvider.GITHUB
+        }
+        return api.forProvider(token, gitProvider)
     }
 
     // ── Fetch commits ──────────────────────────────────────────
@@ -181,7 +178,7 @@ class TrunkMetricsService {
                     .block() ?: break
             } catch (e: Exception) {
                 logger.error("   ❌ Error fetching commits page $page: ${e.message}")
-                break
+                throw e  // Let GlobalExceptionHandler classify it
             }
 
             if (response.isEmpty()) break

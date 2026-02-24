@@ -43,14 +43,15 @@ class TrunkMetricsController(
     fun listWorkflows(
         @RequestParam token: String,
         @RequestParam owner: String,
-        @RequestParam repo: String
+        @RequestParam repo: String,
+        @RequestParam(defaultValue = "GITHUB") provider: String
     ): List<Map<String, String>> {
         val username = userActivity.resolveUser(token)
         userActivity.logApiCall(username, "LIST WORKFLOWS", "repo=$owner/$repo")
-        logger.info("📥 [@$username] GET /api/trunk-matrix/workflows — repo=$owner/$repo")
+        logger.info("📥 [@$username] GET /api/trunk-matrix/workflows — repo=$owner/$repo provider=$provider")
 
         val startTime = System.currentTimeMillis()
-        val result = trunkMetricsService.listWorkflows(token, owner, repo)
+        val result = trunkMetricsService.listWorkflows(token, owner, repo, provider)
         val duration = System.currentTimeMillis() - startTime
 
         userActivity.logAction(username, "WORKFLOWS LOADED", "${result.size} workflows found for $owner/$repo in ${duration}ms")

@@ -1,10 +1,10 @@
 package org.git.developer.contribution.service
 
+import org.git.developer.contribution.config.GitApiClient
 import org.git.developer.contribution.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.ExchangeStrategies
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -20,7 +20,8 @@ import java.util.*
  */
 @Service
 class MetricsService(
-    private val gitProviderService: GitProviderService
+    private val gitProviderService: GitProviderService,
+    private val api: GitApiClient
 ) {
     private val logger = LoggerFactory.getLogger(MetricsService::class.java)
 
@@ -172,16 +173,7 @@ class MetricsService(
         since: String?,
         baseUrl: String?
     ): List<PRDetailedInfo> {
-        val exchangeStrategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        val webClient = WebClient.builder()
-            .baseUrl("https://api.github.com")
-            .exchangeStrategies(exchangeStrategies)
-            .defaultHeader("Authorization", "Bearer $token")
-            .defaultHeader("Content-Type", "application/json")
-            .build()
+        val webClient = api.githubGraphQL(token)
 
         val parts = repositoryFullName.split("/")
         if (parts.size != 2) return emptyList()
@@ -386,18 +378,7 @@ class MetricsService(
         since: String?,
         baseUrl: String?
     ): List<PRDetailedInfo> {
-        val apiUrl = baseUrl ?: "https://api.github.com"
-
-        val exchangeStrategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        val webClient = WebClient.builder()
-            .baseUrl(apiUrl)
-            .exchangeStrategies(exchangeStrategies)
-            .defaultHeader("Authorization", "Bearer $token")
-            .defaultHeader("Accept", "application/vnd.github.v3+json")
-            .build()
+        val webClient = api.github(token, baseUrl)
 
         val prList = mutableListOf<PRDetailedInfo>()
         var page = 1
@@ -473,18 +454,7 @@ class MetricsService(
         since: String?,
         baseUrl: String?
     ): List<PRDetailedInfo> {
-        // Simplified GitLab implementation
-        val apiUrl = baseUrl ?: "https://gitlab.com/api/v4"
-
-        val exchangeStrategies = ExchangeStrategies.builder()
-            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }
-            .build()
-
-        val webClient = WebClient.builder()
-            .baseUrl(apiUrl)
-            .exchangeStrategies(exchangeStrategies)
-            .defaultHeader("PRIVATE-TOKEN", token)
-            .build()
+        val webClient = api.gitlab(token, baseUrl)
 
         val encodedPath = repositoryFullName.replace("/", "%2F")
         val prList = mutableListOf<PRDetailedInfo>()

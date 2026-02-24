@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/common.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #0a0a1a 0%, #12122e 40%, #1a1a3e 70%, #0f0f2a 100%);
@@ -687,11 +688,7 @@
             return contributor?.avatarUrl || contributor?.avatar_url || null;
         }
 
-        // Get session data from localStorage
-        function getSessionData() {
-            const data = localStorage.getItem('spaceAnalyticsSession');
-            return data ? JSON.parse(data) : null;
-        }
+        // getSessionData() and handleApiError() are provided by common.js
 
         // Custom Modal Functions
         function showModal(icon, title, message) {
@@ -1410,6 +1407,12 @@
                     log('info', `│ 📨 [${repoFullName}] Response status: ${response.status} ${response.statusText}`);
 
                     if (!response.ok) {
+                        // Check for token expiry / rate limit
+                        const isAuthError = await handleApiError(response, 'contribution');
+                        if (isAuthError) {
+                            if (progressSimulator) clearInterval(progressSimulator);
+                            throw new Error('Session expired');
+                        }
                         const errorText = await response.text();
                         log('error', `│ ❌ [${repoFullName}] API Error:`, errorText);
                         throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
