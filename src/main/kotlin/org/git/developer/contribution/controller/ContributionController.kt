@@ -2,6 +2,8 @@ package org.git.developer.contribution.controller
 
 import org.git.developer.contribution.model.*
 import org.git.developer.contribution.service.ContributionAggregatorService
+import org.git.developer.contribution.service.UserActivityLogger
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
@@ -11,26 +13,26 @@ import java.time.LocalDate
  */
 @RestController
 @RequestMapping("/api/contributions")
-@CrossOrigin(origins = ["*"]) // Allow CORS for frontend charting libraries
+@CrossOrigin(origins = ["*"])
 class ContributionController(
-    private val aggregatorService: ContributionAggregatorService
+    private val aggregatorService: ContributionAggregatorService,
+    private val userActivity: UserActivityLogger
 ) {
+    private val logger = LoggerFactory.getLogger(ContributionController::class.java)
 
     /**
      * Analyze multiple repositories and get time-series contribution data
-     *
-     * Example request:
-     * POST /api/contributions/analyze
-     * {
-     *   "repositoryPaths": ["/path/to/repo1", "/path/to/repo2"],
-     *   "startDate": "2025-01-01",
-     *   "endDate": "2025-12-31",
-     *   "period": "WEEKLY"
-     * }
      */
     @PostMapping("/analyze")
     fun analyzeRepositories(@RequestBody request: AnalyzeRequest): ResponseEntity<ContributionAnalysisResponse> {
+        logger.info("📥 POST /api/contributions/analyze — repos=${request.repositoryPaths.size}, period=${request.period}")
+        logger.info("   Repos: ${request.repositoryPaths.joinToString(", ")}")
+
+        val startTime = System.currentTimeMillis()
         val result = aggregatorService.analyzeRepositories(request)
+        val duration = System.currentTimeMillis() - startTime
+
+        logger.info("✅ Contribution analysis done in ${duration}ms — commits=${result.summary.totalCommits}, developers=${result.summary.totalDevelopers}")
         return ResponseEntity.ok(result)
     }
 
@@ -45,7 +47,9 @@ class ContributionController(
         @RequestParam(required = false) startDate: LocalDate?,
         @RequestParam(required = false) endDate: LocalDate?
     ): ResponseEntity<List<DeveloperContribution>> {
+        logger.info("📥 GET /api/contributions/developers — repos=${repos.size}, dates=${startDate ?: "all"}..${endDate ?: "all"}")
         val contributions = aggregatorService.getDeveloperContributions(repos, startDate, endDate)
+        logger.info("✅ Developer contributions: ${contributions.size} developers found")
         return ResponseEntity.ok(contributions)
     }
 
@@ -62,6 +66,7 @@ class ContributionController(
         @RequestParam(required = false) endDate: LocalDate?,
         @RequestParam(required = false, defaultValue = "WEEKLY") period: AggregationPeriod
     ): ResponseEntity<ContributionAnalysisResponse> {
+        logger.info("📥 GET /api/contributions/timeline — repos=${repos.size}, period=$period")
         val request = AnalyzeRequest(
             repositoryPaths = repos,
             startDate = startDate,
@@ -84,6 +89,7 @@ class ContributionController(
         @RequestParam(required = false) endDate: LocalDate?,
         @RequestParam(required = false, defaultValue = "WEEKLY") period: AggregationPeriod
     ): ResponseEntity<ChartDataResponse> {
+        logger.info("📥 GET /api/contributions/chart-data — repos=${repos.size}, period=$period")
         val request = AnalyzeRequest(
             repositoryPaths = repos,
             startDate = startDate,
