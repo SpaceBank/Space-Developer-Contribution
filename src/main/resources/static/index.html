@@ -1468,9 +1468,26 @@
     let iframesLoaded = { contribution: false, engagement: false, matrix: false, trunk: false };
 
     // Initialize on page load
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         const sessionData = getSessionData();
         if (sessionData && sessionData.token) {
+            try {
+                // Re-register token→username on backend (cache is lost on server restart)
+                const sessionResp = await fetch('/api/git/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contributors: sessionData.contributors || [],
+                        token: sessionData.token,
+                        username: sessionData.user?.login
+                    })
+                });
+                if (!sessionResp.ok) {
+                    console.warn('Failed to re-register session on backend');
+                }
+            } catch (e) {
+                console.warn('Could not re-register session:', e);
+            }
             showLoggedInState(sessionData);
         }
     });
@@ -1732,7 +1749,11 @@
                 await fetch('/api/git/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contributors: allContributors })
+                    body: JSON.stringify({
+                        contributors: allContributors,
+                        token: token,
+                        username: user.login
+                    })
                 });
             } catch (e) {}
 

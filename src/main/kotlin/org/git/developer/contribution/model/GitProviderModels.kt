@@ -89,7 +89,9 @@ data class PullRequestInfo(
  * Request to store session data (contributors) after login
  */
 data class SessionDataRequest(
-    val contributors: List<Map<String, Any?>>? = null
+    val contributors: List<Map<String, Any?>>? = null,
+    val token: String? = null,
+    val username: String? = null
 )
 
 /**

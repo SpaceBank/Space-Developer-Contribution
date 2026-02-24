@@ -31,13 +31,16 @@ class GitProviderController(
         val contributorCount = request.contributors?.size ?: 0
         logger.info("📥 POST /api/git/session — storing $contributorCount contributors")
 
+        // Register the user for activity logging
+        if (!request.token.isNullOrBlank() && !request.username.isNullOrBlank()) {
+            userActivity.registerUser(request.token, request.username)
+            userActivity.logLogin(request.username)
+        }
+
         if (!request.contributors.isNullOrEmpty()) {
             contributorCacheService.storeContributors(request.contributors)
-            // Try to identify user from contributor list (first entry is often the logged-in user)
-            val firstLogin = request.contributors.firstOrNull()?.get("login") as? String
-            if (firstLogin != null) {
-                userActivity.logSessionStore(firstLogin, contributorCount)
-            }
+            val username = request.username ?: (request.contributors.firstOrNull()?.get("login") as? String) ?: "unknown"
+            userActivity.logSessionStore(username, contributorCount)
         }
         return ResponseEntity.ok(SessionDataResponse(
             contributorsCached = contributorCacheService.size(),

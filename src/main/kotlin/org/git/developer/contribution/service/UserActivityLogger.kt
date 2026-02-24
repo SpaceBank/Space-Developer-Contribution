@@ -2,8 +2,6 @@ package org.git.developer.contribution.service
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -26,31 +24,7 @@ class UserActivityLogger {
      */
     fun resolveUser(token: String?): String {
         if (token.isNullOrBlank()) return "anonymous"
-
-        val tokenKey = tokenPrefix(token)
-        val cached = tokenToUser[tokenKey]
-        if (cached != null) return cached
-
-        return try {
-            val webClient = WebClient.builder()
-                .baseUrl("https://api.github.com")
-                .defaultHeader("Authorization", "Bearer $token")
-                .defaultHeader("Accept", "application/vnd.github.v3+json")
-                .build()
-
-            val user = webClient.get()
-                .uri("/user")
-                .retrieve()
-                .bodyToMono<Map<String, Any?>>()
-                .block()
-
-            val login = user?.get("login") as? String ?: "unknown"
-            tokenToUser[tokenKey] = login
-            login
-        } catch (e: Exception) {
-            logger.debug("Could not resolve user from token: ${e.message}")
-            "unknown"
-        }
+        return tokenToUser[tokenPrefix(token)] ?: "unknown"
     }
 
     /**
