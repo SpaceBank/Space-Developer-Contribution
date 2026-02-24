@@ -136,9 +136,15 @@ body.in-iframe .page-content{padding-top:1rem}
 .results-container{display:none}
 .results-container.visible{display:block}
 .analysis-info{margin-bottom:1.5rem;padding:1rem;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15);border-radius:12px;font-size:.9rem;color:#d4d4d8}
-@media(max-width:1024px){.metrics-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.modal-metrics{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.metrics-grid{grid-template-columns:1fr}.config-grid{grid-template-columns:1fr}.modal-metrics{grid-template-columns:1fr 1fr}}
 .hidden{display:none!important}
+/* Chart detail popup */
+.chart-popup-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center;backdrop-filter:blur(8px)}
+.chart-popup-overlay.show{display:flex}
+.chart-popup{background:#16162a;border:1px solid rgba(255,255,255,.12);border-radius:24px;width:90%;max-width:1000px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.chart-popup-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 2rem;border-bottom:1px solid rgba(255,255,255,.08)}
+.chart-popup-header h3{color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:.5rem}
+.chart-popup-body{padding:1.5rem 2rem;overflow-y:auto;flex:1}
+.chart-popup-count{background:rgba(16,185,129,.15);color:#34d399;padding:.2rem .6rem;border-radius:12px;font-size:.8rem;font-weight:600;margin-left:.5rem}
 </style>
 </head>
 <body>
@@ -203,12 +209,15 @@ body.in-iframe .page-content{padding-top:1rem}
         <div class="chart-panel"><h3>🔄 Cycle Time Decomposition</h3><div class="chart-container"><canvas id="cycleTimeChart"></canvas></div></div>
     </div>
     <div class="charts-row">
-        <div class="chart-panel"><h3>📊 Daily Commits &amp; Actions</h3><div class="chart-container"><canvas id="dailyChart"></canvas></div></div>
-        <div class="chart-panel"><h3>⏱️ Lead Time Trend</h3><div class="chart-container"><canvas id="leadTimeChart"></canvas></div></div>
+        <div class="chart-panel">
+            <h3>📊 Daily Commits &amp; Actions <span style="font-size:.7rem;font-weight:400;color:#71717a;margin-left:.5rem">Click any bar to see details</span></h3>
+            <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+        </div>
+        <div class="chart-panel"><h3>📦 Commit Batch Size Distribution</h3><div class="chart-container"><canvas id="batchSizeChart"></canvas></div></div>
     </div>
     <div class="charts-row">
+        <div class="chart-panel"><h3>⏱️ Lead Time Trend</h3><div class="chart-container"><canvas id="leadTimeChart"></canvas></div></div>
         <div class="chart-panel"><h3>✅ Deploy Success vs Failure</h3><div class="chart-container"><canvas id="successFailChart"></canvas></div></div>
-        <div class="chart-panel"><h3>📦 Commit Batch Size Distribution</h3><div class="chart-container"><canvas id="batchSizeChart"></canvas></div></div>
     </div>
 
     <div class="section-panel">
@@ -256,6 +265,17 @@ body.in-iframe .page-content{padding-top:1rem}
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header"><h2 id="modalTitle"></h2><button class="modal-close" onclick="document.getElementById('authorModal').classList.remove('show')">✕</button></div>
         <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<!-- Chart Detail Popup -->
+<div class="chart-popup-overlay" id="chartPopup" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="chart-popup" onclick="event.stopPropagation()">
+        <div class="chart-popup-header">
+            <h3 id="chartPopupTitle"></h3>
+            <button class="modal-close" onclick="document.getElementById('chartPopup').classList.remove('show')">✕</button>
+        </div>
+        <div class="chart-popup-body" id="chartPopupBody"></div>
     </div>
 </div>
 
@@ -390,7 +410,7 @@ function runAnalysis() {
 function renderResults(d) {
     document.getElementById('analysisInfo').innerHTML =
         '📦 <strong>' + d.owner + '/' + d.repo + '</strong> • Branch: <strong>' + d.branch + '</strong> • Workflow: <strong>' + d.workflowName +
-        '</strong> • ' + d.startDate + ' → ' + d.endDate + ' • ' + d.totalCommits + ' commits • ' + d.totalActionRuns + ' action runs • ' + d.authorStats.length + ' developers';
+        '</strong> • ' + d.startDate + ' → ' + d.endDate + ' • ' + d.totalCommits + ' commits • ' + d.successfulDeploys + ' successful deploys • ' + d.failedDeploys + ' failed deploys • ' + d.authorStats.length + ' developers';
     var ob = document.getElementById('overallBadge');
     ob.className = 'overall-badge rating-' + d.ratings.overall.toLowerCase();
     ob.innerHTML = '🏆 Overall Rating: <strong>' + d.ratings.overall + '</strong>';
@@ -399,7 +419,7 @@ function renderResults(d) {
     renderCycleTimeChart(d);
     renderDailyChart(d.dailyStats);
     renderLeadTimeChart(d.dailyStats);
-    renderSuccessFailChart(d.successfulCommits, d.failedCommits);
+    renderSuccessFailChart(d.successfulDeploys, d.failedDeploys);
     renderBatchSizeChart(d.commits);
     renderDevMatrix(d.authorStats);
     renderCommitList(d.commits);
@@ -493,12 +513,6 @@ function mc(v, l, style) { return '<div class="modal-metric-card"><div class="mm
 
 // ══════ CHARTS ══════
 function dc(n) { if (charts[n]) { charts[n].destroy(); charts[n] = null; } }
-function co(yLabel) {
-    return { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
-        scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
-                  y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: yLabel, color: '#9ca3af' } } } };
-}
 
 function renderWeeklyTrendChart(weeks) {
     dc('weekly');
@@ -508,7 +522,22 @@ function renderWeeklyTrendChart(weeks) {
             { label: 'Commits', data: weeks.map(function(w) { return w.commits; }), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4, pointRadius: 3 },
             { label: 'Successful Deploys', data: weeks.map(function(w) { return w.successfulDeploys; }), borderColor: '#22c55e', tension: .4, pointRadius: 3 },
             { label: 'Failed Deploys', data: weeks.map(function(w) { return w.failedDeploys; }), borderColor: '#ef4444', tension: .4, pointRadius: 3 }
-        ] }, options: co('Count')
+        ] }, options: {
+            responsive: true, maintainAspectRatio: false,
+            onClick: function(e, elements) {
+                if (!elements.length || !analysisData) return;
+                var idx = elements[0].index;
+                var w = weeks[idx];
+                var commits = analysisData.commits.filter(function(c) {
+                    var d = c.committedAt.substring(0, 10);
+                    return d >= w.startDate && d <= w.endDate;
+                });
+                showChartPopup('📈 ' + w.week + ' Commits (' + w.startDate + ' → ' + w.endDate + ')', commits);
+            },
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                      y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Count', color: '#9ca3af' } } }
+        }
     });
 }
 
@@ -523,6 +552,13 @@ function renderCycleTimeChart(d) {
             { label: 'Wait Time (commit→action start)', data: wait.map(function(v) { return v.toFixed(2); }), backgroundColor: 'rgba(139,92,246,.6)', borderRadius: 4 },
             { label: 'Pipeline Duration', data: pipeline.map(function(v) { return v.toFixed(2); }), backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 4 }
         ] }, options: { responsive: true, maintainAspectRatio: false,
+            onClick: function(e, elements) {
+                if (!elements.length || !analysisData) return;
+                var idx = elements[0].index;
+                var author = authors[idx];
+                var commits = analysisData.commits.filter(function(c) { return c.authorLogin === author.authorLogin; });
+                showChartPopup('🔄 Cycle Time — ' + author.authorName, commits);
+            },
             plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
             scales: { x: { stacked: true, ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
                       y: { stacked: true, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Hours', color: '#9ca3af' } } } }
@@ -531,13 +567,90 @@ function renderCycleTimeChart(d) {
 
 function renderDailyChart(stats) {
     dc('daily');
-    charts.daily = new Chart(document.getElementById('dailyChart').getContext('2d'), {
-        type: 'bar', data: { labels: stats.map(function(s) { return s.date.substring(5); }),
+    var canvas = document.getElementById('dailyChart');
+    // Highlight band plugin for this chart
+    var hoverBandPlugin = {
+        id: 'hoverBand',
+        afterDraw: function(chart) {
+            if (chart._hoverIndex == null) return;
+            var meta = chart.getDatasetMeta(0);
+            if (!meta.data[chart._hoverIndex]) return;
+            var ctx = chart.ctx;
+            var bar = meta.data[chart._hoverIndex];
+            var xCenter = bar.x;
+            var barWidth = bar.width || 20;
+            var bandWidth = barWidth * 3.5;
+            ctx.save();
+            ctx.fillStyle = 'rgba(16,185,129,.08)';
+            ctx.fillRect(xCenter - bandWidth / 2, chart.chartArea.top, bandWidth, chart.chartArea.bottom - chart.chartArea.top);
+            ctx.strokeStyle = 'rgba(16,185,129,.25)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xCenter, chart.chartArea.top);
+            ctx.lineTo(xCenter, chart.chartArea.bottom);
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+    charts.daily = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        plugins: [hoverBandPlugin],
+        data: { labels: stats.map(function(s) { return s.date.substring(5); }),
         datasets: [
-            { label: 'Commits', data: stats.map(function(s) { return s.commits; }), backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 4 },
-            { label: 'Successful', data: stats.map(function(s) { return s.successfulRuns; }), backgroundColor: 'rgba(34,197,94,.6)', borderRadius: 4 },
-            { label: 'Failed', data: stats.map(function(s) { return s.failedRuns; }), backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 4 }
-        ] }, options: co('Count')
+            { label: 'Commits', data: stats.map(function(s) { return s.commits; }), backgroundColor: 'rgba(16,185,129,.6)', hoverBackgroundColor: 'rgba(16,185,129,.9)', borderRadius: 4 },
+            { label: 'Successful', data: stats.map(function(s) { return s.successfulRuns; }), backgroundColor: 'rgba(34,197,94,.6)', hoverBackgroundColor: 'rgba(34,197,94,.9)', borderRadius: 4 },
+            { label: 'Failed', data: stats.map(function(s) { return s.failedRuns; }), backgroundColor: 'rgba(239,68,68,.6)', hoverBackgroundColor: 'rgba(239,68,68,.9)', borderRadius: 4 }
+        ] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            onHover: function(e, elements, chart) {
+                var pts = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+                canvas.style.cursor = pts.length ? 'pointer' : 'default';
+                var idxPts = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+                var prevIdx = chart._hoverIndex;
+                chart._hoverIndex = idxPts.length ? idxPts[0].index : null;
+                if (prevIdx !== chart._hoverIndex) chart.draw();
+            },
+            onClick: function(e, elements) {
+                if (!analysisData) return;
+                var pts = charts.daily.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+                if (!pts.length) return;
+                var dsIndex = pts[0].datasetIndex;
+                var idx = pts[0].index;
+                var day = stats[idx].date;
+                var s = stats[idx];
+                var commits;
+                var title;
+                if (dsIndex === 0) {
+                    // Commits bar
+                    commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day; });
+                    title = '📊 ' + day + ' — ' + s.commits + ' commits';
+                } else if (dsIndex === 1) {
+                    // Successful bar
+                    commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day && c.deploymentResult === 'SUCCESS'; });
+                    title = '✅ ' + day + ' — ' + s.successfulRuns + ' successful deploys';
+                } else {
+                    // Failed bar
+                    commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day && c.deploymentResult === 'FAILURE'; });
+                    title = '❌ ' + day + ' — ' + s.failedRuns + ' failed deploys';
+                }
+                showChartPopup(title, commits);
+            },
+            plugins: {
+                legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                tooltip: {
+                    mode: 'index', intersect: false,
+                    callbacks: {
+                        afterBody: function() { return '\n👆 Click to view commits'; }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Count', color: '#9ca3af' } }
+            }
+        }
     });
 }
 
@@ -548,16 +661,51 @@ function renderLeadTimeChart(stats) {
         type: 'line', data: { labels: f.map(function(s) { return s.date.substring(5); }),
         datasets: [{ label: 'Avg Lead Time', data: f.map(function(s) { return (s.avgLeadTimeMinutes / 60).toFixed(2); }),
             borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.1)', fill: true, tension: .4, pointRadius: 3
-        }] }, options: co('Hours')
+        }] }, options: {
+            responsive: true, maintainAspectRatio: false,
+            onClick: function(e, elements) {
+                if (!elements.length || !analysisData) return;
+                var idx = elements[0].index;
+                var day = f[idx].date;
+                var commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day && c.leadTimeMinutes != null; });
+                showChartPopup('⏱️ Lead Time — Commits on ' + day, commits);
+            },
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                      y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Hours', color: '#9ca3af' } } }
+        }
     });
 }
 
 function renderSuccessFailChart(succ, fail) {
     dc('sf');
+    var total = succ + fail;
+    var succPct = total > 0 ? (succ / total * 100).toFixed(1) : '0.0';
+    var failPct = total > 0 ? (fail / total * 100).toFixed(1) : '0.0';
     charts.sf = new Chart(document.getElementById('successFailChart').getContext('2d'), {
-        type: 'doughnut', data: { labels: ['Success (' + succ + ')', 'Failure (' + fail + ')'],
+        type: 'doughnut', data: { labels: ['Successful Deploys — ' + succ + ' (' + succPct + '%)', 'Failed Deploys — ' + fail + ' (' + failPct + '%)'],
         datasets: [{ data: [succ, fail], backgroundColor: ['rgba(34,197,94,.7)', 'rgba(239,68,68,.7)'], borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9ca3af' } } } }
+        options: { responsive: true, maintainAspectRatio: false,
+            onClick: function(e, elements) {
+                if (!elements.length || !analysisData) return;
+                var idx = elements[0].index;
+                var status = idx === 0 ? 'SUCCESS' : 'FAILURE';
+                var label = idx === 0 ? '✅ Successful Deploys' : '❌ Failed Deploys';
+                var commits = analysisData.commits.filter(function(c) { return c.deploymentResult === status; });
+                showChartPopup(label, commits);
+            },
+            plugins: {
+                legend: { labels: { color: '#9ca3af', font: { size: 12 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            var pct = total > 0 ? (ctx.parsed / total * 100).toFixed(1) : '0.0';
+                            return ctx.label.split(' — ')[0] + ': ' + ctx.parsed + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -565,10 +713,32 @@ function renderBatchSizeChart(commits) {
     dc('batch');
     var b = { '1-10': 0, '11-50': 0, '51-100': 0, '101-500': 0, '500+': 0 };
     commits.forEach(function(c) { var t = c.linesAdded + c.linesDeleted; if (t <= 10) b['1-10']++; else if (t <= 50) b['11-50']++; else if (t <= 100) b['51-100']++; else if (t <= 500) b['101-500']++; else b['500+']++; });
+    var ranges = [
+        { label: '1-10', min: 0, max: 10 },
+        { label: '11-50', min: 11, max: 50 },
+        { label: '51-100', min: 51, max: 100 },
+        { label: '101-500', min: 101, max: 500 },
+        { label: '500+', min: 501, max: Infinity }
+    ];
     charts.batch = new Chart(document.getElementById('batchSizeChart').getContext('2d'), {
         type: 'bar', data: { labels: Object.keys(b),
         datasets: [{ label: 'Commits', data: Object.values(b), backgroundColor: ['rgba(34,197,94,.6)', 'rgba(59,130,246,.6)', 'rgba(250,204,21,.6)', 'rgba(249,115,22,.6)', 'rgba(239,68,68,.6)'], borderRadius: 6 }] },
-        options: co('Commits')
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            onClick: function(e, elements) {
+                if (!elements.length || !analysisData) return;
+                var idx = elements[0].index;
+                var range = ranges[idx];
+                var filtered = analysisData.commits.filter(function(c) {
+                    var t = c.linesAdded + c.linesDeleted;
+                    return t >= range.min && t <= range.max;
+                });
+                showChartPopup('📦 Commits with ' + range.label + ' lines changed', filtered);
+            },
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
+                      y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Commits', color: '#9ca3af' } } }
+        }
     });
 }
 
@@ -605,6 +775,34 @@ function filterCommitList() {
     var f = allCommitsForSearch.filter(function(c) { return c.message.toLowerCase().indexOf(q) >= 0 || c.authorLogin.toLowerCase().indexOf(q) >= 0 || c.shortSha.toLowerCase().indexOf(q) >= 0; });
     document.getElementById('commitCountBadge').textContent = f.length;
     renderCommitItems(f);
+}
+
+// ══════ CHART DETAIL POPUP ══════
+function showChartPopup(title, commits) {
+    document.getElementById('chartPopupTitle').innerHTML = title + ' <span class="chart-popup-count">' + commits.length + '</span>';
+    var h = '<div style="max-height:65vh;overflow-y:auto">';
+    if (!commits.length) {
+        h += '<div style="text-align:center;color:#71717a;padding:2rem">No commits found for this selection</div>';
+    } else {
+        h += '<table class="matrix-table"><thead><tr><th>SHA</th><th>Message</th><th>Author</th><th>Date</th><th>Lines</th><th>Status</th><th>Lead Time</th><th>Action</th></tr></thead><tbody>';
+        commits.forEach(function(c) {
+            var date = new Date(c.committedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            var link = c.firstActionUrl ? '<a href="' + c.firstActionUrl + '" target="_blank" style="color:#34d399;text-decoration:none">View ↗</a>' : '—';
+            h += '<tr>' +
+                '<td><span style="font-family:monospace;color:#34d399">' + c.shortSha + '</span></td>' +
+                '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(c.message) + '">' + esc(c.message) + '</td>' +
+                '<td>' + esc(c.authorLogin) + '</td>' +
+                '<td style="white-space:nowrap">' + date + '</td>' +
+                '<td>+' + c.linesAdded + '/-' + c.linesDeleted + '</td>' +
+                '<td>' + statusBadge(c.deploymentResult) + '</td>' +
+                '<td>' + (c.leadTimeMinutes != null ? fmtDur(c.leadTimeMinutes) : '—') + '</td>' +
+                '<td>' + link + '</td></tr>';
+        });
+        h += '</tbody></table>';
+    }
+    h += '</div>';
+    document.getElementById('chartPopupBody').innerHTML = h;
+    document.getElementById('chartPopup').classList.add('show');
 }
 
 // ══════ HELPERS ══════

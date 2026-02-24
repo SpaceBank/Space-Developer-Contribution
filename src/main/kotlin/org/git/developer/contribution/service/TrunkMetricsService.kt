@@ -49,30 +49,39 @@ class TrunkMetricsService {
         val rawCommits = fetchCommits(client, request.owner, request.repo, request.branch, startInstant, endInstant)
         logger.info("   ✅ ${rawCommits.size} commits fetched")
 
-        // 2 — Fetch action runs (extend window +7 days so we catch deployments for late-range commits)
+        // 2 — Fetch action runs
+        //     Exact range: for accurate deploy counts
+        //     Extended range (+7 days): so we can match late-deploying commits
         logger.info("📡 Fetching workflow runs for '${request.workflowName}' …")
         val actionRuns = fetchActionRuns(
+            client, request.owner, request.repo, request.branch,
+            request.workflowName, startInstant, endInstant
+        )
+        val actionRunsExtended = fetchActionRuns(
             client, request.owner, request.repo, request.branch,
             request.workflowName, startInstant,
             endInstant.plus(7, ChronoUnit.DAYS)
         )
-        logger.info("   ✅ ${actionRuns.size} completed action runs fetched")
+        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} runs in extended range")
 
-        // 3 — Map each commit to its first action
-        val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRuns)
+        // 3 — Map each commit to its first action (use extended range for matching)
+        val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRunsExtended)
 
         // 4 — Calculate everything
         val successful = mappedCommits.filter { it.deploymentResult == "SUCCESS" }
         val failed     = mappedCommits.filter { it.deploymentResult == "FAILURE" }
         val pending    = mappedCommits.filter { it.deploymentResult == "PENDING" }
 
-        val totalResolved   = successful.size + failed.size
-        val deployFreq      = successful.size / daysInRange
+        // DORA deploy counts come directly from actual workflow runs, NOT from commit mapping
+        val uniqueSuccessfulRuns = actionRuns.count { it.status == "SUCCESS" }
+        val uniqueFailedRuns     = actionRuns.count { it.status == "FAILURE" }
+        val uniqueResolvedRuns   = uniqueSuccessfulRuns + uniqueFailedRuns
+        val deployFreq      = uniqueSuccessfulRuns / daysInRange
         val leadTimes       = successful.mapNotNull { it.leadTimeMinutes }
         val avgLeadHours    = if (leadTimes.isNotEmpty()) leadTimes.average() / 60.0 else 0.0
         val cycleTimes      = successful.mapNotNull { it.cycleTimeMinutes }
         val avgCycleHours   = if (cycleTimes.isNotEmpty()) cycleTimes.average() / 60.0 else 0.0
-        val changeFailRate  = if (totalResolved > 0) failed.size.toDouble() / totalResolved * 100.0 else 0.0
+        val changeFailRate  = if (uniqueResolvedRuns > 0) uniqueFailedRuns.toDouble() / uniqueResolvedRuns * 100.0 else 0.0
         val mttrHours       = calculateMTTR(actionRuns)
         val commitFreq      = rawCommits.size / daysInRange
         val avgBatch        = if (rawCommits.isNotEmpty()) rawCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
@@ -90,7 +99,7 @@ class TrunkMetricsService {
             rawCommits.size, authorStats.size, ratings
         )
 
-        logger.info("🏁 Analysis complete — ${successful.size} successful, ${failed.size} failed, ${pending.size} pending")
+        logger.info("🏁 Analysis complete — $uniqueSuccessfulRuns successful deploys, $uniqueFailedRuns failed deploys (from ${rawCommits.size} commits, ${pending.size} pending)")
 
         return TrunkMetricsResponse(
             owner = request.owner, repo = request.repo,
@@ -99,6 +108,7 @@ class TrunkMetricsService {
             totalCommits = rawCommits.size, totalActionRuns = actionRuns.size,
             successfulCommits = successful.size, failedCommits = failed.size,
             pendingCommits = pending.size,
+            successfulDeploys = uniqueSuccessfulRuns, failedDeploys = uniqueFailedRuns,
             deploymentFrequency = deployFreq,
             leadTimeForChangesHours = avgLeadHours, cycleTimeHours = avgCycleHours,
             changeFailureRate = changeFailRate, meanTimeToRecoveryHours = mttrHours,
@@ -498,6 +508,10 @@ class TrunkMetricsService {
                     } catch (_: Exception) { null }
                 }
 
+            val authorUniqueSuccRuns = authorCommits
+                .filter { it.deploymentResult == "SUCCESS" }
+                .mapNotNull { it.firstActionRunId }.distinct().size
+
             TrunkAuthorStats(
                 authorLogin = login, authorName = first.authorName,
                 authorAvatarUrl = first.authorAvatarUrl,
@@ -510,7 +524,7 @@ class TrunkMetricsService {
                 avgBatchSize = authorCommits.map { it.linesAdded + it.linesDeleted }.average(),
                 totalLinesAdded  = authorCommits.sumOf { it.linesAdded },
                 totalLinesDeleted = authorCommits.sumOf { it.linesDeleted },
-                deploymentFrequency = succ / daysInRange,
+                deploymentFrequency = authorUniqueSuccRuns / daysInRange,
                 commits = authorCommits
             )
         }.sortedByDescending { it.totalCommits }
@@ -629,12 +643,12 @@ class TrunkMetricsService {
                 d >= weekStartStr && d <= weekEndStr
             }
 
-            val succ = weekCommits.count { it.deploymentResult == "SUCCESS" }
-            val fail = weekCommits.count { it.deploymentResult == "FAILURE" }
+            val weekSuccDeploys = weekRuns.count { it.status == "SUCCESS" }
+            val weekFailDeploys = weekRuns.count { it.status == "FAILURE" }
             val daysInWeek = ChronoUnit.DAYS.between(weekStart, weekEnd).toDouble().coerceAtLeast(1.0) + 1.0
             val leads = weekCommits.mapNotNull { it.leadTimeMinutes }
             val cycles = weekCommits.mapNotNull { it.cycleTimeMinutes }
-            val resolved = succ + fail
+            val weekResolved = weekSuccDeploys + weekFailDeploys
 
             weeks.add(WeeklyTrunkTrend(
                 week = "W$weekNum",
@@ -642,12 +656,12 @@ class TrunkMetricsService {
                 endDate = weekEndStr,
                 commits = weekCommits.size,
                 deployments = weekRuns.size,
-                successfulDeploys = succ,
-                failedDeploys = fail,
+                successfulDeploys = weekSuccDeploys,
+                failedDeploys = weekFailDeploys,
                 avgLeadTimeHours = if (leads.isNotEmpty()) leads.average() / 60.0 else null,
                 avgCycleTimeHours = if (cycles.isNotEmpty()) cycles.average() / 60.0 else null,
-                deploymentFrequency = succ / daysInWeek,
-                changeFailureRate = if (resolved > 0) fail.toDouble() / resolved * 100.0 else 0.0
+                deploymentFrequency = weekSuccDeploys / daysInWeek,
+                changeFailureRate = if (weekResolved > 0) weekFailDeploys.toDouble() / weekResolved * 100.0 else 0.0
             ))
 
             weekStart = weekEnd.plusDays(1)

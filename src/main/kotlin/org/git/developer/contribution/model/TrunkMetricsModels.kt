@@ -44,6 +44,8 @@ data class TrunkMetricsResponse(
     val successfulCommits: Int,
     val failedCommits: Int,
     val pendingCommits: Int,
+    val successfulDeploys: Int,          // unique successful workflow runs
+    val failedDeploys: Int,              // unique failed workflow runs
 
     // DORA metrics
     val deploymentFrequency: Double,        // successful deploys / day
