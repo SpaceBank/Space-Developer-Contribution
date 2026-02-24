@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/common.js"></script>
     <style>
         * {
             margin: 0;
@@ -552,6 +553,7 @@
         .login-feature-icon.green { background: rgba(34, 197, 94, 0.15); }
         .login-feature-icon.purple { background: rgba(139, 92, 246, 0.15); }
         .login-feature-icon.orange { background: rgba(249, 115, 22, 0.15); }
+        .login-feature-icon.blue { background: rgba(59, 130, 246, 0.15); }
 
         .login-feature-text {
             display: flex;
@@ -1296,6 +1298,13 @@
                                 <span>Cycle time, PR size, and quality benchmarks</span>
                             </div>
                         </div>
+                        <div class="login-feature">
+                            <div class="login-feature-icon blue">🌳</div>
+                            <div class="login-feature-text">
+                                <strong>Trunk Matrix</strong>
+                                <span>DORA metrics, deployment frequency, and change failure rate</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1467,11 +1476,69 @@
     let currentTab = 'home';
     let iframesLoaded = { contribution: false, engagement: false, matrix: false, trunk: false };
 
+    // Listen for SESSION_EXPIRED messages from iframe pages
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SESSION_EXPIRED') {
+            console.warn('🔑 Session expired notification from:', event.data.source || 'unknown');
+            logout();
+            showError(event.data.message || 'Your session has expired. Please login again.');
+            switchTab('home');
+        }
+    });
+
     // Initialize on page load
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         const sessionData = getSessionData();
         if (sessionData && sessionData.token) {
+            // Show UI immediately (optimistic)
             showLoggedInState(sessionData);
+
+            // Validate token and register user on backend
+            try {
+                const validateResp = await fetch('/api/git/validate-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: sessionData.token,
+                        username: sessionData.user?.login
+                    })
+                });
+                const validateResult = await validateResp.json();
+
+                if (!validateResult.valid) {
+                    console.warn('⚠️ Stored token is no longer valid:', validateResult.message, 'reason:', validateResult.reason);
+                    logout();
+                    if (validateResult.reason === 'rate_limited') {
+                        showError('GitHub API rate limit reached. Please wait a few minutes and try again.');
+                    } else {
+                        showError('Your session has expired. Please login again.');
+                    }
+                    return;
+                }
+
+                console.log('✅ Token validated for user:', validateResult.username);
+                if (validateResult.tokenExpiry) {
+                    console.log('🗓️ Token expires:', validateResult.tokenExpiry);
+                }
+
+                // Re-cache contributors on backend (they are lost when server restarts)
+                if (sessionData.contributors && sessionData.contributors.length > 0) {
+                    fetch('/api/git/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contributors: sessionData.contributors,
+                            token: sessionData.token,
+                            username: sessionData.user?.login
+                        })
+                    }).then(r => r.json()).then(result => {
+                        console.log('✅ Re-cached', result.contributorsCached, 'contributors on backend');
+                    }).catch(e => console.warn('Could not re-cache contributors:', e));
+                }
+            } catch (e) {
+                console.warn('Could not validate token (server may be starting):', e.message);
+                // Don't logout — server might just be starting up
+            }
         }
     });
 
@@ -1517,19 +1584,8 @@
         document.getElementById('gitlabUrlGroup').classList.toggle('hidden', provider !== 'GITLAB');
     }
 
-    // Session management
-    function getSessionData() {
-        const data = localStorage.getItem('spaceAnalyticsSession');
-        return data ? JSON.parse(data) : null;
-    }
-
-    function saveSessionData(data) {
-        localStorage.setItem('spaceAnalyticsSession', JSON.stringify(data));
-    }
-
-    function clearSessionData() {
-        localStorage.removeItem('spaceAnalyticsSession');
-    }
+    // Session management — getSessionData(), saveSessionData(), clearSessionData()
+    // are provided by common.js
 
     // Connect with token
     async function connectWithToken() {
@@ -1732,7 +1788,11 @@
                 await fetch('/api/git/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contributors: allContributors })
+                    body: JSON.stringify({
+                        contributors: allContributors,
+                        token: token,
+                        username: user.login
+                    })
                 });
             } catch (e) {}
 

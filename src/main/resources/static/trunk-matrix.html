@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/common.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;background:#0a0a1a;color:#e4e4e7;overflow-x:hidden;padding:0}
@@ -265,10 +266,7 @@ var analysisData = null;
 var allCommitsForSearch = [];
 var allRepos = [];
 
-function getSessionData() {
-    var d = localStorage.getItem('spaceAnalyticsSession');
-    return d ? JSON.parse(d) : null;
-}
+// getSessionData() and handleApiError() are provided by common.js
 
 document.addEventListener('DOMContentLoaded', function() {
     if (window.self !== window.top) document.body.classList.add('in-iframe');
@@ -280,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (s && s.repositories) {
         allRepos = s.repositories.map(function(r) { return { fullName: r.fullName, isPrivate: r.private }; });
         renderRepoDropdown(allRepos);
+
     }
 
     // Close dropdown when clicking outside
@@ -341,8 +340,16 @@ function onRepoSelected() {
     document.getElementById('analyzeBtn').disabled = true;
     hideError();
     fetch('/api/trunk-matrix/workflows?owner=' + encodeURIComponent(owner) + '&repo=' + encodeURIComponent(repo) + '&token=' + encodeURIComponent(s.token))
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(async function(r) {
+            if (!r.ok) {
+                var isAuth = await handleApiError(r, 'trunk-matrix');
+                if (isAuth) return null;
+                throw new Error('HTTP ' + r.status);
+            }
+            return r.json();
+        })
         .then(function(wf) {
+            if (!wf) return; // Auth error handled
             ws.innerHTML = '<option value="">— select workflow —</option>';
             wf.forEach(function(w) {
                 var o = document.createElement('option');
@@ -377,8 +384,16 @@ function runAnalysis() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: s.token, provider: s.provider || 'GITHUB', owner: parts[0], repo: parts[1], branch: branch, workflowName: wf, startDate: sd, endDate: ed })
     })
-    .then(function(r) { if (!r.ok) return r.text().then(function(t) { throw new Error(t || 'HTTP ' + r.status); }); return r.json(); })
+    .then(async function(r) {
+        if (!r.ok) {
+            var isAuth = await handleApiError(r, 'trunk-matrix');
+            if (isAuth) return null;
+            return r.text().then(function(t) { throw new Error(t || 'HTTP ' + r.status); });
+        }
+        return r.json();
+    })
     .then(function(data) {
+        if (!data) return; // Auth error handled
         analysisData = data;
         renderResults(data);
         document.getElementById('resultsContainer').classList.add('visible');

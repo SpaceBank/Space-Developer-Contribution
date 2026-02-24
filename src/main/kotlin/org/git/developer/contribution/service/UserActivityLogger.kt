@@ -2,62 +2,37 @@ package org.git.developer.contribution.service
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Service for tracking user activity and providing structured logging.
- * Resolves GitHub token → username and caches the mapping.
- * All controller actions should log through this service so we can see
- * WHO is doing WHAT in the application logs.
+ * Resolves GitHub token → username using a local cache (no external API calls).
+ * The username is registered during login/session-store and then reused for all subsequent requests.
  */
 @Service
 class UserActivityLogger {
 
     private val logger = LoggerFactory.getLogger(UserActivityLogger::class.java)
 
-    // Cache: token-prefix → username (so we don't call GitHub API every time)
+    // Cache: token-prefix → username (never log full tokens)
     private val tokenToUser = ConcurrentHashMap<String, String>()
 
     /**
-     * Resolve a GitHub token to a username.
-     * Uses a prefix of the token as cache key (for security — never log full tokens).
+     * Resolve a GitHub token to a username from local cache only.
+     * Does NOT make any external API calls.
+     * Returns "unknown" if the token hasn't been registered yet.
      */
     fun resolveUser(token: String?): String {
         if (token.isNullOrBlank()) return "anonymous"
-
-        val tokenKey = tokenPrefix(token)
-        val cached = tokenToUser[tokenKey]
-        if (cached != null) return cached
-
-        return try {
-            val webClient = WebClient.builder()
-                .baseUrl("https://api.github.com")
-                .defaultHeader("Authorization", "Bearer $token")
-                .defaultHeader("Accept", "application/vnd.github.v3+json")
-                .build()
-
-            val user = webClient.get()
-                .uri("/user")
-                .retrieve()
-                .bodyToMono<Map<String, Any?>>()
-                .block()
-
-            val login = user?.get("login") as? String ?: "unknown"
-            tokenToUser[tokenKey] = login
-            login
-        } catch (e: Exception) {
-            logger.debug("Could not resolve user from token: ${e.message}")
-            "unknown"
-        }
+        return tokenToUser[tokenPrefix(token)] ?: "unknown"
     }
 
     /**
-     * Register a known user for a token (called after successful login)
+     * Register a known user for a token (called after successful login or session restore)
      */
     fun registerUser(token: String, username: String) {
         tokenToUser[tokenPrefix(token)] = username
+        logger.info("🔐 Registered user @$username for token ${tokenPrefix(token)}***")
     }
 
     // ─── Structured log methods ───

@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="common.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/common.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #0a0a1a 0%, #12122e 40%, #1a1a3e 70%, #0f0f2a 100%);
@@ -521,11 +522,7 @@
             return contributor?.avatarUrl || contributor?.avatar_url || null;
         }
 
-        // Get session data from localStorage
-        function getSessionData() {
-            const data = localStorage.getItem('spaceAnalyticsSession');
-            return data ? JSON.parse(data) : null;
-        }
+        // getSessionData() and handleApiError() are provided by common.js
 
         // Custom Modal Functions
         function showModal(icon, title, message) {
@@ -566,6 +563,7 @@
             if (sessionData && sessionData.token) {
                 // Set provider from session
                 selectedProvider = sessionData.provider || 'GITHUB';
+
 
                 // Auto-load contributors from session
                 if (sessionData.contributors && sessionData.contributors.length > 0) {
@@ -928,9 +926,12 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
-                }).then(r => {
+                }).then(async r => {
                     console.log('📡 Commits API response received:', { status: r.status, ok: r.ok });
                     if (!r.ok) {
+                        // Check for token expiry / rate limit
+                        const isAuthError = await handleApiError(r, 'engagement');
+                        if (isAuthError) throw new Error('Session expired');
                         return r.text().then(text => {
                             console.error('❌ Commits API error response body:', text);
                             throw new Error(`Failed to fetch commits: ${r.status} ${r.statusText}`);
@@ -960,6 +961,12 @@
                             contentLength: r.headers.get('content-length')
                         }
                     });
+
+                    // Check for token expiry / rate limit BEFORE consuming body
+                    if (r.status === 401 || r.status === 429 || (r.status === 403)) {
+                        const isAuthError = await handleApiError(r, 'engagement');
+                        if (isAuthError) throw new Error('Session expired');
+                    }
 
                     // Get raw text first to see what we're dealing with
                     const rawText = await r.text();

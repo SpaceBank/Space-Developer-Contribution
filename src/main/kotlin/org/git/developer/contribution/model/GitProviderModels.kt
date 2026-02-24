@@ -89,7 +89,9 @@ data class PullRequestInfo(
  * Request to store session data (contributors) after login
  */
 data class SessionDataRequest(
-    val contributors: List<Map<String, Any?>>? = null
+    val contributors: List<Map<String, Any?>>? = null,
+    val token: String? = null,      // Token to register for user tracking
+    val username: String? = null     // Logged-in username for activity logging
 )
 
 /**
@@ -98,5 +100,26 @@ data class SessionDataRequest(
 data class SessionDataResponse(
     val contributorsCached: Int,
     val success: Boolean
+)
+
+/**
+ * Request to validate a stored token
+ */
+data class ValidateTokenRequest(
+    val token: String,
+    val provider: GitProvider = GitProvider.GITHUB,
+    val baseUrl: String? = null,
+    val username: String? = null     // If known, register for logging
+)
+
+/**
+ * Response for token validation
+ */
+data class ValidateTokenResponse(
+    val valid: Boolean,
+    val username: String? = null,
+    val message: String? = null,
+    val reason: String? = null,        // "expired", "rate_limited", "error"
+    val tokenExpiry: String? = null    // Token expiration date from GitHub header
 )
 

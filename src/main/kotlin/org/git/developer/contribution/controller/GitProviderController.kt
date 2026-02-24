@@ -1,5 +1,6 @@
 package org.git.developer.contribution.controller
 
+import org.git.developer.contribution.config.GitApiClient
 import org.git.developer.contribution.model.*
 import org.git.developer.contribution.service.ContributorCacheService
 import org.git.developer.contribution.service.GitProviderService
@@ -19,7 +20,8 @@ class GitProviderController(
     private val gitProviderService: GitProviderService,
     private val remoteAnalyzerService: RemoteRepositoryAnalyzerService,
     private val contributorCacheService: ContributorCacheService,
-    private val userActivity: UserActivityLogger
+    private val userActivity: UserActivityLogger,
+    private val gitApiClient: GitApiClient
 ) {
     private val logger = LoggerFactory.getLogger(GitProviderController::class.java)
 
@@ -31,18 +33,87 @@ class GitProviderController(
         val contributorCount = request.contributors?.size ?: 0
         logger.info("📥 POST /api/git/session — storing $contributorCount contributors")
 
+        // Register the user for activity logging
+        if (!request.token.isNullOrBlank() && !request.username.isNullOrBlank()) {
+            userActivity.registerUser(request.token, request.username)
+            userActivity.logLogin(request.username)
+        }
+
         if (!request.contributors.isNullOrEmpty()) {
             contributorCacheService.storeContributors(request.contributors)
-            // Try to identify user from contributor list (first entry is often the logged-in user)
-            val firstLogin = request.contributors.firstOrNull()?.get("login") as? String
-            if (firstLogin != null) {
-                userActivity.logSessionStore(firstLogin, contributorCount)
-            }
+            val username = request.username ?: (request.contributors.firstOrNull()?.get("login") as? String) ?: "unknown"
+            userActivity.logSessionStore(username, contributorCount)
         }
         return ResponseEntity.ok(SessionDataResponse(
             contributorsCached = contributorCacheService.size(),
             success = true
         ))
+    }
+
+    /**
+     * Validate a stored token — called by frontend when restoring session from localStorage.
+     * Also registers the user for activity logging.
+     */
+    @PostMapping("/validate-token")
+    fun validateToken(@RequestBody request: ValidateTokenRequest): ResponseEntity<ValidateTokenResponse> {
+        logger.info("🔑 POST /api/git/validate-token — checking token validity")
+        return try {
+            val webClient = gitApiClient.forProvider(request.token, request.provider, request.baseUrl)
+
+            val response = webClient.get()
+                .uri("/user")
+                .exchangeToMono { clientResponse ->
+                    val statusCode = clientResponse.statusCode().value()
+                    val rateLimitRemaining = clientResponse.headers().asHttpHeaders().getFirst("X-RateLimit-Remaining")
+                    val tokenExpiry = clientResponse.headers().asHttpHeaders().getFirst("github-authentication-token-expiration")
+
+                    if (statusCode == 401) {
+                        logger.warn("🔑 Token is invalid or expired (401)")
+                        reactor.core.publisher.Mono.just(ValidateTokenResponse(
+                            valid = false,
+                            message = "Token expired or invalid. Please login again.",
+                            reason = "expired"
+                        ))
+                    } else if (statusCode == 403 && rateLimitRemaining == "0") {
+                        logger.warn("⏱️ Token valid but rate limited (403)")
+                        reactor.core.publisher.Mono.just(ValidateTokenResponse(
+                            valid = true,
+                            message = "Rate limited — try again later",
+                            reason = "rate_limited"
+                        ))
+                    } else if (statusCode in 200..299) {
+                        clientResponse.bodyToMono(Map::class.java).map { user ->
+                            val login = user?.get("login") as? String
+                            if (login != null) {
+                                userActivity.registerUser(request.token, login)
+                                logger.info("✅ Token valid for user @$login (expires: ${tokenExpiry ?: "never"})")
+                            }
+                            ValidateTokenResponse(
+                                valid = login != null,
+                                username = login,
+                                message = if (login != null) "Token valid" else "Could not identify user",
+                                tokenExpiry = tokenExpiry
+                            )
+                        }
+                    } else {
+                        logger.warn("⚠️ Unexpected status from GitHub: $statusCode")
+                        reactor.core.publisher.Mono.just(ValidateTokenResponse(
+                            valid = false,
+                            message = "Unexpected response from GitHub (status $statusCode)"
+                        ))
+                    }
+                }
+                .block()
+
+            ResponseEntity.ok(response ?: ValidateTokenResponse(valid = false, message = "No response from GitHub"))
+        } catch (e: Exception) {
+            logger.warn("❌ Token validation error: ${e.message}")
+            ResponseEntity.ok(ValidateTokenResponse(
+                valid = false,
+                message = "Token validation failed: ${e.message?.take(100) ?: "unknown error"}",
+                reason = "error"
+            ))
+        }
     }
 
     /**
