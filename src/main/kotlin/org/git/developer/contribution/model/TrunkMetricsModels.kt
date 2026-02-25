@@ -13,7 +13,7 @@ package org.git.developer.contribution.model
  *
  * Lead Time = action_completed_at − commit_authored_at
  * Cycle Time = same as lead time in trunk-based flow
- * MTTR = avg(next_success_completed_at − failure_completed_at)
+ * MTTR = avg(next_success_completed_at − failure_started_at)
  * Change Failure Rate = failed_commits / (failed + successful) * 100
  */
 
@@ -82,6 +82,7 @@ data class TrunkCommitInfo(
     val authorName: String,
     val authorAvatarUrl: String?,
     val committedAt: String,          // ISO-8601
+    val isMerge: Boolean = false,     // true when commit has >1 parent (merge commit)
 
     // Size
     val linesAdded: Int,

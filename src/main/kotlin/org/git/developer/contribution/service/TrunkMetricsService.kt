@@ -67,45 +67,52 @@ class TrunkMetricsService {
         // 3 — Map each commit to its first action (use extended range for matching)
         val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRunsExtended)
 
-        // 4 — Calculate everything
-        val successful = mappedCommits.filter { it.deploymentResult == "SUCCESS" }
-        val failed     = mappedCommits.filter { it.deploymentResult == "FAILURE" }
-        val pending    = mappedCommits.filter { it.deploymentResult == "PENDING" }
+        // 4 — Exclude merge commits from DORA calculations
+        val nonMergeCommits = mappedCommits.filter { !it.isMerge }
+        val mergeCount = mappedCommits.size - nonMergeCommits.size
+        logger.info("   📊 ${mappedCommits.size} total commits, $mergeCount merge commits excluded, ${nonMergeCommits.size} used for metrics")
+
+        val successful = nonMergeCommits.filter { it.deploymentResult == "SUCCESS" }
+        val failed     = nonMergeCommits.filter { it.deploymentResult == "FAILURE" }
+        val pending    = nonMergeCommits.filter { it.deploymentResult == "PENDING" }
 
         // DORA deploy counts come directly from actual workflow runs, NOT from commit mapping
         val uniqueSuccessfulRuns = actionRuns.count { it.status == "SUCCESS" }
         val uniqueFailedRuns     = actionRuns.count { it.status == "FAILURE" }
         val uniqueResolvedRuns   = uniqueSuccessfulRuns + uniqueFailedRuns
         val deployFreq      = uniqueSuccessfulRuns / daysInRange
-        val leadTimes       = successful.mapNotNull { it.leadTimeMinutes }
+        // Lead time: only from non-merge commits that have a lead time (commit → first success run)
+        val leadTimes       = nonMergeCommits.mapNotNull { it.leadTimeMinutes }
         val avgLeadHours    = if (leadTimes.isNotEmpty()) leadTimes.average() / 60.0 else 0.0
-        val cycleTimes      = successful.mapNotNull { it.cycleTimeMinutes }
+        val cycleTimes      = nonMergeCommits.mapNotNull { it.cycleTimeMinutes }
         val avgCycleHours   = if (cycleTimes.isNotEmpty()) cycleTimes.average() / 60.0 else 0.0
         val changeFailRate  = if (uniqueResolvedRuns > 0) uniqueFailedRuns.toDouble() / uniqueResolvedRuns * 100.0 else 0.0
         val mttrHours       = calculateMTTR(actionRuns)
-        val commitFreq      = rawCommits.size / daysInRange
-        val avgBatch        = if (rawCommits.isNotEmpty()) rawCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
+        val commitFreq      = nonMergeCommits.size / daysInRange
+        val avgBatch        = if (nonMergeCommits.isNotEmpty()) nonMergeCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
         val completedRuns   = actionRuns.filter { it.completedAt != null }
         val avgPipeline     = if (completedRuns.isNotEmpty()) completedRuns.map { it.durationMinutes }.average() else 0.0
         val successRate     = 100.0 - changeFailRate
 
+        // Daily stats and weekly trend use ALL commits (including merge) for display
         val dailyStats  = buildDailyStats(mappedCommits, actionRuns, startDate, endDate)
         val weeklyTrend = buildWeeklyTrend(mappedCommits, actionRuns, startDate, endDate)
-        val authorStats = buildAuthorStats(mappedCommits, daysInRange)
+        // Author stats use only non-merge commits
+        val authorStats = buildAuthorStats(nonMergeCommits, daysInRange)
         val ratings     = rate(deployFreq, avgLeadHours, avgCycleHours, changeFailRate, mttrHours, commitFreq, avgBatch, avgPipeline)
         val teamMetrics = buildTeamMetrics(
             deployFreq, avgLeadHours, avgCycleHours, changeFailRate, mttrHours,
             commitFreq, avgBatch, avgPipeline, successRate,
-            rawCommits.size, authorStats.size, ratings
+            nonMergeCommits.size, authorStats.size, ratings
         )
 
-        logger.info("🏁 Analysis complete — $uniqueSuccessfulRuns successful deploys, $uniqueFailedRuns failed deploys (from ${rawCommits.size} commits, ${pending.size} pending)")
+        logger.info("🏁 Analysis complete — $uniqueSuccessfulRuns successful deploys, $uniqueFailedRuns failed deploys (from ${nonMergeCommits.size} non-merge commits, ${pending.size} pending)")
 
         return TrunkMetricsResponse(
             owner = request.owner, repo = request.repo,
             branch = request.branch, workflowName = request.workflowName,
             startDate = request.startDate, endDate = request.endDate,
-            totalCommits = rawCommits.size, totalActionRuns = actionRuns.size,
+            totalCommits = nonMergeCommits.size, totalActionRuns = actionRuns.size,
             successfulCommits = successful.size, failedCommits = failed.size,
             pendingCommits = pending.size,
             successfulDeploys = uniqueSuccessfulRuns, failedDeploys = uniqueFailedRuns,
@@ -115,7 +122,7 @@ class TrunkMetricsService {
             commitFrequency = commitFreq, avgBatchSize = avgBatch,
             avgPipelineDurationMinutes = avgPipeline, deploySuccessRate = successRate,
             teamMetrics = teamMetrics,
-            commits = mappedCommits, actionRuns = actionRuns,
+            commits = nonMergeCommits, actionRuns = actionRuns,
             dailyStats = dailyStats, weeklyTrend = weeklyTrend,
             authorStats = authorStats, ratings = ratings
         )
@@ -201,18 +208,21 @@ class TrunkMetricsService {
                 val commitData  = c["commit"] as? Map<*, *> ?: continue
                 val authorBlock = commitData["author"] as? Map<*, *>
                 val topAuthor   = c["author"] as? Map<*, *>
+                val parents     = c["parents"] as? List<*> ?: emptyList<Any>()
 
                 val message     = (commitData["message"] as? String ?: "").lines().firstOrNull() ?: ""
                 val authorLogin = topAuthor?.get("login") as? String ?: "unknown"
                 val authorName  = authorBlock?.get("name") as? String ?: authorLogin
                 val avatarUrl   = topAuthor?.get("avatar_url") as? String
                 val dateStr     = authorBlock?.get("date") as? String ?: continue
+                val isMerge     = parents.size > 1
 
                 result.add(TrunkCommitInfo(
                     sha = sha, shortSha = sha.take(7),
                     message = message,
                     authorLogin = authorLogin, authorName = authorName,
                     authorAvatarUrl = avatarUrl, committedAt = dateStr,
+                    isMerge = isMerge,
                     linesAdded = 0, linesDeleted = 0, filesChanged = 0,
                     firstActionRunId = null, firstActionStatus = null,
                     firstActionConclusion = null, firstActionStartedAt = null,
@@ -393,7 +403,7 @@ class TrunkMetricsService {
         return commits.map { commit ->
             val commitInstant = try { Instant.parse(commit.committedAt) } catch (_: Exception) { return@map commit }
 
-            // Find the FIRST action run that started at or after this commit
+            // Find the FIRST action run (any status) that started at or after this commit
             val firstRun = sortedRuns.firstOrNull { run ->
                 try {
                     val runStart = Instant.parse(run.startedAt)
@@ -401,10 +411,20 @@ class TrunkMetricsService {
                 } catch (_: Exception) { false }
             } ?: return@map commit.copy(deploymentResult = "PENDING")
 
-            val completedInstant = try { Instant.parse(firstRun.completedAt!!) } catch (_: Exception) { null }
+            // Lead Time: commit → first SUCCESS run completed after commit
+            // (this may be a different run than firstRun if firstRun was a failure)
+            val firstSuccessRun = sortedRuns.firstOrNull { run ->
+                run.status == "SUCCESS" && try {
+                    val runStart = Instant.parse(run.startedAt)
+                    !runStart.isBefore(commitInstant)
+                } catch (_: Exception) { false }
+            }
 
-            val leadTimeMin = if (firstRun.status == "SUCCESS" && completedInstant != null) {
-                ChronoUnit.SECONDS.between(commitInstant, completedInstant) / 60.0
+            val leadTimeMin = if (firstSuccessRun != null) {
+                try {
+                    val completedInstant = Instant.parse(firstSuccessRun.completedAt!!)
+                    ChronoUnit.SECONDS.between(commitInstant, completedInstant) / 60.0
+                } catch (_: Exception) { null }
             } else null
 
             commit.copy(
@@ -425,29 +445,40 @@ class TrunkMetricsService {
     //  MTTR
     // ════════════════════════════════════════════════════════════
 
+    /**
+     * MTTR — Mean Time To Recovery.
+     *
+     * For EACH failed run, find the next successful run (by start time order).
+     * Recovery time = success.completedAt − failure.startedAt.
+     *
+     * Using startedAt for failures (when the broken run was triggered) and
+     * completedAt for the recovering success (when recovery was actually done).
+     *
+     * Example: FAIL1, FAIL2, FAIL3, SUCCESS4
+     *   → 3 recovery times: (S4.completedAt−F1.startedAt), (S4.completedAt−F2.startedAt), (S4.completedAt−F3.startedAt)
+     *   → MTTR = average of all three
+     */
     private fun calculateMTTR(runs: List<TrunkActionRun>): Double {
         val completed = runs
-            .filter { it.status == "SUCCESS" || it.status == "FAILURE" }
-            .sortedBy { it.completedAt }
+            .filter { (it.status == "SUCCESS" || it.status == "FAILURE") && it.completedAt != null }
+            .sortedBy { it.startedAt }
 
         val recoveryTimes = mutableListOf<Double>()
-        var i = 0
-        while (i < completed.size) {
+        for (i in completed.indices) {
             if (completed[i].status == "FAILURE") {
-                var j = i + 1
-                while (j < completed.size && completed[j].status != "SUCCESS") j++
-                if (j < completed.size) {
+                // Find the NEXT success after this failure
+                val nextSuccess = ((i + 1) until completed.size).firstOrNull { j ->
+                    completed[j].status == "SUCCESS"
+                }
+                if (nextSuccess != null) {
                     try {
-                        val failTime    = Instant.parse(completed[i].completedAt!!)
-                        val recoverTime = Instant.parse(completed[j].completedAt!!)
+                        val failTime    = Instant.parse(completed[i].startedAt)
+                        val recoverTime = Instant.parse(completed[nextSuccess].completedAt!!)
                         val hours = ChronoUnit.SECONDS.between(failTime, recoverTime) / 3600.0
                         if (hours > 0) recoveryTimes.add(hours)
                     } catch (_: Exception) {}
-                    i = j + 1
-                    continue
                 }
             }
-            i++
         }
         return if (recoveryTimes.isNotEmpty()) recoveryTimes.average() else 0.0
     }
@@ -465,7 +496,7 @@ class TrunkMetricsService {
         var date = startDate
         while (!date.isAfter(endDate)) {
             val d = date.toString()
-            val dayCommits = commits.filter { it.committedAt.startsWith(d) }
+            val dayCommits = commits.filter { it.committedAt.startsWith(d) && !it.isMerge }
             val dayRuns    = runs.filter { (it.completedAt ?: it.startedAt).startsWith(d) }
             val leads  = dayCommits.mapNotNull { it.leadTimeMinutes }
             val cycles = dayCommits.mapNotNull { it.cycleTimeMinutes }
@@ -635,8 +666,10 @@ class TrunkMetricsService {
             val weekEndStr = weekEnd.toString()
 
             val weekCommits = commits.filter {
-                val d = it.committedAt.substring(0, 10)
-                d >= weekStartStr && d <= weekEndStr
+                !it.isMerge && run {
+                    val d = it.committedAt.substring(0, 10)
+                    d >= weekStartStr && d <= weekEndStr
+                }
             }
             val weekRuns = runs.filter {
                 val d = (it.completedAt ?: it.startedAt).substring(0, 10)
