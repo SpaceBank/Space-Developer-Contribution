@@ -87,7 +87,7 @@ class TrunkMetricsService {
         val cycleTimes      = nonMergeCommits.mapNotNull { it.cycleTimeMinutes }
         val avgCycleHours   = if (cycleTimes.isNotEmpty()) cycleTimes.average() / 60.0 else 0.0
         val changeFailRate  = if (uniqueResolvedRuns > 0) uniqueFailedRuns.toDouble() / uniqueResolvedRuns * 100.0 else 0.0
-        val mttrHours       = calculateMTTR(actionRuns)
+        val mttrHours       = calculateMTTR(actionRuns, actionRunsExtended, endInstant)
         val commitFreq      = nonMergeCommits.size / daysInRange
         val avgBatch        = if (nonMergeCommits.isNotEmpty()) nonMergeCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
         val completedRuns   = actionRuns.filter { it.completedAt != null }
@@ -446,38 +446,56 @@ class TrunkMetricsService {
     // ════════════════════════════════════════════════════════════
 
     /**
-     * MTTR — Mean Time To Recovery.
+     * MTTR — Mean Time To Recovery (grouped).
      *
-     * For EACH failed run, find the next successful run (by start time order).
-     * Recovery time = success.completedAt − failure.startedAt.
+     * Walk through runs sorted by completedAt. When we hit a FAILURE,
+     * record it as the start of an incident. Skip all subsequent failures
+     * (they belong to the same incident). When we hit the next SUCCESS,
+     * that's the recovery point.
      *
-     * Using startedAt for failures (when the broken run was triggered) and
-     * completedAt for the recovering success (when recovery was actually done).
+     * Recovery time = success.completedAt − firstFailure.completedAt
      *
-     * Example: FAIL1, FAIL2, FAIL3, SUCCESS4
-     *   → 3 recovery times: (S4.completedAt−F1.startedAt), (S4.completedAt−F2.startedAt), (S4.completedAt−F3.startedAt)
-     *   → MTTR = average of all three
+     * Example: F1, F2, F3, S1, F4, F5, S2
+     *   → 2 incidents:
+     *       incident 1: S1.completed − F1.completed  (F2, F3 skipped)
+     *       incident 2: S2.completed − F4.completed  (F5 skipped)
+     *   → MTTR = average of the 2 recovery times
      */
-    private fun calculateMTTR(runs: List<TrunkActionRun>): Double {
-        val completed = runs
+    private fun calculateMTTR(rangeRuns: List<TrunkActionRun>, allRuns: List<TrunkActionRun>, endInstant: Instant): Double {
+        val sorted = allRuns
             .filter { (it.status == "SUCCESS" || it.status == "FAILURE") && it.completedAt != null }
-            .sortedBy { it.startedAt }
+            .sortedBy { it.completedAt }
 
         val recoveryTimes = mutableListOf<Double>()
-        for (i in completed.indices) {
-            if (completed[i].status == "FAILURE") {
-                // Find the NEXT success after this failure
-                val nextSuccess = ((i + 1) until completed.size).firstOrNull { j ->
-                    completed[j].status == "SUCCESS"
+        var i = 0
+        while (i < sorted.size) {
+            val run = sorted[i]
+            if (run.status == "FAILURE") {
+                // This is the FIRST failure of a new incident
+                val firstFailTime = try { Instant.parse(run.startedAt!!) } catch (_: Exception) { i++; continue }
+
+                // Skip all subsequent failures (same incident)
+                var j = i + 1
+                while (j < sorted.size && sorted[j].status == "FAILURE") {
+                    j++
                 }
-                if (nextSuccess != null) {
+
+                // j now points to the next SUCCESS (or end of list)
+                if (j < sorted.size && sorted[j].status == "SUCCESS") {
                     try {
-                        val failTime    = Instant.parse(completed[i].startedAt)
-                        val recoverTime = Instant.parse(completed[nextSuccess].completedAt!!)
-                        val hours = ChronoUnit.SECONDS.between(failTime, recoverTime) / 3600.0
+                        val recoverTime = Instant.parse(sorted[j].completedAt!!)
+                        val hours = ChronoUnit.SECONDS.between(firstFailTime, recoverTime) / 3600.0
                         if (hours > 0) recoveryTimes.add(hours)
                     } catch (_: Exception) {}
+                    i = j + 1  // move past the success
+                } else {
+                    // No recovery found — use end of period
+                    val hours = ChronoUnit.SECONDS.between(firstFailTime, endInstant) / 3600.0
+                    if (hours > 0) recoveryTimes.add(hours)
+                    i = j
                 }
+            } else {
+                i++
             }
         }
         return if (recoveryTimes.isNotEmpty()) recoveryTimes.average() else 0.0

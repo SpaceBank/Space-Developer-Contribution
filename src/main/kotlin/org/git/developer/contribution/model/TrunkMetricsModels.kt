@@ -13,7 +13,7 @@ package org.git.developer.contribution.model
  *
  * Lead Time = action_completed_at − commit_authored_at
  * Cycle Time = same as lead time in trunk-based flow
- * MTTR = avg(next_success_completed_at − failure_started_at)
+ * MTTR = avg(next_success_completed_at − first_failure_in_group_completed_at)
  * Change Failure Rate = failed_commits / (failed + successful) * 100
  */
 
