@@ -133,14 +133,16 @@ echo ""
 
 # ── Step 4: Extract project ──
 echo "📂 [4/6] Extracting project..."
+# Remove old source files to ensure clean state
+rm -rf src gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts Dockerfile 2>/dev/null || true
 tar xzf deploy.tar.gz
 rm -f deploy.tar.gz
-echo "   ✅ Extracted"
+echo "   ✅ Extracted (clean)"
 echo ""
 
 # ── Step 5: Build Docker image ──
 echo "🔨 [5/6] Building Docker image (this takes 2-5 minutes)..."
-run_sudo docker build -t $IMAGE_NAME . 2>&1 | tail -5
+run_sudo docker build --no-cache -t $IMAGE_NAME . 2>&1 | tail -5
 echo "   ✅ Image built: $IMAGE_NAME"
 echo ""
 
@@ -161,6 +163,9 @@ run_sudo docker run -d \
     $IMAGE_NAME
 
 echo "   ✅ Container started"
+
+# Clean up old dangling images
+run_sudo docker image prune -f 2>/dev/null || true
 echo ""
 
 # ── Wait & Verify ──
