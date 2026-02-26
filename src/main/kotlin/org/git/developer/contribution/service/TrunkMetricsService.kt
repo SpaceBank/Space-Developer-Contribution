@@ -697,8 +697,8 @@ class TrunkMetricsService {
     private fun formatHours(h: Double): String {
         return when {
             h < 1.0 -> "%.0f min".format(h * 60)
-            h < 24.0 -> "%.1f hrs".format(h)
-            else -> "%.1f days".format(h / 24.0)
+            h < 24.0 -> "%.2f hrs".format(h)
+            else -> "%.2f days".format(h / 24.0)
         }
     }
 
