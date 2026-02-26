@@ -51,7 +51,9 @@ class TrunkMetricsService {
 
         // 2 — Fetch action runs
         //     Exact range: for accurate deploy counts
-        //     Extended range (+7 days): so we can match late-deploying commits
+        //     Extended range (+7 days forward): so we can match late-deploying commits
+        //     MTTR range (-7 days back, +7 days forward): so MTTR can see failures before the range
+        //       that are resolved by the first success inside the range
         logger.info("📡 Fetching workflow runs for '${request.workflowName}' …")
         val actionRuns = fetchActionRuns(
             client, request.owner, request.repo, request.branch,
@@ -62,7 +64,13 @@ class TrunkMetricsService {
             request.workflowName, startInstant,
             endInstant.plus(7, ChronoUnit.DAYS)
         )
-        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} runs in extended range")
+        val actionRunsForMTTR = fetchActionRuns(
+            client, request.owner, request.repo, request.branch,
+            request.workflowName,
+            startInstant.minus(7, ChronoUnit.DAYS),
+            endInstant.plus(7, ChronoUnit.DAYS)
+        )
+        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} extended, ${actionRunsForMTTR.size} for MTTR (with lookback)")
 
         // 3 — Map each commit to its first action (use extended range for matching)
         val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRunsExtended)
@@ -87,7 +95,7 @@ class TrunkMetricsService {
         val cycleTimes      = nonMergeCommits.mapNotNull { it.cycleTimeMinutes }
         val avgCycleHours   = if (cycleTimes.isNotEmpty()) cycleTimes.average() / 60.0 else 0.0
         val changeFailRate  = if (uniqueResolvedRuns > 0) uniqueFailedRuns.toDouble() / uniqueResolvedRuns * 100.0 else 0.0
-        val mttrHours       = calculateMTTR(actionRuns, actionRunsExtended, endInstant)
+        val mttrHours       = calculateMTTR(actionRunsForMTTR, startInstant, endInstant)
         val commitFreq      = nonMergeCommits.size / daysInRange
         val avgBatch        = if (nonMergeCommits.isNotEmpty()) nonMergeCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
         val completedRuns   = actionRuns.filter { it.completedAt != null }
@@ -446,7 +454,11 @@ class TrunkMetricsService {
     // ════════════════════════════════════════════════════════════
 
     /**
-     * MTTR — Mean Time To Recovery (grouped).
+     * MTTR — Mean Time To Recovery (grouped, with lookback).
+     *
+     * Uses runs fetched with a -7 day lookback window so that if the first
+     * event in the selected range is a SUCCESS, we can find its preceding
+     * failures from before the range and correctly measure that recovery.
      *
      * Walk through runs sorted by completedAt. When we hit a FAILURE,
      * record it as the start of an incident. Skip all subsequent failures
@@ -460,8 +472,19 @@ class TrunkMetricsService {
      *       incident 1: S1.completed − F1.completed  (F2, F3 skipped)
      *       incident 2: S2.completed − F4.completed  (F5 skipped)
      *   → MTTR = average of the 2 recovery times
+     *
+     * Only incidents where the recovering SUCCESS is within [startInstant, endInstant)
+     * are counted:
+     *   - Lookback-only incidents (resolved before the range) are excluded.
+     *   - Forward-only incidents (resolved after the range) are excluded.
+     *   - Lookback failures recovered by the first success IN the range ARE included.
+     * Unrecovered failures are NOT counted (no synthetic recovery time).
+     *
+     * @param allRuns      runs fetched with -7 day lookback and +7 day forward extension
+     * @param startInstant the original selected range start
+     * @param endInstant   the original selected range end (exclusive upper bound)
      */
-    private fun calculateMTTR(rangeRuns: List<TrunkActionRun>, allRuns: List<TrunkActionRun>, endInstant: Instant): Double {
+    private fun calculateMTTR(allRuns: List<TrunkActionRun>, startInstant: Instant, endInstant: Instant): Double {
         val sorted = allRuns
             .filter { (it.status == "SUCCESS" || it.status == "FAILURE") && it.completedAt != null }
             .sortedBy { it.completedAt }
@@ -472,7 +495,7 @@ class TrunkMetricsService {
             val run = sorted[i]
             if (run.status == "FAILURE") {
                 // This is the FIRST failure of a new incident
-                val firstFailTime = try { Instant.parse(run.startedAt!!) } catch (_: Exception) { i++; continue }
+                val firstFailTime = try { Instant.parse(run.completedAt!!) } catch (_: Exception) { i++; continue }
 
                 // Skip all subsequent failures (same incident)
                 var j = i + 1
@@ -485,19 +508,31 @@ class TrunkMetricsService {
                     try {
                         val recoverTime = Instant.parse(sorted[j].completedAt!!)
                         val hours = ChronoUnit.SECONDS.between(firstFailTime, recoverTime) / 3600.0
-                        if (hours > 0) recoveryTimes.add(hours)
+
+                        // Only count this incident if the recovery SUCCESS falls within [startInstant, endInstant).
+                        // - !recoverTime.isBefore(startInstant): filters out incidents fully resolved before the range
+                        //   (lookback-only incidents).
+                        // - recoverTime.isBefore(endInstant): filters out incidents resolved after the range
+                        //   (from the +7 day forward extension, not part of the selected period).
+                        // This ensures lookback failures recovered by the first success IN the range ARE counted,
+                        // but incidents entirely outside the range are not.
+                        if (hours > 0 && !recoverTime.isBefore(startInstant) && recoverTime.isBefore(endInstant)) {
+                            recoveryTimes.add(hours)
+                            logger.debug("   📊 MTTR incident: F(${run.completedAt}) → S(${sorted[j].completedAt}) = ${"%.2f".format(hours)}h")
+                        }
                     } catch (_: Exception) {}
                     i = j + 1  // move past the success
                 } else {
-                    // No recovery found — use end of period
-                    val hours = ChronoUnit.SECONDS.between(firstFailTime, endInstant) / 3600.0
-                    if (hours > 0) recoveryTimes.add(hours)
+                    // No recovery found within fetched data — skip unrecovered failures
+                    // (do NOT use endInstant as a synthetic recovery time; that inflates MTTR)
                     i = j
                 }
             } else {
                 i++
             }
         }
+
+        logger.info("   📊 MTTR: ${recoveryTimes.size} incidents found, recovery times: ${recoveryTimes.map { "%.2f".format(it) }}")
         return if (recoveryTimes.isNotEmpty()) recoveryTimes.average() else 0.0
     }
 
