@@ -526,13 +526,31 @@ function renderWeeklyTrendChart(weeks) {
             responsive: true, maintainAspectRatio: false,
             onClick: function(e, elements) {
                 if (!elements.length || !analysisData) return;
+                var dsIndex = elements[0].datasetIndex;
                 var idx = elements[0].index;
                 var w = weeks[idx];
-                var commits = analysisData.commits.filter(function(c) {
-                    var d = c.committedAt.substring(0, 10);
-                    return d >= w.startDate && d <= w.endDate;
-                });
-                showChartPopup('📈 ' + w.week + ' Commits (' + w.startDate + ' → ' + w.endDate + ')', commits);
+                if (dsIndex === 0) {
+                    // Commits line
+                    var commits = analysisData.commits.filter(function(c) {
+                        var d = c.committedAt.substring(0, 10);
+                        return d >= w.startDate && d <= w.endDate;
+                    });
+                    showChartPopup('📈 ' + w.week + ' Commits (' + w.startDate + ' → ' + w.endDate + ')', commits);
+                } else if (dsIndex === 1) {
+                    // Successful Deploys line
+                    var runs = analysisData.actionRuns.filter(function(r) {
+                        var d = (r.completedAt || r.startedAt).substring(0, 10);
+                        return d >= w.startDate && d <= w.endDate && r.status === 'SUCCESS';
+                    });
+                    showRunsPopup('✅ ' + w.week + ' Successful Deploys (' + w.startDate + ' → ' + w.endDate + ')', runs);
+                } else {
+                    // Failed Deploys line
+                    var runs = analysisData.actionRuns.filter(function(r) {
+                        var d = (r.completedAt || r.startedAt).substring(0, 10);
+                        return d >= w.startDate && d <= w.endDate && r.status === 'FAILURE';
+                    });
+                    showRunsPopup('❌ ' + w.week + ' Failed Deploys (' + w.startDate + ' → ' + w.endDate + ')', runs);
+                }
             },
             plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
             scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } },
@@ -626,23 +644,25 @@ function renderDailyChart(stats) {
                     // Commits bar
                     commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day; });
                     title = '📊 ' + day + ' — ' + s.commits + ' commits';
+                    showChartPopup(title, commits);
                 } else if (dsIndex === 1) {
-                    // Successful bar
-                    commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day && c.deploymentResult === 'SUCCESS'; });
+                    // Successful runs bar
+                    var runs = analysisData.actionRuns.filter(function(r) { return (r.completedAt || r.startedAt).substring(0, 10) === day && r.status === 'SUCCESS'; });
                     title = '✅ ' + day + ' — ' + s.successfulRuns + ' successful deploys';
+                    showRunsPopup(title, runs);
                 } else {
-                    // Failed bar
-                    commits = analysisData.commits.filter(function(c) { return c.committedAt.substring(0, 10) === day && c.deploymentResult === 'FAILURE'; });
+                    // Failed runs bar
+                    var runs = analysisData.actionRuns.filter(function(r) { return (r.completedAt || r.startedAt).substring(0, 10) === day && r.status === 'FAILURE'; });
                     title = '❌ ' + day + ' — ' + s.failedRuns + ' failed deploys';
+                    showRunsPopup(title, runs);
                 }
-                showChartPopup(title, commits);
             },
             plugins: {
                 legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
                 tooltip: {
                     mode: 'index', intersect: false,
                     callbacks: {
-                        afterBody: function() { return '\n👆 Click to view commits'; }
+                        afterBody: function() { return '\n👆 Click to view details'; }
                     }
                 }
             },
@@ -691,8 +711,8 @@ function renderSuccessFailChart(succ, fail) {
                 var idx = elements[0].index;
                 var status = idx === 0 ? 'SUCCESS' : 'FAILURE';
                 var label = idx === 0 ? '✅ Successful Deploys' : '❌ Failed Deploys';
-                var commits = analysisData.commits.filter(function(c) { return c.deploymentResult === status; });
-                showChartPopup(label, commits);
+                var runs = analysisData.actionRuns.filter(function(r) { return r.status === status; });
+                showRunsPopup(label, runs);
             },
             plugins: {
                 legend: { labels: { color: '#9ca3af', font: { size: 12 } } },
@@ -778,6 +798,35 @@ function filterCommitList() {
 }
 
 // ══════ CHART DETAIL POPUP ══════
+function showRunsPopup(title, runs) {
+    document.getElementById('chartPopupTitle').innerHTML = title + ' <span class="chart-popup-count">' + runs.length + '</span>';
+    var h = '<div style="max-height:65vh;overflow-y:auto">';
+    if (!runs.length) {
+        h += '<div style="text-align:center;color:#71717a;padding:2rem">No workflow runs found for this selection</div>';
+    } else {
+        h += '<table class="matrix-table"><thead><tr><th>#</th><th>Status</th><th>Started</th><th>Completed</th><th>Duration</th><th>Commit</th><th>Action</th></tr></thead><tbody>';
+        runs.forEach(function(r, i) {
+            var startDate = r.startedAt ? new Date(r.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+            var endDate = r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+            var dur = r.durationMinutes != null ? fmtDur(r.durationMinutes) : '—';
+            var link = r.htmlUrl ? '<a href="' + r.htmlUrl + '" target="_blank" style="color:#34d399;text-decoration:none">View ↗</a>' : '—';
+            var sha = r.headSha ? '<span style="font-family:monospace;color:#34d399">' + r.headSha.substring(0, 7) + '</span>' : '—';
+            h += '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + statusBadge(r.status) + '</td>' +
+                '<td style="white-space:nowrap">' + startDate + '</td>' +
+                '<td style="white-space:nowrap">' + endDate + '</td>' +
+                '<td>' + dur + '</td>' +
+                '<td>' + sha + '</td>' +
+                '<td>' + link + '</td></tr>';
+        });
+        h += '</tbody></table>';
+    }
+    h += '</div>';
+    document.getElementById('chartPopupBody').innerHTML = h;
+    document.getElementById('chartPopup').classList.add('show');
+}
+
 function showChartPopup(title, commits) {
     document.getElementById('chartPopupTitle').innerHTML = title + ' <span class="chart-popup-count">' + commits.length + '</span>';
     var h = '<div style="max-height:65vh;overflow-y:auto">';

@@ -374,8 +374,8 @@ class TrunkMetricsService {
 
                 val status = when (conclusion) {
                     "success" -> "SUCCESS"
-                    "failure", "timed_out", "cancelled" -> "FAILURE"
-                    else -> "UNKNOWN"
+                    "failure" -> "FAILURE"
+                    else -> "UNKNOWN"   // timed_out, cancelled, skipped, etc. are excluded
                 }
                 if (status == "UNKNOWN") continue
 
