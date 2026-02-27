@@ -49,11 +49,15 @@ class TrunkMetricsService {
         val rawCommits = fetchCommits(client, request.owner, request.repo, request.branch, startInstant, endInstant)
         logger.info("   ✅ ${rawCommits.size} commits fetched")
 
+        // 1b — Fetch lookback commits (7 days before range) for DORA lead time
+        val lookbackStart = startInstant.minus(7, ChronoUnit.DAYS)
+        val lookbackCommits = fetchCommits(client, request.owner, request.repo, request.branch, lookbackStart, startInstant)
+        logger.info("   ✅ ${lookbackCommits.size} lookback commits fetched (7-day window before range)")
+
         // 2 — Fetch action runs
         //     Exact range: for accurate deploy counts
-        //     Extended range (+7 days forward): so we can match late-deploying commits
-        //     MTTR range (-7 days back, +7 days forward): so MTTR can see failures before the range
-        //       that are resolved by the first success inside the range
+        //     Extended range (-7 days back, +7 days forward): for commit→action mapping,
+        //       DORA lead time lookback, and MTTR lookback/forward
         logger.info("📡 Fetching workflow runs for '${request.workflowName}' …")
         val actionRuns = fetchActionRuns(
             client, request.owner, request.repo, request.branch,
@@ -61,19 +65,15 @@ class TrunkMetricsService {
         )
         val actionRunsExtended = fetchActionRuns(
             client, request.owner, request.repo, request.branch,
-            request.workflowName, startInstant,
-            endInstant.plus(7, ChronoUnit.DAYS)
-        )
-        val actionRunsForMTTR = fetchActionRuns(
-            client, request.owner, request.repo, request.branch,
             request.workflowName,
             startInstant.minus(7, ChronoUnit.DAYS),
             endInstant.plus(7, ChronoUnit.DAYS)
         )
-        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} extended, ${actionRunsForMTTR.size} for MTTR (with lookback)")
+        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} extended (-7/+7 days)")
 
         // 3 — Map each commit to its first action (use extended range for matching)
         val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRunsExtended)
+        val mappedLookbackCommits = mapCommitsToFirstAction(lookbackCommits, actionRunsExtended)
 
         // 4 — Exclude merge commits from DORA calculations
         val nonMergeCommits = mappedCommits.filter { !it.isMerge }
@@ -89,13 +89,14 @@ class TrunkMetricsService {
         val uniqueFailedRuns     = actionRuns.count { it.status == "FAILURE" }
         val uniqueResolvedRuns   = uniqueSuccessfulRuns + uniqueFailedRuns
         val deployFreq      = uniqueSuccessfulRuns / daysInRange
-        // Lead time: only from non-merge commits that have a lead time (commit → first success run)
-        val leadTimes       = nonMergeCommits.mapNotNull { it.leadTimeMinutes }
-        val avgLeadHours    = if (leadTimes.isNotEmpty()) leadTimes.average() / 60.0 else 0.0
-        val cycleTimes      = nonMergeCommits.mapNotNull { it.cycleTimeMinutes }
-        val avgCycleHours   = if (cycleTimes.isNotEmpty()) cycleTimes.average() / 60.0 else 0.0
+        // Lead time: DORA event-pairing — for each success run S, find all commits between
+        // the previous S and this S, compute lead time = S.completedAt - C.committedAt for each,
+        // then average across all paired commits. Looks back 7 days for commits before first S.
+        val lookbackNonMerge = mappedLookbackCommits.filter { !it.isMerge }
+        val avgLeadHours    = calculateDORALeadTime(nonMergeCommits, lookbackNonMerge, actionRuns, actionRunsExtended)
+        val avgCycleHours   = avgLeadHours  // same as lead time in trunk-based
         val changeFailRate  = if (uniqueResolvedRuns > 0) uniqueFailedRuns.toDouble() / uniqueResolvedRuns * 100.0 else 0.0
-        val mttrHours       = calculateMTTR(actionRunsForMTTR, startInstant, endInstant)
+        val mttrHours       = calculateMTTR(actionRunsExtended, startInstant, endInstant)
         val commitFreq      = nonMergeCommits.size / daysInRange
         val avgBatch        = if (nonMergeCommits.isNotEmpty()) nonMergeCommits.map { it.linesAdded + it.linesDeleted }.average() else 0.0
         val completedRuns   = actionRuns.filter { it.completedAt != null }
@@ -215,6 +216,7 @@ class TrunkMetricsService {
                 val sha = c["sha"] as? String ?: continue
                 val commitData  = c["commit"] as? Map<*, *> ?: continue
                 val authorBlock = commitData["author"] as? Map<*, *>
+                val committer = commitData["committer"] as? Map<*, *>
                 val topAuthor   = c["author"] as? Map<*, *>
                 val parents     = c["parents"] as? List<*> ?: emptyList<Any>()
 
@@ -222,8 +224,8 @@ class TrunkMetricsService {
                 val authorLogin = topAuthor?.get("login") as? String ?: "unknown"
                 val authorName  = authorBlock?.get("name") as? String ?: authorLogin
                 val avatarUrl   = topAuthor?.get("avatar_url") as? String
-                val dateStr     = authorBlock?.get("date") as? String ?: continue
-                val isMerge     = parents.size > 1
+                val dateStr     = committer?.get("date") as? String ?: continue
+                val isMerge     = message.lowercase().startsWith("merge pull request")
 
                 result.add(TrunkCommitInfo(
                     sha = sha, shortSha = sha.take(7),
@@ -450,6 +452,125 @@ class TrunkMetricsService {
     }
 
     // ════════════════════════════════════════════════════════════
+    //  DORA LEAD TIME (event-pairing)
+    // ════════════════════════════════════════════════════════════
+
+    /**
+     * DORA Lead Time for Changes — event-pairing approach.
+     *
+     * For each successful workflow run (S) in the selected range, find all commits
+     * between the previous successful run and this one. The lead time for each such
+     * commit C is: S.completedAt − C.committedAt.
+     *
+     * The result is the average of all individual commit lead times (denominator =
+     * total number of paired commits, not the number of successful runs).
+     *
+     * Lookback: we look 7 days before the range start to find the last successful
+     * run before the range, so that commits between that run and the first S inside
+     * the range are correctly attributed.
+     *
+     * Trailing commits after the last S are ignored (not yet deployed).
+     *
+     * @param commitsInRange   non-merge commits inside the selected date range
+     * @param lookbackCommits  non-merge commits from 7 days before the range start
+     * @param runsInRange      workflow runs inside the selected date range
+     * @param allRunsExtended  workflow runs with -7/+7 day extension (used to find previous S)
+     */
+    private fun calculateDORALeadTime(
+        commitsInRange: List<TrunkCommitInfo>,
+        lookbackCommits: List<TrunkCommitInfo>,
+        runsInRange: List<TrunkActionRun>,
+        allRunsExtended: List<TrunkActionRun>
+    ): Double {
+
+        val report =  mutableListOf<Report>()
+        // Only successful runs in the selected range matter as deployment events
+        val successRunsInRange = runsInRange
+            .filter { it.status == "SUCCESS" && it.startedAt != null }
+            .sortedBy { it.startedAt }
+
+        if (successRunsInRange.isEmpty()) {
+            logger.info("   📊 DORA Lead Time: no successful runs in range → 0.0")
+            return 0.0
+        }
+
+        // All successful runs (including lookback) to find "previous S" for each S in range
+        val allSuccessRuns = allRunsExtended
+            .filter { it.status == "SUCCESS" && it.startedAt != null }
+            .sortedBy { it.startedAt }
+
+        // Merge lookback + in-range commits, deduplicate by SHA, sorted by committedAt
+        val allCommits = (lookbackCommits + commitsInRange)
+            .distinctBy { it.sha }
+            .sortedBy { it.committedAt }
+
+        val leadTimesHours = mutableListOf<Double>()
+
+        for (successRun in successRunsInRange) {
+            val sCompletedAt = try { Instant.parse(successRun.startedAt!!) } catch (_: Exception) { continue }
+
+            // Find the previous successful run (completed before this one)
+            val prevSuccess = allSuccessRuns.lastOrNull { run ->
+                run.runId != successRun.runId && try {
+                    val prevCompleted = Instant.parse(run.startedAt!!)
+                    prevCompleted.isBefore(sCompletedAt)
+                } catch (_: Exception) { false }
+            }
+
+            val prevBoundary: Instant = if (prevSuccess != null) {
+                try { Instant.parse(prevSuccess.startedAt!!) } catch (_: Exception) { Instant.MIN }
+            } else {
+                Instant.MIN
+            }
+
+            // Collect all commits between prevBoundary (exclusive) and sCompletedAt (inclusive)
+            val pairedCommits = allCommits.filter { commit ->
+                try {
+                    val commitTime = Instant.parse(commit.committedAt)
+                    commitTime.isAfter(prevBoundary) && !commitTime.isAfter(sCompletedAt)
+                } catch (_: Exception) { false }
+            }
+
+            for (commit in pairedCommits) {
+                try {
+                    val commitTime = Instant.parse(commit.committedAt)
+
+                    val second  = ChronoUnit.SECONDS.between(commitTime, sCompletedAt)
+                    val hours = second / 3600.0
+                    if (hours >= 0) {
+                        leadTimesHours.add(hours)
+                    }
+
+                    report.add(Report(
+                        sha = commit.sha,
+                        commitCreatedAt = commit.committedAt,
+                        runnerId = successRun.runId.toString(),
+                        workflowCreatedAt = successRun.startedAt,
+                        diffSecond  = second,
+                        diffMinute = hours
+                    ))
+
+                } catch (_: Exception) {}
+            }
+
+            logger.debug("   📊 DORA Lead Time: S(${successRun.completedAt}) paired with ${pairedCommits.size} commits")
+        }
+
+        val avg = if (leadTimesHours.isNotEmpty()) leadTimesHours.average() else 0.0
+        logger.info("   📊 DORA Lead Time: ${leadTimesHours.size} commit-pairs, avg = ${"%.2f".format(avg)} hours")
+        return avg
+    }
+
+
+    data class Report(
+        val sha: String,
+        val commitCreatedAt: String,
+        val runnerId: String,
+        val workflowCreatedAt: String,
+        val diffSecond : Long,
+        val diffMinute : Double
+    )
+        // ════════════════════════════════════════════════════════════
     //  MTTR
     // ════════════════════════════════════════════════════════════
 
@@ -683,12 +804,12 @@ class TrunkMetricsService {
             deploymentFrequency = TrunkMetricValue(deployFreq, "deploys/day", "%.2f".format(deployFreq), ratings.deploymentFrequency),
             leadTime = TrunkMetricValue(leadHours, "hours", formatHours(leadHours), ratings.leadTimeForChanges),
             cycleTime = TrunkMetricValue(cycleHours, "hours", formatHours(cycleHours), ratings.cycleTime),
-            changeFailureRate = TrunkMetricValue(failRate, "%", "%.1f%%".format(failRate), ratings.changeFailureRate),
+            changeFailureRate = TrunkMetricValue(failRate, "%", "%.2f%%".format(failRate), ratings.changeFailureRate),
             mttr = TrunkMetricValue(mttrHours, "hours", formatHours(mttrHours), ratings.meanTimeToRecovery),
             commitFrequency = TrunkMetricValue(commitFreq, "commits/day", "%.1f".format(commitFreq), ratings.commitFrequency),
             batchSize = TrunkMetricValue(batchSize, "lines", "%.0f".format(batchSize), ratings.batchSize),
             timeToDeploy = TrunkMetricValue(pipelineMin, "minutes", "%.1f min".format(pipelineMin), ratings.timeToDeploy),
-            deploySuccessRate = TrunkMetricValue(successRate, "%", "%.1f%%".format(successRate), rateDeployFreq(successRate / 100.0)),
+            deploySuccessRate = TrunkMetricValue(successRate, "%", "%.2f%%".format(successRate), rateDeployFreq(successRate / 100.0)),
             totalCommits = totalCommits,
             totalDevelopers = totalDevs
         )
@@ -696,7 +817,10 @@ class TrunkMetricsService {
 
     private fun formatHours(h: Double): String {
         return when {
-            h < 1.0 -> "%.0f min".format(h * 60)
+            h < 1.0 -> {
+                val minutes = h * 60
+                if (minutes < 1.0) "< 1 min" else "%.1f min".format(minutes)
+            }
             h < 24.0 -> "%.2f hrs".format(h)
             else -> "%.2f days".format(h / 24.0)
         }
