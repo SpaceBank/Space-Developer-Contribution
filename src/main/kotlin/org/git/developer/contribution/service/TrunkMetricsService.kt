@@ -45,34 +45,45 @@ class TrunkMetricsService {
 
         val client = buildClient(request.token)
 
-        // ── Parallel fetch: commits + lookback commits + extended action runs ──
-        // These 3 calls are independent — run them in parallel to cut loading time.
+        // ── Parallel fetch: all commits (with lookback) + extended action runs ──
+        // These 2 calls are independent — run them in parallel to cut loading time.
+        // We fetch commits from -7 days to endInstant in one call and split locally.
         // We fetch only actionRunsExtended (-7/+7 days) and derive actionRuns (exact range) from it.
-        logger.info("📡 Fetching commits, lookback commits, and workflow runs in parallel …")
+        logger.info("📡 Fetching commits and workflow runs in parallel …")
         val fetchStartTime = System.currentTimeMillis()
+        val lookbackStart = startInstant.minus(7, ChronoUnit.DAYS)
 
-        val rawCommitsFuture = CompletableFuture.supplyAsync {
-            fetchCommits(client, request.owner, request.repo, request.branch, startInstant, endInstant)
-        }
-        val lookbackCommitsFuture = CompletableFuture.supplyAsync {
-            val lookbackStart = startInstant.minus(7, ChronoUnit.DAYS)
-            fetchCommits(client, request.owner, request.repo, request.branch, lookbackStart, startInstant)
+        val allCommitsFuture = CompletableFuture.supplyAsync {
+            fetchCommits(client, request.owner, request.repo, request.branch, lookbackStart, endInstant)
         }
         val actionRunsExtendedFuture = CompletableFuture.supplyAsync {
             fetchActionRuns(
                 client, request.owner, request.repo, request.branch,
                 request.workflowName,
-                startInstant.minus(7, ChronoUnit.DAYS),
+                lookbackStart,
                 endInstant.plus(7, ChronoUnit.DAYS)
             )
         }
 
-        // Wait for all to complete
-        CompletableFuture.allOf(rawCommitsFuture, lookbackCommitsFuture, actionRunsExtendedFuture).join()
+        // Wait for both to complete
+        CompletableFuture.allOf(allCommitsFuture, actionRunsExtendedFuture).join()
 
-        val rawCommits = rawCommitsFuture.get()
-        val lookbackCommits = lookbackCommitsFuture.get()
+        val allFetchedCommits = allCommitsFuture.get()
         val actionRunsExtended = actionRunsExtendedFuture.get()
+
+        // Split commits into lookback vs in-range
+        val rawCommits = allFetchedCommits.filter { commit ->
+            try {
+                val t = Instant.parse(commit.committedAt)
+                !t.isBefore(startInstant) && t.isBefore(endInstant)
+            } catch (_: Exception) { false }
+        }
+        val lookbackCommits = allFetchedCommits.filter { commit ->
+            try {
+                val t = Instant.parse(commit.committedAt)
+                !t.isBefore(lookbackStart) && t.isBefore(startInstant)
+            } catch (_: Exception) { false }
+        }
 
         // Derive exact-range runs from the extended set (avoids a separate API call)
         val actionRuns = actionRunsExtended.filter { run ->
