@@ -10,6 +10,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.CompletableFuture
 
 /**
  * Service for Trunk-Based Matrix — DORA metrics based on commits + GitHub Actions.
@@ -44,32 +45,45 @@ class TrunkMetricsService {
 
         val client = buildClient(request.token)
 
-        // 1 — Fetch commits
-        logger.info("📡 Fetching commits …")
-        val rawCommits = fetchCommits(client, request.owner, request.repo, request.branch, startInstant, endInstant)
-        logger.info("   ✅ ${rawCommits.size} commits fetched")
+        // ── Parallel fetch: commits + lookback commits + extended action runs ──
+        // These 3 calls are independent — run them in parallel to cut loading time.
+        // We fetch only actionRunsExtended (-7/+7 days) and derive actionRuns (exact range) from it.
+        logger.info("📡 Fetching commits, lookback commits, and workflow runs in parallel …")
+        val fetchStartTime = System.currentTimeMillis()
 
-        // 1b — Fetch lookback commits (7 days before range) for DORA lead time
-        val lookbackStart = startInstant.minus(7, ChronoUnit.DAYS)
-        val lookbackCommits = fetchCommits(client, request.owner, request.repo, request.branch, lookbackStart, startInstant)
-        logger.info("   ✅ ${lookbackCommits.size} lookback commits fetched (7-day window before range)")
+        val rawCommitsFuture = CompletableFuture.supplyAsync {
+            fetchCommits(client, request.owner, request.repo, request.branch, startInstant, endInstant)
+        }
+        val lookbackCommitsFuture = CompletableFuture.supplyAsync {
+            val lookbackStart = startInstant.minus(7, ChronoUnit.DAYS)
+            fetchCommits(client, request.owner, request.repo, request.branch, lookbackStart, startInstant)
+        }
+        val actionRunsExtendedFuture = CompletableFuture.supplyAsync {
+            fetchActionRuns(
+                client, request.owner, request.repo, request.branch,
+                request.workflowName,
+                startInstant.minus(7, ChronoUnit.DAYS),
+                endInstant.plus(7, ChronoUnit.DAYS)
+            )
+        }
 
-        // 2 — Fetch action runs
-        //     Exact range: for accurate deploy counts
-        //     Extended range (-7 days back, +7 days forward): for commit→action mapping,
-        //       DORA lead time lookback, and MTTR lookback/forward
-        logger.info("📡 Fetching workflow runs for '${request.workflowName}' …")
-        val actionRuns = fetchActionRuns(
-            client, request.owner, request.repo, request.branch,
-            request.workflowName, startInstant, endInstant
-        )
-        val actionRunsExtended = fetchActionRuns(
-            client, request.owner, request.repo, request.branch,
-            request.workflowName,
-            startInstant.minus(7, ChronoUnit.DAYS),
-            endInstant.plus(7, ChronoUnit.DAYS)
-        )
-        logger.info("   ✅ ${actionRuns.size} runs in range, ${actionRunsExtended.size} extended (-7/+7 days)")
+        // Wait for all to complete
+        CompletableFuture.allOf(rawCommitsFuture, lookbackCommitsFuture, actionRunsExtendedFuture).join()
+
+        val rawCommits = rawCommitsFuture.get()
+        val lookbackCommits = lookbackCommitsFuture.get()
+        val actionRunsExtended = actionRunsExtendedFuture.get()
+
+        // Derive exact-range runs from the extended set (avoids a separate API call)
+        val actionRuns = actionRunsExtended.filter { run ->
+            try {
+                val runTime = Instant.parse(run.startedAt)
+                !runTime.isBefore(startInstant) && runTime.isBefore(endInstant)
+            } catch (_: Exception) { false }
+        }
+
+        val fetchDuration = System.currentTimeMillis() - fetchStartTime
+        logger.info("   ✅ Parallel fetch complete in ${fetchDuration}ms — ${rawCommits.size} commits, ${lookbackCommits.size} lookback commits, ${actionRuns.size} runs in range, ${actionRunsExtended.size} extended (-7/+7 days)")
 
         // 3 — Map each commit to its first action (use extended range for matching)
         val mappedCommits = mapCommitsToFirstAction(rawCommits, actionRunsExtended)
