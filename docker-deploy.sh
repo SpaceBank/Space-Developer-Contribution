@@ -183,9 +183,9 @@ for i in \$(seq 1 40); do
         echo "║   👉  http://\${SERVER_IP_DETECTED}:$APP_PORT             ║"
         echo "║                                                          ║"
         echo "║   Commands:                                              ║"
-        echo "║     sudo docker logs -f $CONTAINER_NAME                  ║"
-        echo "║     sudo docker restart $CONTAINER_NAME                  ║"
-        echo "║     sudo docker stop $CONTAINER_NAME                     ║"
+        echo "║     sudo docker logs -f $CONTAINER_NAME                 ║"
+        echo "║     sudo docker restart $CONTAINER_NAME                 ║"
+        echo "║     sudo docker stop $CONTAINER_NAME                    ║"
         echo "║                                                          ║"
         echo "╚══════════════════════════════════════════════════════════╝"
         exit 0
