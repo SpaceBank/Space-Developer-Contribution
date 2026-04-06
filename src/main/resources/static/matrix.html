@@ -1507,11 +1507,25 @@
                 const url = repo ? 'https://github.com/' + repo + '/pull/' + num : '#';
                 const titleEl = document.createElement('span'); titleEl.textContent = title;
                 const safeTitle = titleEl.innerHTML;
-                const mergedDate = pr.mergedAt ? new Date(pr.mergedAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
                 const dot = statusDot(pr.checkStatus);
 
+                // Build timeline
+                const timeline = [];
+                if (pr.firstCommitTime) {
+                    timeline.push('<span style="color:#a78bfa;">📝 First Commit:</span> ' + formatDateTime(pr.firstCommitTime));
+                }
+                timeline.push('<span style="color:#60a5fa;">🚀 PR Created:</span> ' + formatDateTime(pr.createdAt));
+                if (pr.firstReviewTime) {
+                    timeline.push('<span style="color:#fbbf24;">👀 First Review:</span> ' + formatDateTime(pr.firstReviewTime));
+                }
+                if (pr.firstApprovalTime) {
+                    timeline.push('<span style="color:#34d399;">✅ Approved:</span> ' + formatDateTime(pr.firstApprovalTime));
+                }
+                if (pr.mergedAt) {
+                    timeline.push('<span style="color:#22c55e;">🔀 Merged:</span> ' + formatDateTime(pr.mergedAt));
+                }
 
-                // Build all 6 metric tags
+                // Build all 6 metric tags with hours value shown
                 const allMetrics = [
                     { label: 'Coding', val: pr.codingTimeHours, type: 'codingTime' },
                     { label: 'Pickup', val: pr.pickupTimeHours, type: 'pickupTime' },
@@ -1523,9 +1537,13 @@
                 const metricsTagsHTML = allMetrics.map(m => {
                     const rating = getRatingClass(m.val, m.type);
                     const displayVal = formatHoursShort(m.val);
+                    const hoursVal = m.val != null ? m.val.toFixed(1) + 'h' : '—';
                     const isHighlighted = metric && metric.key === m.type;
                     const highlightStyle = isHighlighted ? 'outline:2px solid ' + (rating === 'elite' ? '#22c55e' : rating === 'good' ? '#3b82f6' : rating === 'fair' ? '#f59e0b' : '#ef4444') + '; outline-offset:1px;' : '';
-                    return `<span class="pr-metric-tag ${rating}" style="${highlightStyle}">${m.label}: ${displayVal}</span>`;
+                    // Show both friendly and raw hours when value is >= 24h
+                    const showBoth = m.val != null && m.val >= 24;
+                    const label = showBoth ? m.label + ': ' + displayVal + ' (' + hoursVal + ')' : m.label + ': ' + displayVal;
+                    return `<span class="pr-metric-tag ${rating}" style="${highlightStyle}">${label}</span>`;
                 }).join('');
 
                 const prSizeHighlight = metric && metric.key === 'prSize' ? 'outline:2px solid ' + (pr.prSize < 100 ? '#22c55e' : pr.prSize <= 155 ? '#3b82f6' : pr.prSize <= 228 ? '#f59e0b' : '#ef4444') + '; outline-offset:1px;' : '';
@@ -1540,12 +1558,14 @@
                             <div style="font-size:.85rem; color:#e4e4e7; margin-bottom:.25rem; word-break:break-word;">
                                 <a href="${url}" target="_blank" style="color:#e4e4e7; text-decoration:none;" onmouseover="this.style.color='#818cf8';this.style.textDecoration='underline'" onmouseout="this.style.color='#e4e4e7';this.style.textDecoration='none'">${safeTitle}</a>
                             </div>
-                            <div style="display:flex; flex-wrap:wrap; gap:.5rem; font-size:.73rem; color:#71717a; align-items:center; margin-bottom:.4rem;">
+                            <div style="display:flex; flex-wrap:wrap; gap:.5rem; font-size:.73rem; color:#71717a; align-items:center; margin-bottom:.3rem;">
                                 <span style="width:8px; height:8px; border-radius:50%; background:${dot}; display:inline-block;" title="Check: ${pr.checkStatus || 'none'}"></span>
                                 ${author ? '<span>👤 ' + author + '</span>' : ''}
                                 ${repoShort ? '<span>📦 ' + repoShort + '</span>' : ''}
-                                ${mergedDate ? '<span>📅 ' + mergedDate + '</span>' : ''}
                                 ${pr.prSize != null ? '<span style="' + prSizeHighlight + ' padding:.1rem .3rem; border-radius:4px;">📏 ' + pr.prSize + ' lines</span>' : ''}
+                            </div>
+                            <div style="font-size:.7rem; color:#52525b; line-height:1.6; margin-bottom:.4rem; padding:.35rem .5rem; background:rgba(255,255,255,.02); border-radius:6px;">
+                                ${timeline.join(' &nbsp;→&nbsp; ')}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:.3rem;">
                                 ${metricsTagsHTML}
