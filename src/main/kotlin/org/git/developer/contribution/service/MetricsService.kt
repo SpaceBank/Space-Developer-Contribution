@@ -121,14 +121,21 @@ class MetricsService(
         val developerMetrics = calculateDeveloperMetrics(filteredPRs, weeksInRange)
 
         // Calculate weekly trend
-        val weeklyTrend = calculateWeeklyTrend(filteredPRs, startDate, endDate)
+        val daysInRange = ChronoUnit.DAYS.between(startDate, endDate)
+        val granularity = when {
+            daysInRange <= 14  -> "daily"
+            daysInRange <= 90  -> "weekly"
+            else               -> "monthly"
+        }
+        val trendData = calculateTrend(filteredPRs, startDate, endDate, granularity)
 
         return MetricsAnalysisResponse(
             analyzedRepositories = request.repositoryFullNames,
             dateRange = DateRange(startDate, endDate),
             teamMetrics = teamMetrics,
             developerMetrics = developerMetrics,
-            weeklyTrend = weeklyTrend
+            weeklyTrend = trendData,
+            trendGranularity = granularity
         )
     }
 
@@ -629,14 +636,55 @@ class MetricsService(
     }
 
     /**
-     * Calculate weekly trend
+     * Calculate trend with adaptive granularity (daily / weekly / monthly).
+     */
+    private fun calculateTrend(
+        prs: List<PRDetailedInfo>,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        granularity: String
+    ): List<MetricsTrendPoint> {
+        return when (granularity) {
+            "daily"   -> calculateDailyTrend(prs, startDate, endDate)
+            "monthly" -> calculateMonthlyTrend(prs, startDate, endDate)
+            else      -> calculateWeeklyTrend(prs, startDate, endDate)
+        }
+    }
+
+    /**
+     * Daily trend – one bucket per day.
+     */
+    private fun calculateDailyTrend(
+        prs: List<PRDetailedInfo>,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<MetricsTrendPoint> {
+        val trends = mutableListOf<MetricsTrendPoint>()
+        var current = startDate
+
+        while (!current.isAfter(endDate)) {
+            val dayStr = current.toString()
+            val label = current.format(java.time.format.DateTimeFormatter.ofPattern("EEE MM/dd"))
+
+            val dayPRs = prs.filter { pr ->
+                pr.mergedAt?.substring(0, 10) == dayStr
+            }
+
+            trends.add(buildTrendPoint(label, dayStr, dayStr, dayPRs))
+            current = current.plusDays(1)
+        }
+        return trends
+    }
+
+    /**
+     * Weekly trend – one bucket per calendar week (Mon–Sun).
      */
     private fun calculateWeeklyTrend(
         prs: List<PRDetailedInfo>,
         startDate: LocalDate,
         endDate: LocalDate
-    ): List<WeeklyMetricsTrend> {
-        val trends = mutableListOf<WeeklyMetricsTrend>()
+    ): List<MetricsTrendPoint> {
+        val trends = mutableListOf<MetricsTrendPoint>()
         val weekFields = WeekFields.of(Locale.getDefault())
 
         var current = startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -652,23 +700,72 @@ class MetricsService(
                 mergedDate != null && !mergedDate.isBefore(current) && !mergedDate.isAfter(weekEnd)
             }
 
-            val cycleTimes = weekPRs.mapNotNull { calculateCycleTime(it) }
-            val reviewTimes = weekPRs.mapNotNull { calculateReviewTime(it) }
-
-            trends.add(WeeklyMetricsTrend(
-                week = weekLabel,
-                startDate = current.toString(),
-                endDate = weekEnd.toString(),
-                cycleTime = cycleTimes.averageOrNull() ?: 0.0,
-                reviewTime = reviewTimes.averageOrNull() ?: 0.0,
-                mergeFrequency = weekPRs.size.toDouble(),
-                prCount = weekPRs.size
-            ))
-
+            trends.add(buildTrendPoint(weekLabel, current.toString(), weekEnd.toString(), weekPRs))
             current = current.plusWeeks(1)
         }
-
         return trends
+    }
+
+    /**
+     * Monthly trend – one bucket per calendar month.
+     */
+    private fun calculateMonthlyTrend(
+        prs: List<PRDetailedInfo>,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<MetricsTrendPoint> {
+        val trends = mutableListOf<MetricsTrendPoint>()
+        var current = startDate.withDayOfMonth(1)
+
+        while (!current.isAfter(endDate)) {
+            val monthEnd = current.plusMonths(1).minusDays(1)
+            val label = current.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MMM"))
+
+            val monthPRs = prs.filter { pr ->
+                val mergedDate = pr.mergedAt?.substring(0, 10)?.let { LocalDate.parse(it) }
+                mergedDate != null && !mergedDate.isBefore(current) && !mergedDate.isAfter(monthEnd)
+            }
+
+            trends.add(buildTrendPoint(label, current.toString(), monthEnd.toString(), monthPRs))
+            current = current.plusMonths(1)
+        }
+        return trends
+    }
+
+    /**
+     * Build a single trend point from a bucket of PRs.
+     */
+    private fun buildTrendPoint(
+        label: String,
+        periodStart: String,
+        periodEnd: String,
+        periodPRs: List<PRDetailedInfo>
+    ): MetricsTrendPoint {
+        val cycleTimes   = periodPRs.mapNotNull { calculateCycleTime(it) }
+        val reviewTimes  = periodPRs.mapNotNull { calculateReviewTime(it) }
+        val codingTimes  = periodPRs.mapNotNull { calculateCodingTime(it) }
+        val pickupTimes  = periodPRs.mapNotNull { calculatePickupTime(it) }
+        val approveTimes = periodPRs.mapNotNull { calculateApproveTime(it) }
+        val mergeTimes   = periodPRs.mapNotNull { calculateMergeTime(it) }
+        val prSizes      = periodPRs.map { it.prSize.toDouble() }
+
+        if (approveTimes.averageOrNull() ?: 0.0 == 0.0){
+            logger.debug("Trend point $label has no approval times (average is 0.0) - likely no PRs with approvals in this period")
+        }
+        return MetricsTrendPoint(
+            week         = label,
+            startDate    = periodStart,
+            endDate      = periodEnd,
+            codingTime   = codingTimes.averageOrNull() ?: 0.0,
+            pickupTime   = pickupTimes.averageOrNull() ?: 0.0,
+            approveTime  = approveTimes.averageOrNull() ?: 0.0,
+            mergeTime    = mergeTimes.averageOrNull() ?: 0.0,
+            reviewTime   = reviewTimes.averageOrNull() ?: 0.0,
+            cycleTime    = cycleTimes.averageOrNull() ?: 0.0,
+            mergeFrequency = periodPRs.size.toDouble(),
+            prSize       = prSizes.averageOrNull() ?: 0.0,
+            prCount      = periodPRs.size
+        )
     }
 
     // Time calculation helpers
@@ -686,11 +783,10 @@ class MetricsService(
     }
 
     private fun calculateApproveTime(pr: PRDetailedInfo): Double? {
-        val firstReview = parseDateTime(pr.firstReviewTime) ?: return null
-        // If we have formal approval, use that. Otherwise, use merge time as the "approval" point
+        val firstCommit = parseDateTime(pr.firstCommitTime) ?: parseDateTime(pr.createdAt) ?: return null
         val approvalTime = parseDateTime(pr.firstApprovalTime) ?: parseDateTime(pr.mergedAt) ?: return null
-        val result = hoursBetween(firstReview, approvalTime)
-        // Only return positive values (approval should be after review)
+        val result = hoursBetween(firstCommit, approvalTime)
+        // Only return positive values (approval should be after first commit)
         return if (result >= 0) result else null
     }
 

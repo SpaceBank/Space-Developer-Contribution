@@ -104,19 +104,25 @@ data class MetricsAnalysisResponse(
     val dateRange: DateRange,
     val teamMetrics: TeamMetrics,
     val developerMetrics: List<DeveloperMetrics>,
-    val weeklyTrend: List<WeeklyMetricsTrend>
+    val weeklyTrend: List<MetricsTrendPoint>,
+    val trendGranularity: String = "weekly"  // "daily", "weekly", or "monthly"
 )
 
 /**
- * Weekly trend data
+ * Trend data point — represents one period (day, week, or month)
  */
-data class WeeklyMetricsTrend(
-    val week: String,
+data class MetricsTrendPoint(
+    val week: String,          // Period label (e.g. "Mon 02/03", "2026-W05", "2026-Feb")
     val startDate: String,
     val endDate: String,
-    val cycleTime: Double,
+    val codingTime: Double,
+    val pickupTime: Double,
+    val approveTime: Double,
+    val mergeTime: Double,
     val reviewTime: Double,
+    val cycleTime: Double,
     val mergeFrequency: Double,
+    val prSize: Double,
     val prCount: Int
 )
 
