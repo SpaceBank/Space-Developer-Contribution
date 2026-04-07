@@ -750,9 +750,7 @@ class MetricsService(
         val mergeTimes   = periodPRs.mapNotNull { calculateMergeTime(it) }
         val prSizes      = periodPRs.map { it.prSize.toDouble() }
 
-        if (approveTimes.averageOrNull() ?: 0.0 == 0.0){
-            logger.debug("Trend point $label has no approval times (average is 0.0) - likely no PRs with approvals in this period")
-        }
+
         return MetricsTrendPoint(
             week         = label,
             startDate    = periodStart,
@@ -784,10 +782,10 @@ class MetricsService(
     }
 
     private fun calculateApproveTime(pr: PRDetailedInfo): Double? {
-        val firstCommit = parseDateTime(pr.createdAt) ?: return null
-        val approvalTime = parseDateTime(pr.firstApprovalTime) ?: parseDateTime(pr.mergedAt) ?: return null
-        val result = hoursBetween(firstCommit, approvalTime)
-        // Only return positive values (approval should be after first commit)
+        val created = parseDateTime(pr.createdAt) ?: return null
+        val approvalTime = parseDateTime(pr.firstApprovalTime) ?: return null
+        val result = hoursBetween(created, approvalTime)
+        // Only return positive values (approval should be after PR creation)
         return if (result >= 0) result else null
     }
 
@@ -833,7 +831,7 @@ class MetricsService(
     }
 
     private fun hoursBetween(start: LocalDateTime, end: LocalDateTime): Double {
-        return ChronoUnit.MINUTES.between(start, end) / 60.0
+        return ChronoUnit.SECONDS.between(start, end) / 3600.0
     }
 
     private fun createMetricValue(
@@ -859,8 +857,16 @@ class MetricsService(
         }
 
         val displayValue = when {
-            unit == "hours" && value < 1 -> "${(value * 60).toInt()} mins"
-            unit == "hours" -> String.format("%.1f hrs", value)
+            unit == "hours" && value < 1 -> {
+                val mins = Math.round(value * 60).toInt()
+                if (mins == 0 && value > 0) "< 1 min" else "$mins mins"
+            }
+            unit == "hours" && value < 24 -> String.format("%.1f hrs", value)
+            unit == "hours" -> {
+                val days = (value / 24).toInt()
+                val remainingHours = Math.round(value % 24).toInt()
+                if (remainingHours == 0) "${days}d" else "${days}d ${remainingHours}h"
+            }
             unit.contains("week") -> String.format("%.2f", value)
             else -> value.toInt().toString()
         }
