@@ -387,7 +387,7 @@
                 </div>
                 <div class="panel" style="min-height: 300px; display:flex; flex-direction:column;">
                     <h3 style="margin-bottom:.25rem;">✅ Approve Time Trend</h3>
-                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">First commit → approval (hours)</p>
+                    <p style="font-size: 0.78rem; color: #71717a; margin-bottom: 1rem;">PR opened → approval (hours)</p>
                     <div style="flex:1; position:relative; min-height:220px;">
                         <canvas id="approveTimeTrendChart"></canvas>
                     </div>
@@ -453,7 +453,13 @@
             </div>
 
             <!-- PR Quality & Size Analytics -->
-            <h3 style="margin: 2rem 0 1rem;">📊 PR Quality & Size Analytics</h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin: 2rem 0 1rem; flex-wrap:wrap; gap:.5rem;">
+                <h3 style="margin:0;">📊 PR Quality & Size Analytics</h3>
+                <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none; padding:.4rem .75rem; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:8px; transition:all .15s;" onmouseover="this.style.borderColor='rgba(99,102,241,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+                    <input type="checkbox" id="masterOnlyCheckbox" checked onchange="refreshQualityAnalytics()" style="width:16px; height:16px; accent-color:#6366f1; cursor:pointer;">
+                    <span style="font-size:.82rem; color:#d4d4d8; font-weight:500;">Only master/main</span>
+                </label>
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                 <!-- Quality Check Rate -->
                 <div class="panel" style="min-height: 420px; display:flex; flex-direction:column;">
@@ -586,12 +592,12 @@
                                     <span class="info-icon">ℹ
                                         <div class="info-tooltip">
                                             <div class="tooltip-title">✅ Approve Time</div>
-                                            <div class="tooltip-desc">The time from the first commit until the first approval. Measures how long it takes for a change to get formally approved.</div>
-                                            <div class="tooltip-formula">Formula: First Approval Time - First Commit Time</div>
+                                            <div class="tooltip-desc">The time from the PR opened until the first approval. Measures how long it takes for a change to get formally approved.</div>
+                                            <div class="tooltip-formula">Formula: First Approval Time - PR opened Time</div>
                                             <div class="tooltip-why">💡 Why it matters: Long approve time may indicate complex PRs, unclear code, or slow review iterations.</div>
                                         </div>
                                     </span>
-                                    <br><span class="metric-hint">First commit → approval</span>
+                                    <br><span class="metric-hint">PR opened → approval</span>
                                 </td>
                                 <td class="elite-col">&lt; 10h</td>
                                 <td class="good-col">10 - 22h</td>
@@ -1084,10 +1090,7 @@
             renderDeveloperMatrix(data.developerMetrics);
 
             // PR Quality & Size Analytics
-            renderQualityRateChart(allPRsList);
-            renderPRSizeDistribution(allPRsList);
-            renderDailyPRChart(allPRsList);
-            renderProductionReadiness(allPRsList);
+            refreshQualityAnalytics();
 
             // PR List
             renderPRList(allPRsList, data.analyzedRepositories);
@@ -1120,7 +1123,7 @@
             const metricsConfig = [
                 { key: 'codingTime', name: 'Coding Time', icon: '⌨️', desc: 'First commit to PR opened' },
                 { key: 'pickupTime', name: 'Pickup Time', icon: '👀', desc: 'PR opened to first review' },
-                { key: 'approveTime', name: 'Approve Time', icon: '✅', desc: 'First commit to approval' },
+                { key: 'approveTime', name: 'Approve Time', icon: '✅', desc: 'PR opened to approval' },
                 { key: 'mergeTime', name: 'Merge Time', icon: '🔀', desc: 'First approval to merge' },
                 { key: 'reviewTime', name: 'Review Time', icon: '📝', desc: 'PR opened to merge' },
                 { key: 'cycleTime', name: 'Cycle Time', icon: '🔄', desc: 'First commit to merge' },
@@ -1696,6 +1699,24 @@
         }
 
         // ==================== PR QUALITY & SIZE ANALYTICS ====================
+
+        /**
+         * Filter PRs based on master-only checkbox, then re-render all 4 quality/size charts.
+         */
+        function refreshQualityAnalytics() {
+            const masterOnly = document.getElementById('masterOnlyCheckbox')?.checked ?? true;
+            let prs = allPRsList;
+            if (masterOnly) {
+                prs = allPRsList.filter(pr => {
+                    const branch = (pr.baseBranch || '').toLowerCase();
+                    return branch === 'master' || branch === 'main';
+                });
+            }
+            renderQualityRateChart(prs);
+            renderPRSizeDistribution(prs);
+            renderDailyPRChart(prs);
+            renderProductionReadiness(prs);
+        }
 
         // Global buckets for drill-down
         let _qualityBuckets = {};

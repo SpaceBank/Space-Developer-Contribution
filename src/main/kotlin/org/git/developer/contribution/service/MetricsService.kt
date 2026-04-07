@@ -614,7 +614,8 @@ class MetricsService(
                     firstCommitTime = pr.firstCommitTime,
                     firstReviewTime = pr.firstReviewTime,
                     firstApprovalTime = pr.firstApprovalTime,
-                    checkStatus = pr.checkStatus
+                    checkStatus = pr.checkStatus,
+                    baseBranch = pr.baseBranch
                 )
             }
 
@@ -783,7 +784,7 @@ class MetricsService(
     }
 
     private fun calculateApproveTime(pr: PRDetailedInfo): Double? {
-        val firstCommit = parseDateTime(pr.firstCommitTime) ?: parseDateTime(pr.createdAt) ?: return null
+        val firstCommit = parseDateTime(pr.createdAt) ?: return null
         val approvalTime = parseDateTime(pr.firstApprovalTime) ?: parseDateTime(pr.mergedAt) ?: return null
         val result = hoursBetween(firstCommit, approvalTime)
         // Only return positive values (approval should be after first commit)

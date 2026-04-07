@@ -46,7 +46,8 @@ data class PRMetrics(
     val firstCommitTime: String?,      // First commit timestamp
     val firstReviewTime: String?,      // First review timestamp
     val firstApprovalTime: String?,    // First approval timestamp
-    val checkStatus: String? = null    // CI check status: SUCCESS, FAILURE, PENDING, null
+    val checkStatus: String? = null,   // CI check status: SUCCESS, FAILURE, PENDING, null
+    val baseBranch: String? = null     // Target branch (e.g. master, main, develop)
 )
 
 /**
