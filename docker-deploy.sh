@@ -22,6 +22,12 @@ CONTAINER_NAME="git-contribution"
 IMAGE_NAME="git-contribution"
 REMOTE_DIR="/opt/git-contribution"
 
+SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=10 -o ServerAliveCountMax=60 -o TCPKeepAlive=yes -o ConnectTimeout=15"
+
+remote_cmd() {
+    sshpass -p "$PASSWORD" ssh $SSH_OPTS "$USERNAME@$SERVER_IP" "$@"
+}
+
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║   🚀 GitDeveloperContribution — Docker Deploy           ║"
@@ -40,10 +46,10 @@ if ! command -v sshpass &> /dev/null; then
     exit 1
 fi
 
-# ── Step 1: Pack project ──
+# ── Step 1: Pack project (disable macOS xattrs) ──
 echo "📦 [1/6] Packing project..."
 TARBALL="/tmp/git-contribution-deploy.tar.gz"
-tar czf "$TARBALL" \
+COPYFILE_DISABLE=1 tar czf "$TARBALL" \
     --exclude='.git' \
     --exclude='build' \
     --exclude='.gradle' \
@@ -56,136 +62,91 @@ echo ""
 
 # ── Step 2: Copy to server ──
 echo "📤 [2/6] Copying to server..."
-
-# Create directory using sudo -S (reads password from stdin)
-sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no "$USERNAME@$SERVER_IP" \
-    "echo '$PASSWORD' | sudo -S mkdir -p $REMOTE_DIR 2>/dev/null && echo '$PASSWORD' | sudo -S chown $USERNAME:$USERNAME $REMOTE_DIR 2>/dev/null"
-
-# Copy tarball
-sshpass -p "$PASSWORD" scp -o StrictHostKeyChecking=no "$TARBALL" "$USERNAME@$SERVER_IP:$REMOTE_DIR/deploy.tar.gz"
+remote_cmd "echo '$PASSWORD' | sudo -S mkdir -p $REMOTE_DIR 2>/dev/null && echo '$PASSWORD' | sudo -S chown $USERNAME:$USERNAME $REMOTE_DIR 2>/dev/null"
+sshpass -p "$PASSWORD" scp $SSH_OPTS "$TARBALL" "$USERNAME@$SERVER_IP:$REMOTE_DIR/deploy.tar.gz"
 echo "   ✅ Files copied to $REMOTE_DIR"
 echo ""
 
-# ── Step 3–6: Run everything on server ──
-echo "🖥️  [3-6/6] Setting up on server..."
-echo ""
-
-sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no "$USERNAME@$SERVER_IP" bash -s << REMOTE_EOF
-set -e
-
-SUDO_PASS="$PASSWORD"
-
-# Helper: run sudo with password piped via stdin
-run_sudo() {
-    echo "\$SUDO_PASS" | sudo -S "\$@" 2>/dev/null
-}
-
-# Suppress ALL interactive prompts from apt (kernel upgrade, restart services, etc.)
-export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=a
-export NEEDRESTART_SUSPEND=1
-
-cd $REMOTE_DIR
-
-# ── Step 3: Install Docker ──
+# ── Step 3: Check Docker ──
 echo "🐳 [3/6] Checking Docker..."
-if ! command -v docker &> /dev/null; then
-    echo "   📥 Installing Docker..."
-
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS_ID=\$ID
-    else
-        OS_ID="unknown"
-    fi
-
-    case \$OS_ID in
-        ubuntu|debian)
-            run_sudo apt-get update -qq
-            run_sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
-            curl -fsSL https://download.docker.com/linux/\$OS_ID/gpg | run_sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null || true
-            echo "deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/\$OS_ID \$(lsb_release -cs) stable" | run_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            run_sudo apt-get update -qq
-            run_sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y -qq docker-ce docker-ce-cli containerd.io
-            ;;
-        centos|rhel|rocky|almalinux|fedora)
-            run_sudo yum install -y yum-utils
-            run_sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-            run_sudo yum install -y docker-ce docker-ce-cli containerd.io
-            ;;
-        amzn)
-            run_sudo yum install -y docker
-            ;;
-        *)
-            echo "   ⚠️  Unknown OS: \$OS_ID — trying generic install..."
-            curl -fsSL https://get.docker.com | run_sudo sh
-            ;;
-    esac
-
-    run_sudo systemctl start docker
-    run_sudo systemctl enable docker
-    run_sudo usermod -aG docker $USERNAME
-    echo "   ✅ Docker installed"
+DOCKER_VER=$(remote_cmd "docker --version 2>/dev/null || echo '$PASSWORD' | sudo -S docker --version 2>/dev/null" || echo "")
+if [ -n "$DOCKER_VER" ]; then
+    echo "   ✅ $DOCKER_VER"
 else
-    echo "   ✅ Docker already installed: \$(docker --version 2>/dev/null || run_sudo docker --version)"
+    echo "   📥 Installing Docker..."
+    remote_cmd "curl -fsSL https://get.docker.com | echo '$PASSWORD' | sudo -S sh 2>/dev/null && echo '$PASSWORD' | sudo -S systemctl enable --now docker 2>/dev/null"
+    echo "   ✅ Docker installed"
 fi
 echo ""
 
 # ── Step 4: Extract project ──
 echo "📂 [4/6] Extracting project..."
-# Remove old source files to ensure clean state
-rm -rf src gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts Dockerfile 2>/dev/null || true
-tar xzf deploy.tar.gz
-rm -f deploy.tar.gz
-echo "   ✅ Extracted (clean)"
+remote_cmd "cd $REMOTE_DIR && rm -rf src gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts Dockerfile 2>/dev/null; tar xzf deploy.tar.gz 2>/dev/null; rm -f deploy.tar.gz && echo '   ✅ Extracted'"
 echo ""
 
-# ── Step 5: Build Docker image ──
-echo "🔨 [5/6] Building Docker image (this takes 2-5 minutes)..."
-run_sudo docker build --no-cache -t $IMAGE_NAME . 2>&1 | tail -5
-echo "   ✅ Image built: $IMAGE_NAME"
+# ── Step 5: Build Docker image (nohup — survives SSH drops) ──
+echo "🔨 [5/6] Building Docker image..."
+
+# Clean markers, launch build in background with nohup
+remote_cmd "echo '$PASSWORD' | sudo -S rm -f /tmp/docker-build.log /tmp/docker-build.done 2>/dev/null; cd $REMOTE_DIR && nohup bash -c 'echo \"$PASSWORD\" | sudo -S docker build --no-cache -t $IMAGE_NAME . > /tmp/docker-build.log 2>&1; echo \$? > /tmp/docker-build.done' > /dev/null 2>&1 &"
+
+echo "   ⏳ Build started on server, polling for completion..."
+
+# Poll every 10s, up to 10 min
+DONE=""
+for i in $(seq 1 60); do
+    sleep 10
+    DONE=$(remote_cmd "cat /tmp/docker-build.done 2>/dev/null" || echo "")
+    if [ -n "$DONE" ]; then
+        break
+    fi
+    LAST=$(remote_cmd "tail -1 /tmp/docker-build.log 2>/dev/null" || echo "...")
+    printf "\r   ⏳ [%3ds] %s                    " $((i * 10)) "$(echo "$LAST" | cut -c1-55)"
+done
+
+echo ""
+if [ -z "$DONE" ]; then
+    echo "   ⚠️  Build timed out (10 min). Check: ssh $USERNAME@$SERVER_IP 'tail -f /tmp/docker-build.log'"
+    exit 1
+elif [ "$DONE" != "0" ]; then
+    echo "   ❌ Build failed! Last 20 lines:"
+    remote_cmd "tail -20 /tmp/docker-build.log"
+    exit 1
+else
+    echo "   ✅ Image built: $IMAGE_NAME"
+fi
 echo ""
 
 # ── Step 6: Run container ──
 echo "🚀 [6/6] Starting container..."
-
-# Stop and remove old container if exists
-if run_sudo docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER_NAME}\$"; then
-    echo "   🛑 Stopping old container..."
-    run_sudo docker stop $CONTAINER_NAME 2>/dev/null || true
-    run_sudo docker rm $CONTAINER_NAME 2>/dev/null || true
+remote_cmd "
+P='$PASSWORD'
+rs() { echo \"\$P\" | sudo -S \"\$@\" 2>/dev/null; }
+if rs docker ps -a --format '{{.Names}}' | grep -q '^${CONTAINER_NAME}\$'; then
+    echo '   🛑 Stopping old container...'
+    rs docker stop $CONTAINER_NAME || true
+    rs docker rm $CONTAINER_NAME || true
 fi
-
-run_sudo docker run -d \
-    --name $CONTAINER_NAME \
-    --restart always \
-    -p $APP_PORT:$APP_PORT \
-    $IMAGE_NAME
-
-echo "   ✅ Container started"
-
-# Clean up old dangling images
-run_sudo docker image prune -f 2>/dev/null || true
+rs docker run -d --name $CONTAINER_NAME --restart always -p $APP_PORT:$APP_PORT $IMAGE_NAME
+echo '   ✅ Container started'
+rs docker image prune -f || true
+"
 echo ""
 
 # ── Wait & Verify ──
 echo "⏳ Waiting for app to start..."
-for i in \$(seq 1 40); do
-    HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$APP_PORT 2>/dev/null || echo "000")
-    if [ "\$HTTP_CODE" = "200" ]; then
-        SERVER_IP_DETECTED=\$(hostname -I 2>/dev/null | awk '{print \$1}' || echo "$SERVER_IP")
+for i in $(seq 1 40); do
+    HTTP_CODE=$(remote_cmd "curl -s -o /dev/null -w '%{http_code}' http://localhost:$APP_PORT 2>/dev/null" || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
         echo ""
         echo "╔══════════════════════════════════════════════════════════╗"
         echo "║                                                          ║"
         echo "║   🎉  DEPLOYMENT SUCCESSFUL!                             ║"
         echo "║                                                          ║"
-        echo "║   Open in browser:                                       ║"
-        echo "║   👉  http://\${SERVER_IP_DETECTED}:$APP_PORT             ║"
+        echo "║   👉  http://$SERVER_IP:$APP_PORT                        ║"
         echo "║                                                          ║"
-        echo "║   Commands:                                              ║"
-        echo "║     sudo docker logs -f $CONTAINER_NAME                 ║"
-        echo "║     sudo docker restart $CONTAINER_NAME                 ║"
-        echo "║     sudo docker stop $CONTAINER_NAME                    ║"
+        echo "║   sudo docker logs -f $CONTAINER_NAME                   ║"
+        echo "║   sudo docker restart $CONTAINER_NAME                   ║"
         echo "║                                                          ║"
         echo "╚══════════════════════════════════════════════════════════╝"
         exit 0
@@ -195,11 +156,7 @@ for i in \$(seq 1 40); do
 done
 
 echo ""
-echo "⚠️  App may still be starting. Check logs:"
+echo "⚠️  App may still be starting. Check:"
 echo "    sudo docker logs -f $CONTAINER_NAME"
-
-REMOTE_EOF
-
 echo ""
-echo "🎉 Done! Open: http://$SERVER_IP:$APP_PORT"
-
+echo "🎉 Open: http://$SERVER_IP:$APP_PORT"
